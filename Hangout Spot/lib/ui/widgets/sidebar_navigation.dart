@@ -56,13 +56,20 @@ class SidebarNavigation extends StatelessWidget {
             isSelected: selectedIndex == 2,
             onTap: () => onDestinationSelected(2),
           ),
+          const SizedBox(height: 16),
+          _NavIcon(
+            icon: Icons.analytics_rounded,
+            label: "Analytics",
+            isSelected: selectedIndex == 3,
+            onTap: () => onDestinationSelected(3),
+          ),
 
           const Spacer(),
           _NavIcon(
             icon: Icons.settings_rounded,
             label: "Settings",
-            isSelected: selectedIndex == 3,
-            onTap: () => onDestinationSelected(3),
+            isSelected: selectedIndex == 4,
+            onTap: () => onDestinationSelected(4),
           ),
         ],
       ),

@@ -194,6 +194,279 @@ class AnalyticsRepository {
 
     return await query.getSingleOrNull();
   }
+
+  Future<double> getAverageOrderValue(DateTime start, DateTime end) async {
+    final query = _db.selectOnly(_db.orders)
+      ..addColumns([_db.orders.totalAmount.sum(), _db.orders.id.count()])
+      ..where(_db.orders.createdAt.isBiggerOrEqualValue(start))
+      ..where(_db.orders.createdAt.isSmallerThanValue(end))
+      ..where(_db.orders.status.equals('completed'));
+
+    final result = await query.getSingle();
+    final sum = result.read(_db.orders.totalAmount.sum()) ?? 0.0;
+    final count = result.read(_db.orders.id.count()) ?? 0;
+    if (count == 0) return 0.0;
+    return sum / count;
+  }
+
+  Future<double> getAverageDailySales(DateTime start, DateTime end) async {
+    final query = _db.selectOnly(_db.orders)
+      ..addColumns([_db.orders.totalAmount.sum()])
+      ..where(_db.orders.createdAt.isBiggerOrEqualValue(start))
+      ..where(_db.orders.createdAt.isSmallerThanValue(end))
+      ..where(_db.orders.status.equals('completed'));
+
+    final result = await query.getSingle();
+    final sum = result.read(_db.orders.totalAmount.sum()) ?? 0.0;
+    final days = end.difference(start).inDays + 1;
+    if (days <= 0) return sum;
+    return sum / days;
+  }
+
+  Future<Map<String, int>> getCustomerSegments(
+    DateTime start,
+    DateTime end,
+  ) async {
+    final rows = await _db
+        .customSelect(
+          "SELECT customer_id as customerId, COUNT(*) as orderCount "
+          "FROM orders "
+          "WHERE status = 'completed' AND customer_id IS NOT NULL "
+          "AND created_at >= ? AND created_at < ? "
+          "GROUP BY customer_id",
+          variables: [Variable.withDateTime(start), Variable.withDateTime(end)],
+          readsFrom: {_db.orders},
+        )
+        .get();
+
+    int newCustomers = 0;
+    int returningCustomers = 0;
+    for (final row in rows) {
+      final count = row.read<int>('orderCount') ?? 0;
+      if (count <= 1) {
+        newCustomers++;
+      } else {
+        returningCustomers++;
+      }
+    }
+
+    return {
+      'new': newCustomers,
+      'returning': returningCustomers,
+      'total': rows.length,
+    };
+  }
+
+  Future<double> getRepeatCustomerRate(DateTime start, DateTime end) async {
+    final segments = await getCustomerSegments(start, end);
+    final total = segments['total'] ?? 0;
+    if (total == 0) return 0.0;
+    return (segments['returning'] ?? 0) / total;
+  }
+
+  Future<Map<String, double>> getDiscountImpact(
+    DateTime start,
+    DateTime end,
+  ) async {
+    final discountedQuery = _db.selectOnly(_db.orders)
+      ..addColumns([_db.orders.totalAmount.sum(), _db.orders.id.count()])
+      ..where(_db.orders.createdAt.isBiggerOrEqualValue(start))
+      ..where(_db.orders.createdAt.isSmallerThanValue(end))
+      ..where(_db.orders.status.equals('completed'))
+      ..where(_db.orders.discountAmount.isBiggerThanValue(0));
+
+    final nonDiscountedQuery = _db.selectOnly(_db.orders)
+      ..addColumns([_db.orders.totalAmount.sum(), _db.orders.id.count()])
+      ..where(_db.orders.createdAt.isBiggerOrEqualValue(start))
+      ..where(_db.orders.createdAt.isSmallerThanValue(end))
+      ..where(_db.orders.status.equals('completed'))
+      ..where(_db.orders.discountAmount.equals(0));
+
+    final discounted = await discountedQuery.getSingle();
+    final nonDiscounted = await nonDiscountedQuery.getSingle();
+
+    final discountedSum = discounted.read(_db.orders.totalAmount.sum()) ?? 0.0;
+    final discountedCount = discounted.read(_db.orders.id.count()) ?? 0;
+    final nonDiscountedSum =
+        nonDiscounted.read(_db.orders.totalAmount.sum()) ?? 0.0;
+    final nonDiscountedCount = nonDiscounted.read(_db.orders.id.count()) ?? 0;
+
+    final discountedAvg = discountedCount == 0
+        ? 0.0
+        : discountedSum / discountedCount;
+    final nonDiscountedAvg = nonDiscountedCount == 0
+        ? 0.0
+        : nonDiscountedSum / nonDiscountedCount;
+
+    return {
+      'discountedAvg': discountedAvg,
+      'nonDiscountedAvg': nonDiscountedAvg,
+    };
+  }
+
+  Future<List<MapEntry<int, double>>> getPeakHours(
+    DateTime start,
+    DateTime end,
+  ) async {
+    final rows = await _db
+        .customSelect(
+          "SELECT strftime('%H', created_at, 'localtime') as hour, "
+          "COUNT(*) as orders "
+          "FROM orders "
+          "WHERE status = 'completed' AND created_at >= ? AND created_at < ? "
+          "GROUP BY hour ORDER BY hour",
+          variables: [Variable.withDateTime(start), Variable.withDateTime(end)],
+          readsFrom: {_db.orders},
+        )
+        .get();
+
+    return rows.map((row) {
+      final hourStr = row.read<String>('hour') ?? '0';
+      final hour = int.tryParse(hourStr) ?? 0;
+      final orders = (row.read<int>('orders') ?? 0).toDouble();
+      return MapEntry(hour, orders);
+    }).toList();
+  }
+
+  Future<List<MapEntry<String, double>>> getTopSellingItemsSince(
+    DateTime start,
+    DateTime end, {
+    int limit = 5,
+  }) async {
+    final rows = await _db
+        .customSelect(
+          "SELECT oi.item_name as name, SUM(oi.quantity) as qty "
+          "FROM order_items oi "
+          "INNER JOIN orders o ON o.id = oi.order_id "
+          "WHERE o.status = 'completed' AND o.created_at >= ? AND o.created_at < ? "
+          "GROUP BY oi.item_name "
+          "ORDER BY qty DESC "
+          "LIMIT $limit",
+          variables: [Variable.withDateTime(start), Variable.withDateTime(end)],
+          readsFrom: {_db.orderItems, _db.orders},
+        )
+        .get();
+
+    return rows.map((row) {
+      final name = row.read<String>('name') ?? 'Unknown';
+      final qty = (row.read<int>('qty') ?? 0).toDouble();
+      return MapEntry(name, qty);
+    }).toList();
+  }
+
+  Future<List<MapEntry<String, double>>> getLowSellingItemsSince(
+    DateTime start,
+    DateTime end, {
+    int limit = 5,
+  }) async {
+    final rows = await _db
+        .customSelect(
+          "SELECT oi.item_name as name, SUM(oi.quantity) as qty "
+          "FROM order_items oi "
+          "INNER JOIN orders o ON o.id = oi.order_id "
+          "WHERE o.status = 'completed' AND o.created_at >= ? AND o.created_at < ? "
+          "GROUP BY oi.item_name "
+          "ORDER BY qty ASC "
+          "LIMIT $limit",
+          variables: [Variable.withDateTime(start), Variable.withDateTime(end)],
+          readsFrom: {_db.orderItems, _db.orders},
+        )
+        .get();
+
+    return rows.map((row) {
+      final name = row.read<String>('name') ?? 'Unknown';
+      final qty = (row.read<int>('qty') ?? 0).toDouble();
+      return MapEntry(name, qty);
+    }).toList();
+  }
+
+  Future<List<MapEntry<String, double>>> getDemandForecast(
+    DateTime start,
+    DateTime end, {
+    int limit = 10,
+  }) async {
+    final rows = await _db
+        .customSelect(
+          "SELECT oi.item_name as name, "
+          "date(o.created_at) as day, "
+          "SUM(oi.quantity) as qty "
+          "FROM order_items oi "
+          "INNER JOIN orders o ON o.id = oi.order_id "
+          "WHERE o.status = 'completed' AND o.created_at >= ? AND o.created_at < ? "
+          "GROUP BY oi.item_name, date(o.created_at)",
+          variables: [Variable.withDateTime(start), Variable.withDateTime(end)],
+          readsFrom: {_db.orderItems, _db.orders},
+        )
+        .get();
+
+    final totals = <String, double>{};
+    for (final row in rows) {
+      final name = row.read<String>('name') ?? 'Unknown';
+      final qty = (row.read<int>('qty') ?? 0).toDouble();
+      totals[name] = (totals[name] ?? 0) + qty;
+    }
+
+    final days = end.difference(start).inDays + 1;
+    final forecast = totals.entries
+        .map((e) => MapEntry(e.key, e.value / days))
+        .toList();
+
+    forecast.sort((a, b) => b.value.compareTo(a.value));
+    return forecast.take(limit).toList();
+  }
+
+  Future<List<MapEntry<String, int>>> getTopBundles(
+    DateTime start,
+    DateTime end, {
+    int limit = 5,
+  }) async {
+    final rows = await _db
+        .customSelect(
+          "SELECT oi.order_id as orderId, oi.item_name as name "
+          "FROM order_items oi "
+          "INNER JOIN orders o ON o.id = oi.order_id "
+          "WHERE o.status = 'completed' AND o.created_at >= ? AND o.created_at < ?",
+          variables: [Variable.withDateTime(start), Variable.withDateTime(end)],
+          readsFrom: {_db.orderItems, _db.orders},
+        )
+        .get();
+
+    final orderItems = <String, Set<String>>{};
+    for (final row in rows) {
+      final orderId = row.read<String>('orderId') ?? '';
+      final name = row.read<String>('name') ?? '';
+      if (orderId.isEmpty || name.isEmpty) continue;
+      orderItems.putIfAbsent(orderId, () => <String>{}).add(name);
+    }
+
+    final pairCounts = <String, int>{};
+    for (final items in orderItems.values) {
+      final list = items.toList()..sort();
+      for (int i = 0; i < list.length; i++) {
+        for (int j = i + 1; j < list.length; j++) {
+          final key = '${list[i]} + ${list[j]}';
+          pairCounts[key] = (pairCounts[key] ?? 0) + 1;
+        }
+      }
+    }
+
+    final bundles = pairCounts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    return bundles.take(limit).toList();
+  }
+
+  Future<String?> getSalesAnomalyNote(DateTime start, DateTime end) async {
+    final todaySales = await getTodaySales();
+    final avg = await getAverageDailySales(start, end);
+    if (avg <= 0) return null;
+    if (todaySales < avg * 0.7) {
+      return 'Sales are below the recent average.';
+    }
+    if (todaySales > avg * 1.5) {
+      return 'Sales are above the recent average.';
+    }
+    return null;
+  }
 }
 
 final analyticsRepositoryProvider = Provider<AnalyticsRepository>((ref) {

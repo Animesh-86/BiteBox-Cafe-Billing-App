@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hangout_spot/ui/screens/dashboard/dashboard_screen.dart';
+import 'package:hangout_spot/ui/screens/analytics/analytics_screen.dart';
 import 'package:hangout_spot/ui/screens/menu/manage_menu_screen.dart';
 import 'package:hangout_spot/ui/screens/billing/billing_screen.dart';
 import 'package:hangout_spot/ui/screens/settings/settings_screen.dart';
@@ -81,6 +82,11 @@ class _MainScreenState extends State<MainScreen> {
                   label: 'Menu',
                 ),
                 NavigationDestination(
+                  icon: Icon(Icons.analytics_outlined),
+                  selectedIcon: Icon(Icons.analytics),
+                  label: 'Analytics',
+                ),
+                NavigationDestination(
                   icon: Icon(Icons.settings_outlined),
                   selectedIcon: Icon(Icons.settings),
                   label: 'Settings',
@@ -99,6 +105,8 @@ class _MainScreenState extends State<MainScreen> {
       case 2:
         return const ManageMenuScreen();
       case 3:
+        return const AnalyticsScreen();
+      case 4:
         return const SettingsScreen();
       default:
         return const DashboardScreen();

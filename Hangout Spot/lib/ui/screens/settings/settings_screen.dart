@@ -1,10 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:drift/drift.dart' as drift;
 import 'package:hangout_spot/data/repositories/auth_repository.dart';
 import 'package:hangout_spot/data/repositories/sync_repository.dart';
 import 'package:hangout_spot/ui/screens/auth/login_screen.dart';
 import 'package:hangout_spot/data/providers/theme_provider.dart';
 import 'package:hangout_spot/logic/rewards/reward_provider.dart';
+import 'package:hangout_spot/data/providers/database_provider.dart';
+import 'package:hangout_spot/data/local/db/app_database.dart';
+
+const String CLOUD_AUTO_SYNC_ENABLED_KEY = 'cloud_auto_sync_enabled';
+const String CLOUD_AUTO_SYNC_INTERVAL_KEY = 'cloud_auto_sync_interval_minutes';
+const int DEFAULT_AUTO_SYNC_INTERVAL_MINUTES = 15;
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -15,6 +24,10 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _isSyncing = false;
+  bool _autoSyncEnabled = false;
+  int _autoSyncIntervalMinutes = DEFAULT_AUTO_SYNC_INTERVAL_MINUTES;
+  bool _syncSettingsLoaded = false;
+  Timer? _autoSyncTimer;
   late TextEditingController _earningRateController;
   late TextEditingController _redemptionRateController;
 
@@ -23,31 +36,86 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     super.initState();
     _earningRateController = TextEditingController();
     _redemptionRateController = TextEditingController();
+    _loadSyncSettings();
   }
 
   @override
   void dispose() {
+    _autoSyncTimer?.cancel();
     _earningRateController.dispose();
     _redemptionRateController.dispose();
     super.dispose();
   }
 
-  Future<void> _sync() async {
+  Future<void> _sync({bool showSnackBar = true}) async {
+    if (_isSyncing) return;
     setState(() => _isSyncing = true);
     try {
       await ref.read(syncRepositoryProvider).backupData();
-      if (mounted)
+      if (mounted && showSnackBar)
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text("Backup Successful!")));
     } catch (e) {
-      if (mounted)
+      if (mounted && showSnackBar)
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text("Backup Failed: $e")));
     } finally {
       if (mounted) setState(() => _isSyncing = false);
     }
+  }
+
+  Future<void> _loadSyncSettings() async {
+    final db = ref.read(appDatabaseProvider);
+    final settings =
+        await (db.select(db.settings)..where(
+              (tbl) => tbl.key.isIn([
+                CLOUD_AUTO_SYNC_ENABLED_KEY,
+                CLOUD_AUTO_SYNC_INTERVAL_KEY,
+              ]),
+            ))
+            .get();
+
+    final map = <String, String>{for (final s in settings) s.key: s.value};
+
+    final enabled = map[CLOUD_AUTO_SYNC_ENABLED_KEY] == 'true';
+    final interval =
+        int.tryParse(
+          map[CLOUD_AUTO_SYNC_INTERVAL_KEY] ??
+              DEFAULT_AUTO_SYNC_INTERVAL_MINUTES.toString(),
+        ) ??
+        DEFAULT_AUTO_SYNC_INTERVAL_MINUTES;
+
+    if (mounted) {
+      setState(() {
+        _autoSyncEnabled = enabled;
+        _autoSyncIntervalMinutes = interval;
+        _syncSettingsLoaded = true;
+      });
+    }
+
+    _applyAutoSync();
+  }
+
+  Future<void> _saveSyncSetting(String key, String value) async {
+    final db = ref.read(appDatabaseProvider);
+    await db
+        .into(db.settings)
+        .insert(
+          SettingsCompanion(key: drift.Value(key), value: drift.Value(value)),
+          mode: drift.InsertMode.insertOrReplace,
+        );
+  }
+
+  void _applyAutoSync() {
+    _autoSyncTimer?.cancel();
+    if (!_autoSyncEnabled) return;
+
+    _autoSyncTimer = Timer.periodic(
+      Duration(minutes: _autoSyncIntervalMinutes),
+      (_) => _sync(showSnackBar: false),
+    );
   }
 
   Future<void> _restore() async {
@@ -141,6 +209,50 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
+                ListTile(
+                  leading: const Icon(Icons.sync),
+                  title: const Text("Auto Sync"),
+                  subtitle: const Text("Automatically backup to cloud"),
+                  trailing: Switch(
+                    value: _autoSyncEnabled,
+                    onChanged: !_syncSettingsLoaded
+                        ? null
+                        : (value) async {
+                            setState(() => _autoSyncEnabled = value);
+                            await _saveSyncSetting(
+                              CLOUD_AUTO_SYNC_ENABLED_KEY,
+                              value.toString(),
+                            );
+                            _applyAutoSync();
+                          },
+                  ),
+                ),
+                if (_autoSyncEnabled)
+                  ListTile(
+                    leading: const Icon(Icons.schedule),
+                    title: const Text("Sync Interval"),
+                    subtitle: Text("Every $_autoSyncIntervalMinutes minutes"),
+                    trailing: DropdownButton<int>(
+                      value: _autoSyncIntervalMinutes,
+                      items: const [15, 30, 60]
+                          .map(
+                            (m) => DropdownMenuItem<int>(
+                              value: m,
+                              child: Text("$m min"),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) async {
+                        if (value == null) return;
+                        setState(() => _autoSyncIntervalMinutes = value);
+                        await _saveSyncSetting(
+                          CLOUD_AUTO_SYNC_INTERVAL_KEY,
+                          value.toString(),
+                        );
+                        _applyAutoSync();
+                      },
+                    ),
+                  ),
                 ListTile(
                   leading: const Icon(Icons.cloud_upload),
                   title: const Text("Sync Now (Backup)"),
