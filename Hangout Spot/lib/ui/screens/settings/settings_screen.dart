@@ -10,10 +10,18 @@ import 'package:hangout_spot/data/providers/theme_provider.dart';
 import 'package:hangout_spot/logic/rewards/reward_provider.dart';
 import 'package:hangout_spot/data/providers/database_provider.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
+import 'package:hangout_spot/logic/offers/promo_provider.dart';
+import 'package:hangout_spot/logic/locations/location_provider.dart';
+import 'package:uuid/uuid.dart';
 
 const String CLOUD_AUTO_SYNC_ENABLED_KEY = 'cloud_auto_sync_enabled';
 const String CLOUD_AUTO_SYNC_INTERVAL_KEY = 'cloud_auto_sync_interval_minutes';
 const int DEFAULT_AUTO_SYNC_INTERVAL_MINUTES = 15;
+const String STORE_NAME_KEY = 'store_name';
+const String STORE_ADDRESS_KEY = 'store_address';
+const String STORE_LOGO_URL_KEY = 'store_logo_url';
+const String RECEIPT_FOOTER_KEY = 'receipt_footer';
+const String RECEIPT_SHOW_THANK_YOU_KEY = 'receipt_show_thank_you';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -30,13 +38,35 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Timer? _autoSyncTimer;
   late TextEditingController _earningRateController;
   late TextEditingController _redemptionRateController;
+  late TextEditingController _storeNameController;
+  late TextEditingController _storeAddressController;
+  late TextEditingController _storeLogoController;
+  late TextEditingController _receiptFooterController;
+  bool _showThankYou = true;
+  bool _storeSettingsLoaded = false;
+  late TextEditingController _promoTitleController;
+  late TextEditingController _promoDiscountController;
+  late TextEditingController _promoBundleController;
+  bool _promoEnabled = false;
+  DateTime? _promoStart;
+  DateTime? _promoEnd;
+  bool _promoSettingsLoaded = false;
 
   @override
   void initState() {
     super.initState();
     _earningRateController = TextEditingController();
     _redemptionRateController = TextEditingController();
+    _storeNameController = TextEditingController();
+    _storeAddressController = TextEditingController();
+    _storeLogoController = TextEditingController();
+    _receiptFooterController = TextEditingController();
+    _promoTitleController = TextEditingController();
+    _promoDiscountController = TextEditingController();
+    _promoBundleController = TextEditingController();
     _loadSyncSettings();
+    _loadStoreSettings();
+    _loadPromoSettings();
   }
 
   @override
@@ -44,6 +74,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _autoSyncTimer?.cancel();
     _earningRateController.dispose();
     _redemptionRateController.dispose();
+    _storeNameController.dispose();
+    _storeAddressController.dispose();
+    _storeLogoController.dispose();
+    _receiptFooterController.dispose();
+    _promoTitleController.dispose();
+    _promoDiscountController.dispose();
+    _promoBundleController.dispose();
     super.dispose();
   }
 
@@ -108,6 +145,110 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         );
   }
 
+  Future<void> _loadStoreSettings() async {
+    final db = ref.read(appDatabaseProvider);
+    final settings =
+        await (db.select(db.settings)..where(
+              (tbl) => tbl.key.isIn([
+                STORE_NAME_KEY,
+                STORE_ADDRESS_KEY,
+                STORE_LOGO_URL_KEY,
+                RECEIPT_FOOTER_KEY,
+                RECEIPT_SHOW_THANK_YOU_KEY,
+              ]),
+            ))
+            .get();
+
+    final map = <String, String>{for (final s in settings) s.key: s.value};
+    _storeNameController.text = map[STORE_NAME_KEY] ?? 'Hangout Spot';
+    _storeAddressController.text = map[STORE_ADDRESS_KEY] ?? '';
+    _storeLogoController.text = map[STORE_LOGO_URL_KEY] ?? '';
+    _receiptFooterController.text = map[RECEIPT_FOOTER_KEY] ?? '';
+    _showThankYou = (map[RECEIPT_SHOW_THANK_YOU_KEY] ?? 'true') == 'true';
+
+    if (mounted) {
+      setState(() => _storeSettingsLoaded = true);
+    }
+  }
+
+  Future<void> _saveStoreSettings() async {
+    final db = ref.read(appDatabaseProvider);
+    final entries = <MapEntry<String, String>>[
+      MapEntry(STORE_NAME_KEY, _storeNameController.text.trim()),
+      MapEntry(STORE_ADDRESS_KEY, _storeAddressController.text.trim()),
+      MapEntry(STORE_LOGO_URL_KEY, _storeLogoController.text.trim()),
+      MapEntry(RECEIPT_FOOTER_KEY, _receiptFooterController.text.trim()),
+      MapEntry(RECEIPT_SHOW_THANK_YOU_KEY, _showThankYou.toString()),
+    ];
+
+    for (final entry in entries) {
+      await db
+          .into(db.settings)
+          .insert(
+            SettingsCompanion(
+              key: drift.Value(entry.key),
+              value: drift.Value(entry.value),
+            ),
+            mode: drift.InsertMode.insertOrReplace,
+          );
+    }
+  }
+
+  Future<void> _loadPromoSettings() async {
+    final db = ref.read(appDatabaseProvider);
+    final settings =
+        await (db.select(db.settings)..where(
+              (tbl) => tbl.key.isIn([
+                PROMO_ENABLED_KEY,
+                PROMO_TITLE_KEY,
+                PROMO_START_KEY,
+                PROMO_END_KEY,
+                PROMO_DISCOUNT_PERCENT_KEY,
+                PROMO_BUNDLE_ITEM_IDS_KEY,
+              ]),
+            ))
+            .get();
+
+    final map = <String, String>{for (final s in settings) s.key: s.value};
+    _promoEnabled = (map[PROMO_ENABLED_KEY] ?? 'false') == 'true';
+    _promoTitleController.text = map[PROMO_TITLE_KEY] ?? 'Valentine Combo';
+    _promoDiscountController.text = map[PROMO_DISCOUNT_PERCENT_KEY] ?? '0';
+    _promoBundleController.text = map[PROMO_BUNDLE_ITEM_IDS_KEY] ?? '';
+    _promoStart = DateTime.tryParse(map[PROMO_START_KEY] ?? '');
+    _promoEnd = DateTime.tryParse(map[PROMO_END_KEY] ?? '');
+
+    if (mounted) {
+      setState(() => _promoSettingsLoaded = true);
+    }
+  }
+
+  Future<void> _savePromoSettings() async {
+    final db = ref.read(appDatabaseProvider);
+    final entries = <MapEntry<String, String>>[
+      MapEntry(PROMO_ENABLED_KEY, _promoEnabled.toString()),
+      MapEntry(PROMO_TITLE_KEY, _promoTitleController.text.trim()),
+      MapEntry(PROMO_START_KEY, _promoStart?.toIso8601String() ?? ''),
+      MapEntry(PROMO_END_KEY, _promoEnd?.toIso8601String() ?? ''),
+      MapEntry(
+        PROMO_DISCOUNT_PERCENT_KEY,
+        _promoDiscountController.text.trim(),
+      ),
+      MapEntry(PROMO_BUNDLE_ITEM_IDS_KEY, _promoBundleController.text.trim()),
+    ];
+
+    for (final entry in entries) {
+      await db
+          .into(db.settings)
+          .insert(
+            SettingsCompanion(
+              key: drift.Value(entry.key),
+              value: drift.Value(entry.value),
+            ),
+            mode: drift.InsertMode.insertOrReplace,
+          );
+    }
+  }
+
   void _applyAutoSync() {
     _autoSyncTimer?.cancel();
     if (!_autoSyncEnabled) return;
@@ -136,10 +277,78 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  Future<void> _setCurrentLocation(String locationId) async {
+    final db = ref.read(appDatabaseProvider);
+    await db
+        .into(db.settings)
+        .insert(
+          SettingsCompanion(
+            key: const drift.Value(CURRENT_LOCATION_ID_KEY),
+            value: drift.Value(locationId),
+          ),
+          mode: drift.InsertMode.insertOrReplace,
+        );
+  }
+
+  Future<void> _showAddLocationDialog() async {
+    final nameController = TextEditingController();
+    final addressController = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Add Location'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(labelText: 'Location name'),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: addressController,
+              decoration: const InputDecoration(labelText: 'Address'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final name = nameController.text.trim();
+              final address = addressController.text.trim();
+              if (name.isEmpty) return;
+              final db = ref.read(appDatabaseProvider);
+              final id = const Uuid().v4();
+              await db
+                  .into(db.locations)
+                  .insert(
+                    LocationsCompanion(
+                      id: drift.Value(id),
+                      name: drift.Value(name),
+                      address: drift.Value(address.isEmpty ? null : address),
+                    ),
+                  );
+              await _setCurrentLocation(id);
+              if (mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = ref.read(authRepositoryProvider).currentUser;
     final themeMode = ref.watch(themeProvider);
+    final locationsAsync = ref.watch(locationsStreamProvider);
+    final currentLocationIdAsync = ref.watch(currentLocationIdProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
@@ -190,6 +399,299 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       if (val != null)
                         ref.read(themeProvider.notifier).setTheme(val);
                     },
+                  ),
+                ),
+                const Divider(),
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text(
+                    "Store Information",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    children: [
+                      TextField(
+                        controller: _storeNameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Store Name',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: _storeAddressController,
+                        decoration: const InputDecoration(
+                          labelText: 'Address',
+                          border: OutlineInputBorder(),
+                        ),
+                        maxLines: 2,
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: _storeLogoController,
+                        decoration: const InputDecoration(
+                          labelText: 'Logo URL (optional)',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: ElevatedButton(
+                          onPressed: _storeSettingsLoaded
+                              ? () async {
+                                  await _saveStoreSettings();
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Store info saved'),
+                                      ),
+                                    );
+                                  }
+                                }
+                              : null,
+                          child: const Text('Save Store Info'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(),
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text(
+                    "Receipt Customization",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    children: [
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Show Thank You line'),
+                        value: _showThankYou,
+                        onChanged: (val) {
+                          setState(() => _showThankYou = val);
+                        },
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: _receiptFooterController,
+                        decoration: const InputDecoration(
+                          labelText: 'Receipt Footer Note',
+                          border: OutlineInputBorder(),
+                        ),
+                        maxLines: 2,
+                      ),
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: ElevatedButton(
+                          onPressed: _storeSettingsLoaded
+                              ? () async {
+                                  await _saveStoreSettings();
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Receipt settings saved'),
+                                      ),
+                                    );
+                                  }
+                                }
+                              : null,
+                          child: const Text('Save Receipt'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(),
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text(
+                    "Marketing Offers",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    children: [
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Enable limited-time offer'),
+                        value: _promoEnabled,
+                        onChanged: (val) {
+                          setState(() => _promoEnabled = val);
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _promoTitleController,
+                        decoration: const InputDecoration(
+                          labelText: 'Offer title',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: _promoDiscountController,
+                        decoration: const InputDecoration(
+                          labelText: 'Discount % for combo',
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.number,
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: _promoBundleController,
+                        decoration: const InputDecoration(
+                          labelText: 'Bundle Item IDs (comma separated)',
+                          border: OutlineInputBorder(),
+                          helperText:
+                              'Paste item IDs from menu export for combo offers',
+                        ),
+                        maxLines: 2,
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () async {
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: _promoStart ?? DateTime.now(),
+                                  firstDate: DateTime(2020),
+                                  lastDate: DateTime(2100),
+                                );
+                                if (picked != null && mounted) {
+                                  setState(
+                                    () => _promoStart = DateTime(
+                                      picked.year,
+                                      picked.month,
+                                      picked.day,
+                                    ),
+                                  );
+                                }
+                              },
+                              child: Text(
+                                _promoStart == null
+                                    ? 'Start Date'
+                                    : 'Start: ${_promoStart!.toLocal().toString().split(' ').first}',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () async {
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: _promoEnd ?? DateTime.now(),
+                                  firstDate: DateTime(2020),
+                                  lastDate: DateTime(2100),
+                                );
+                                if (picked != null && mounted) {
+                                  setState(
+                                    () => _promoEnd = DateTime(
+                                      picked.year,
+                                      picked.month,
+                                      picked.day,
+                                      23,
+                                      59,
+                                      59,
+                                    ),
+                                  );
+                                }
+                              },
+                              child: Text(
+                                _promoEnd == null
+                                    ? 'End Date'
+                                    : 'End: ${_promoEnd!.toLocal().toString().split(' ').first}',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: ElevatedButton(
+                          onPressed: _promoSettingsLoaded
+                              ? () async {
+                                  await _savePromoSettings();
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Offer settings saved'),
+                                      ),
+                                    );
+                                  }
+                                }
+                              : null,
+                          child: const Text('Save Offer'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(),
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text(
+                    "Locations",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    children: [
+                      locationsAsync.when(
+                        data: (locations) {
+                          final currentId = currentLocationIdAsync.valueOrNull;
+                          if (locations.isEmpty) {
+                            return const Text('No locations added yet');
+                          }
+                          return Column(
+                            children: locations
+                                .map(
+                                  (loc) => RadioListTile<String>(
+                                    contentPadding: EdgeInsets.zero,
+                                    title: Text(loc.name),
+                                    subtitle: Text(loc.address ?? ''),
+                                    value: loc.id,
+                                    groupValue: currentId,
+                                    onChanged: (val) {
+                                      if (val != null) {
+                                        _setCurrentLocation(val);
+                                      }
+                                    },
+                                  ),
+                                )
+                                .toList(),
+                          );
+                        },
+                        loading: () =>
+                            const Center(child: CircularProgressIndicator()),
+                        error: (e, _) => Text('Error: $e'),
+                      ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: ElevatedButton.icon(
+                          onPressed: _showAddLocationDialog,
+                          icon: const Icon(Icons.add),
+                          label: const Text('Add Location'),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const Divider(),

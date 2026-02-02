@@ -8,14 +8,16 @@ import 'package:hangout_spot/logic/billing/cart_provider.dart';
 import 'package:hangout_spot/logic/billing/session_provider.dart';
 import 'package:hangout_spot/data/repositories/menu_repository.dart';
 import 'package:hangout_spot/data/repositories/order_repository.dart';
+import 'package:hangout_spot/services/printing_service.dart';
+import 'package:hangout_spot/services/share_service.dart';
 import 'package:hangout_spot/ui/screens/customer/customer_list_screen.dart';
 import 'package:hangout_spot/logic/rewards/reward_provider.dart';
+import 'package:hangout_spot/logic/offers/promo_provider.dart';
+import 'package:hangout_spot/logic/locations/location_provider.dart';
 import 'package:timeago/timeago.dart' as timeago;
-
-// Providers
-final selectedCategoryProvider = StateProvider<String?>((ref) => null);
-final sidebarFlexProvider = StateProvider<double>((ref) => 20.0);
-final itemSearchQueryProvider = StateProvider<String>((ref) => '');
+import 'package:hangout_spot/ui/screens/billing/billing_providers.dart';
+import 'package:hangout_spot/ui/screens/billing/billing_items_grid.dart';
+import 'package:uuid/uuid.dart';
 
 class BillingScreen extends ConsumerWidget {
   const BillingScreen({super.key});
@@ -35,6 +37,8 @@ class _BillingView extends ConsumerWidget {
     final screenWidth = MediaQuery.of(context).size.width;
     final isTablet = screenWidth > 600;
     final cart = ref.watch(cartProvider);
+    final promoDiscount = ref.watch(promoDiscountProvider);
+    ref.read(cartProvider.notifier).setPromoDiscount(promoDiscount);
 
     final theme = Theme.of(context);
     return Scaffold(
@@ -91,11 +95,7 @@ class _BillingView extends ConsumerWidget {
             tooltip: "Print KOT",
             padding: const EdgeInsets.all(8),
             constraints: const BoxConstraints(),
-            onPressed: () {
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text("Printing KOT...")));
-            },
+            onPressed: () => _printKot(context, ref),
           ),
           // Held Orders
           _HeldOrdersButton(),
@@ -104,6 +104,68 @@ class _BillingView extends ConsumerWidget {
       ),
       body: isTablet ? _TabletLayout() : _MobileLayout(),
     );
+  }
+
+  Future<void> _printKot(BuildContext context, WidgetRef ref) async {
+    final cart = ref.read(cartProvider);
+    if (cart.items.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Cart is empty")));
+      return;
+    }
+
+    try {
+      final sessionManager = ref.read(sessionManagerProvider);
+      final invoiceNumber = await sessionManager.getNextInvoiceNumber();
+      final orderId = cart.orderId ?? const Uuid().v4();
+
+      final order = Order(
+        id: orderId,
+        invoiceNumber: invoiceNumber,
+        customerId: cart.customer?.id,
+        tableId: null,
+        subtotal: cart.subtotal,
+        discountAmount: cart.totalDiscount,
+        taxAmount: cart.taxAmount,
+        totalAmount: cart.grandTotal,
+        paidCash: cart.paidCash,
+        paidUPI: cart.paidUPI,
+        paymentMode: cart.paymentMode,
+        status: 'pending',
+        createdAt: DateTime.now(),
+        isSynced: false,
+      );
+
+      final items = cart.items
+          .map(
+            (ci) => OrderItem(
+              id: const Uuid().v4(),
+              orderId: orderId,
+              itemId: ci.item.id,
+              itemName: ci.item.name,
+              price: ci.item.price,
+              quantity: ci.quantity,
+              discountAmount: ci.discountAmount,
+              note: ci.note,
+            ),
+          )
+          .toList();
+
+      await ref.read(printingServiceProvider).printKot(order, items);
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("KOT sent to printer")));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Print failed: $e")));
+      }
+    }
   }
 }
 
@@ -136,7 +198,7 @@ class _TabletLayout extends ConsumerWidget {
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: Colors.white.withOpacity(0.1)),
             ),
-            child: const _ItemsGrid(),
+            child: const BillingItemsGrid(),
           ),
         ),
         // Cart Panel (35%)
@@ -231,7 +293,7 @@ class _MobileLayout extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: Colors.white.withOpacity(0.1)),
                   ),
-                  child: const _ItemsGrid(),
+                  child: const BillingItemsGrid(),
                 ),
               ),
               // Cart Summary at bottom
@@ -390,262 +452,6 @@ class _CategorySidebar extends ConsumerWidget {
   }
 }
 
-/// Items Grid
-class _ItemsGrid extends ConsumerWidget {
-  const _ItemsGrid();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final allItemsAsync = ref.watch(allItemsStreamProvider);
-    final selectedCat = ref.watch(selectedCategoryProvider);
-    final query = ref.watch(itemSearchQueryProvider).trim().toLowerCase();
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isTablet = screenWidth > 600;
-
-    return allItemsAsync.when(
-      data: (items) {
-        // Filter to show only available items
-        final availableItems = items.where((i) => i.isAvailable).toList();
-
-        var filtered = (selectedCat == null || selectedCat == 'all')
-            ? availableItems
-            : availableItems.where((i) => i.categoryId == selectedCat).toList();
-
-        if (query.isNotEmpty) {
-          filtered = filtered
-              .where((i) => i.name.toLowerCase().contains(query))
-              .toList();
-        }
-
-        final crossAxisCount = isTablet
-            ? ((screenWidth - 50) / 180).floor().clamp(2, 5)
-            : 2;
-
-        return Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(10),
-              child: TextField(
-                onChanged: (value) =>
-                    ref.read(itemSearchQueryProvider.notifier).state = value,
-                decoration: InputDecoration(
-                  hintText: 'Search items...',
-                  prefixIcon: const Icon(Icons.search, size: 18),
-                  suffixIcon: query.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.close, size: 18),
-                          onPressed: () =>
-                              ref.read(itemSearchQueryProvider.notifier).state =
-                                  '',
-                        )
-                      : null,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  filled: true,
-                  fillColor: Colors.white.withOpacity(0.04),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                ),
-              ),
-            ),
-            Expanded(
-              child: filtered.isEmpty
-                  ? Center(
-                      child: Text(
-                        query.isNotEmpty
-                            ? "No items match your search"
-                            : "No items",
-                        style: TextStyle(color: Colors.white60, fontSize: 14),
-                      ),
-                    )
-                  : GridView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: crossAxisCount,
-                        childAspectRatio: 0.7,
-                        crossAxisSpacing: 10,
-                        mainAxisSpacing: 10,
-                      ),
-                      itemCount: filtered.length,
-                      itemBuilder: (context, index) =>
-                          _ItemCard(item: filtered[index]),
-                    ),
-            ),
-          ],
-        );
-      },
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, st) => Center(child: Text("Error: $e")),
-    );
-  }
-}
-
-/// Item Card
-class _ItemCard extends ConsumerWidget {
-  final Item item;
-  const _ItemCard({required this.item});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final cartItems = ref.watch(cartProvider).items;
-    final notifier = ref.read(cartProvider.notifier);
-    final inCart = cartItems.any((i) => i.item.id == item.id);
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return GestureDetector(
-      onTap: () {
-        if (inCart) {
-          notifier.removeByItemId(item.id);
-        } else {
-          notifier.addItem(item);
-        }
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: inCart
-              ? LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    colorScheme.primary.withOpacity(0.2),
-                    colorScheme.primary.withOpacity(0.1),
-                  ],
-                )
-              : null,
-          color: inCart ? null : Colors.white.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: inCart ? colorScheme.primary : Colors.white.withOpacity(0.1),
-            width: inCart ? 1.5 : 1,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Header
-            Expanded(
-              flex: 2,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: inCart
-                      ? LinearGradient(
-                          colors: [
-                            colorScheme.primary.withOpacity(0.15),
-                            colorScheme.primary.withOpacity(0.05),
-                          ],
-                        )
-                      : null,
-                  color: inCart ? null : Colors.white.withOpacity(0.03),
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(10),
-                  ),
-                ),
-                child: Center(
-                  child: inCart
-                      ? Icon(
-                          Icons.check_circle_rounded,
-                          size: 28,
-                          color: colorScheme.primary,
-                        )
-                      : (item.imageUrl != null && item.imageUrl!.isNotEmpty)
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: Image.network(
-                            item.imageUrl!,
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                            height: double.infinity,
-                            errorBuilder: (context, error, stackTrace) {
-                              return _ItemLetterBadge(item: item);
-                            },
-                          ),
-                        )
-                      : _ItemLetterBadge(item: item),
-                ),
-              ),
-            ),
-            // Info
-            Expanded(
-              flex: 2,
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        item.name,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "₹${item.price.toStringAsFixed(0)}",
-                          style: TextStyle(
-                            color: colorScheme.primary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                          ),
-                        ),
-                        if (item.discountPercent > 0)
-                          Text(
-                            "Discount: ${item.discountPercent.toStringAsFixed(0)}%",
-                            style: TextStyle(
-                              color: Colors.orange.shade300,
-                              fontWeight: FontWeight.w500,
-                              fontSize: 10,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ItemLetterBadge extends StatelessWidget {
-  final Item item;
-
-  const _ItemLetterBadge({required this.item});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        shape: BoxShape.circle,
-      ),
-      child: Text(
-        item.name.isNotEmpty ? item.name[0].toUpperCase() : "?",
-        style: TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.w700,
-          color: Colors.white.withOpacity(0.3),
-        ),
-      ),
-    );
-  }
-}
-
 /// Cart Panel (Tablet/Desktop)
 class _CartPanel extends ConsumerStatefulWidget {
   const _CartPanel();
@@ -659,6 +465,10 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
   Widget build(BuildContext context) {
     final cart = ref.watch(cartProvider);
     final notifier = ref.read(cartProvider.notifier);
+    final nonPromoDiscount = (cart.totalDiscount - cart.promoDiscount).clamp(
+      0.0,
+      cart.totalDiscount,
+    );
 
     return Column(
       children: [
@@ -1172,8 +982,29 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                             ),
                           ],
                         ),
-                        if (cart.totalDiscount > 0) const SizedBox(height: 4),
-                        if (cart.totalDiscount > 0)
+                        if (cart.promoDiscount > 0) const SizedBox(height: 4),
+                        if (cart.promoDiscount > 0)
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Promo',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.white60,
+                                ),
+                              ),
+                              Text(
+                                "-₹${cart.promoDiscount.toStringAsFixed(2)}",
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.pinkAccent,
+                                ),
+                              ),
+                            ],
+                          ),
+                        if (nonPromoDiscount > 0) const SizedBox(height: 4),
+                        if (nonPromoDiscount > 0)
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -1185,7 +1016,7 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                                 ),
                               ),
                               Text(
-                                "-₹${cart.totalDiscount.toStringAsFixed(2)}",
+                                "-₹${nonPromoDiscount.toStringAsFixed(2)}",
                                 style: const TextStyle(
                                   fontSize: 11,
                                   color: Colors.green,
@@ -1396,6 +1227,7 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
     }
 
     try {
+      final customer = cart.selectedCustomer;
       final sessionManager = ref.read(sessionManagerProvider);
       final orderId = await ref
           .read(orderRepositoryProvider)
@@ -1427,6 +1259,9 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
           context,
         ).showSnackBar(const SnackBar(content: Text("Order completed!")));
       }
+      if (context.mounted) {
+        await _showPostCheckoutActions(context, ref, orderId, customer);
+      }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(
@@ -1434,6 +1269,57 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
         ).showSnackBar(SnackBar(content: Text("Error: $e")));
       }
     }
+  }
+
+  Future<void> _showPostCheckoutActions(
+    BuildContext context,
+    WidgetRef ref,
+    String orderId,
+    Customer? customer,
+  ) async {
+    final db = ref.read(appDatabaseProvider);
+    final order = await (db.select(
+      db.orders,
+    )..where((t) => t.id.equals(orderId))).getSingle();
+    final items = await (db.select(
+      db.orderItems,
+    )..where((t) => t.orderId.equals(orderId))).get();
+
+    if (!context.mounted) return;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Order completed'),
+        content: const Text('Print or share the bill now?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Later'),
+          ),
+          TextButton.icon(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await ref
+                  .read(printingServiceProvider)
+                  .printInvoice(order, items, customer);
+            },
+            icon: const Icon(Icons.print_outlined),
+            label: const Text('Print Bill'),
+          ),
+          TextButton.icon(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await ref
+                  .read(shareServiceProvider)
+                  .shareInvoiceWhatsApp(order, items, customer);
+            },
+            icon: const Icon(Icons.share_outlined),
+            label: const Text('Share (WhatsApp)'),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -1515,6 +1401,10 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
   Widget build(BuildContext context) {
     final cart = ref.watch(cartProvider);
     final notifier = ref.read(cartProvider.notifier);
+    final nonPromoDiscount = (cart.totalDiscount - cart.promoDiscount).clamp(
+      0.0,
+      cart.totalDiscount,
+    );
 
     return Column(
       children: [
@@ -2118,8 +2008,29 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                         ),
                       ],
                     ),
-                    if (cart.totalDiscount > 0) const SizedBox(height: 6),
-                    if (cart.totalDiscount > 0)
+                    if (cart.promoDiscount > 0) const SizedBox(height: 6),
+                    if (cart.promoDiscount > 0)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Promo',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.white60,
+                            ),
+                          ),
+                          Text(
+                            "-₹${cart.promoDiscount.toStringAsFixed(2)}",
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.pinkAccent,
+                            ),
+                          ),
+                        ],
+                      ),
+                    if (nonPromoDiscount > 0) const SizedBox(height: 6),
+                    if (nonPromoDiscount > 0)
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -2131,7 +2042,7 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                             ),
                           ),
                           Text(
-                            "-₹${cart.totalDiscount.toStringAsFixed(2)}",
+                            "-₹${nonPromoDiscount.toStringAsFixed(2)}",
                             style: const TextStyle(
                               fontSize: 12,
                               color: Colors.green,
@@ -2493,8 +2404,11 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
 class _HeldOrdersButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final locationId = ref.watch(currentLocationIdProvider).valueOrNull;
     final pendingOrdersStream = ref.watch(
-      orderRepositoryProvider.select((r) => r.watchPendingOrders()),
+      orderRepositoryProvider.select(
+        (r) => r.watchPendingOrders(locationId: locationId),
+      ),
     );
 
     return Stack(
@@ -2540,8 +2454,11 @@ class _HeldOrdersDialog extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final locationId = ref.watch(currentLocationIdProvider).valueOrNull;
     final pendingOrdersStream = ref.watch(
-      orderRepositoryProvider.select((r) => r.watchPendingOrders()),
+      orderRepositoryProvider.select(
+        (r) => r.watchPendingOrders(locationId: locationId),
+      ),
     );
 
     return Dialog(

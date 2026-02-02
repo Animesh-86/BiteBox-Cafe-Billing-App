@@ -10,17 +10,22 @@ class CustomerRepository {
 
   Stream<List<Customer>> watchCustomers(String query) {
     if (query.isEmpty) {
-      return (_db.select(_db.customers)
-            ..orderBy([(t) => OrderingTerm(expression: t.lastVisit, mode: OrderingMode.desc)]))
+      return (_db.select(_db.customers)..orderBy([
+            (t) =>
+                OrderingTerm(expression: t.lastVisit, mode: OrderingMode.desc),
+          ]))
           .watch();
     }
-    return (_db.select(_db.customers)
-          ..where((tbl) => tbl.name.contains(query) | tbl.phone.contains(query)))
+    return (_db.select(
+          _db.customers,
+        )..where((tbl) => tbl.name.contains(query) | tbl.phone.contains(query)))
         .watch();
   }
-  
+
   Future<Customer?> getCustomerById(String id) {
-    return (_db.select(_db.customers)..where((t) => t.id.equals(id))).getSingleOrNull();
+    return (_db.select(
+      _db.customers,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
   }
 
   Future<void> addCustomer(CustomersCompanion customer) {
@@ -30,19 +35,29 @@ class CustomerRepository {
   Future<void> updateCustomer(Customer customer) {
     return _db.update(_db.customers).replace(customer);
   }
-  
+
+  Future<void> deleteCustomer(String id) {
+    return (_db.delete(_db.customers)..where((t) => t.id.equals(id))).go();
+  }
+
   Future<void> updateVisitStats(String id, double amount) async {
     // Transaction to update connection stats safely
     await _db.transaction(() async {
-      final customer = await (_db.select(_db.customers)..where((t) => t.id.equals(id))).getSingle();
+      final customer = await (_db.select(
+        _db.customers,
+      )..where((t) => t.id.equals(id))).getSingle();
       final newVisits = customer.totalVisits + 1;
       final newSpent = customer.totalSpent + amount;
-      
-      await _db.update(_db.customers).replace(customer.copyWith(
-        totalVisits: newVisits,
-        totalSpent: newSpent,
-        lastVisit: Value(DateTime.now()),
-      ));
+
+      await _db
+          .update(_db.customers)
+          .replace(
+            customer.copyWith(
+              totalVisits: newVisits,
+              totalSpent: newSpent,
+              lastVisit: Value(DateTime.now()),
+            ),
+          );
     });
   }
 }

@@ -4,6 +4,7 @@ import 'package:drift/drift.dart' as drift;
 import 'package:uuid/uuid.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/data/repositories/customer_repository.dart';
+import 'package:hangout_spot/ui/screens/customer/customer_profile_screen.dart';
 
 class CustomerListScreen extends ConsumerStatefulWidget {
   final bool isSelectionMode;
@@ -70,9 +71,17 @@ class _CustomerListScreenState extends ConsumerState<CustomerListScreen> {
                   if (widget.isSelectionMode) {
                     Navigator.pop(context, customer);
                   } else {
-                    _showAddEditDialog(context, customer: customer);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            CustomerProfileScreen(customer: customer),
+                      ),
+                    );
                   }
                 },
+                onLongPress: () =>
+                    _showAddEditDialog(context, customer: customer),
               );
             },
           );
@@ -118,6 +127,18 @@ class _CustomerListScreenState extends ConsumerState<CustomerListScreen> {
           ),
         ),
         actions: [
+          if (customer != null)
+            TextButton.icon(
+              onPressed: () async {
+                await ref
+                    .read(customerRepositoryProvider)
+                    .deleteCustomer(customer.id);
+                if (context.mounted) Navigator.pop(context);
+              },
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('Delete'),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+            ),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),

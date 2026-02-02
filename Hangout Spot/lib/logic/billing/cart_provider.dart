@@ -41,6 +41,7 @@ class CartState {
   final double paidCash;
   final double paidUPI;
   final double manualDiscount;
+  final double promoDiscount;
   final bool canUndo;
   final bool canRedo;
 
@@ -52,6 +53,7 @@ class CartState {
     this.paidCash = 0.0,
     this.paidUPI = 0.0,
     this.manualDiscount = 0.0,
+    this.promoDiscount = 0.0,
     this.canUndo = false,
     this.canRedo = false,
   });
@@ -71,7 +73,8 @@ class CartState {
     double custDiscount = customer != null
         ? (afterItemDiscount * (customer!.discountPercent / 100))
         : 0.0;
-    final rawDiscount = itemDiscounts + custDiscount + manualDiscount;
+    final rawDiscount =
+        itemDiscounts + custDiscount + manualDiscount + promoDiscount;
     return rawDiscount.clamp(0.0, subtotal);
   }
 
@@ -91,6 +94,7 @@ class CartState {
     double? paidCash,
     double? paidUPI,
     double? manualDiscount,
+    double? promoDiscount,
     bool? canUndo,
     bool? canRedo,
   }) {
@@ -102,6 +106,7 @@ class CartState {
       paidCash: paidCash ?? this.paidCash,
       paidUPI: paidUPI ?? this.paidUPI,
       manualDiscount: manualDiscount ?? this.manualDiscount,
+      promoDiscount: promoDiscount ?? this.promoDiscount,
       canUndo: canUndo ?? this.canUndo,
       canRedo: canRedo ?? this.canRedo,
     );
@@ -260,7 +265,7 @@ class CartNotifier extends StateNotifier<CartState> {
         : 0.0;
     final maxManual = math.max(
       0.0,
-      state.subtotal - itemDiscounts - custDiscount,
+      state.subtotal - itemDiscounts - custDiscount - state.promoDiscount,
     );
 
     final nextManual = discount.clamp(0.0, maxManual);
@@ -306,7 +311,7 @@ class CartNotifier extends StateNotifier<CartState> {
         : 0.0;
     final maxManual = math.max(
       0.0,
-      state.subtotal - itemDiscounts - custDiscount,
+      state.subtotal - itemDiscounts - custDiscount - state.promoDiscount,
     );
 
     final nextManual = (state.manualDiscount + discountAmount).clamp(
@@ -314,6 +319,12 @@ class CartNotifier extends StateNotifier<CartState> {
       maxManual,
     );
     _applyState(state.copyWith(manualDiscount: nextManual));
+  }
+
+  void setPromoDiscount(double discount) {
+    final nextPromo = discount.clamp(0.0, state.subtotal);
+    if (nextPromo == state.promoDiscount) return;
+    _applyState(state.copyWith(promoDiscount: nextPromo));
   }
 }
 

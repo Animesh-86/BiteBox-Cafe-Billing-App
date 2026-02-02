@@ -58,6 +58,16 @@ class Customers extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+class Locations extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  TextColumn get address => text().nullable()();
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 class RestaurantTables extends Table {
   TextColumn get id => text()();
   TextColumn get tableNumber => text().unique()();
@@ -76,6 +86,7 @@ class Orders extends Table {
   TextColumn get invoiceNumber => text().unique()();
   TextColumn get customerId =>
       text().nullable()(); // No FK constraint for nullable field
+  TextColumn get locationId => text().nullable()();
   TextColumn get tableId =>
       text().nullable()(); // No FK constraint for nullable field
   RealColumn get subtotal => real()();
@@ -145,6 +156,7 @@ class Settings extends Table {
     Categories,
     Items,
     Customers,
+    Locations,
     RestaurantTables,
     Orders,
     OrderItems,
@@ -157,7 +169,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(openConnection());
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration {
@@ -220,6 +232,43 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(items, items.imageUrl);
           } catch (e) {
             debugPrint('Migration: imageUrl column might already exist: $e');
+          }
+        }
+        if (from < 7) {
+          try {
+            await m.database.customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_orders_status_created ON orders(status, created_at)',
+            );
+            await m.database.customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id)',
+            );
+            await m.database.customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id)',
+            );
+            await m.database.customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_order_items_item ON order_items(item_id)',
+            );
+          } catch (e) {
+            debugPrint('Migration: indexes might already exist: $e');
+          }
+        }
+        if (from < 8) {
+          try {
+            await m.createTable(locations);
+          } catch (e) {
+            debugPrint('Migration: locations table might already exist: $e');
+          }
+          try {
+            await m.addColumn(orders, orders.locationId);
+          } catch (e) {
+            debugPrint('Migration: locationId column might already exist: $e');
+          }
+          try {
+            await m.database.customStatement(
+              'CREATE INDEX IF NOT EXISTS idx_orders_location ON orders(location_id)',
+            );
+          } catch (e) {
+            debugPrint('Migration: location index might already exist: $e');
           }
         }
       },

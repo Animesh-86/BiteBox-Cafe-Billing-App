@@ -10,6 +10,10 @@ class PdfService {
     List<OrderItem> items,
     Customer? customer, {
     bool isKot = false,
+    String? storeName,
+    String? storeAddress,
+    String? footerNote,
+    bool showThankYou = true,
   }) async {
     final pdf = pw.Document();
     final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
@@ -24,13 +28,21 @@ class PdfService {
             children: [
               pw.Center(
                 child: pw.Text(
-                  'Hangout Spot',
+                  storeName ?? 'Hangout Spot',
                   style: pw.TextStyle(
                     fontSize: 18,
                     fontWeight: pw.FontWeight.bold,
                   ),
                 ),
               ),
+              if (storeAddress != null && storeAddress!.trim().isNotEmpty)
+                pw.Center(
+                  child: pw.Text(
+                    storeAddress!,
+                    style: const pw.TextStyle(fontSize: 9),
+                    textAlign: pw.TextAlign.center,
+                  ),
+                ),
               pw.Divider(),
               if (isKot)
                 pw.Center(
@@ -68,7 +80,16 @@ class PdfService {
                   fontSize: 16,
                 ),
                 pw.SizedBox(height: 10),
-                pw.Center(child: pw.Text("Thank You! Visit Again!")),
+                if (showThankYou)
+                  pw.Center(child: pw.Text("Thank You! Visit Again!")),
+                if (footerNote != null && footerNote!.trim().isNotEmpty)
+                  pw.Center(
+                    child: pw.Text(
+                      footerNote!,
+                      style: const pw.TextStyle(fontSize: 8),
+                      textAlign: pw.TextAlign.center,
+                    ),
+                  ),
                 pw.Center(
                   child: pw.Text(
                     "Developed by Animesh Sharma",

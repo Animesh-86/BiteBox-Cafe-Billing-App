@@ -1800,6 +1800,316 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
   }
 }
 
+class $LocationsTable extends Locations
+    with TableInfo<$LocationsTable, Location> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LocationsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _addressMeta = const VerificationMeta(
+    'address',
+  );
+  @override
+  late final GeneratedColumn<String> address = GeneratedColumn<String>(
+    'address',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _isActiveMeta = const VerificationMeta(
+    'isActive',
+  );
+  @override
+  late final GeneratedColumn<bool> isActive = GeneratedColumn<bool>(
+    'is_active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, name, address, isActive];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'locations';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Location> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('address')) {
+      context.handle(
+        _addressMeta,
+        address.isAcceptableOrUnknown(data['address']!, _addressMeta),
+      );
+    }
+    if (data.containsKey('is_active')) {
+      context.handle(
+        _isActiveMeta,
+        isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Location map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Location(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      address: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}address'],
+      ),
+      isActive: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_active'],
+      )!,
+    );
+  }
+
+  @override
+  $LocationsTable createAlias(String alias) {
+    return $LocationsTable(attachedDatabase, alias);
+  }
+}
+
+class Location extends DataClass implements Insertable<Location> {
+  final String id;
+  final String name;
+  final String? address;
+  final bool isActive;
+  const Location({
+    required this.id,
+    required this.name,
+    this.address,
+    required this.isActive,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    if (!nullToAbsent || address != null) {
+      map['address'] = Variable<String>(address);
+    }
+    map['is_active'] = Variable<bool>(isActive);
+    return map;
+  }
+
+  LocationsCompanion toCompanion(bool nullToAbsent) {
+    return LocationsCompanion(
+      id: Value(id),
+      name: Value(name),
+      address: address == null && nullToAbsent
+          ? const Value.absent()
+          : Value(address),
+      isActive: Value(isActive),
+    );
+  }
+
+  factory Location.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Location(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      address: serializer.fromJson<String?>(json['address']),
+      isActive: serializer.fromJson<bool>(json['isActive']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'address': serializer.toJson<String?>(address),
+      'isActive': serializer.toJson<bool>(isActive),
+    };
+  }
+
+  Location copyWith({
+    String? id,
+    String? name,
+    Value<String?> address = const Value.absent(),
+    bool? isActive,
+  }) => Location(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    address: address.present ? address.value : this.address,
+    isActive: isActive ?? this.isActive,
+  );
+  Location copyWithCompanion(LocationsCompanion data) {
+    return Location(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      address: data.address.present ? data.address.value : this.address,
+      isActive: data.isActive.present ? data.isActive.value : this.isActive,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Location(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('address: $address, ')
+          ..write('isActive: $isActive')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, address, isActive);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Location &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.address == this.address &&
+          other.isActive == this.isActive);
+}
+
+class LocationsCompanion extends UpdateCompanion<Location> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<String?> address;
+  final Value<bool> isActive;
+  final Value<int> rowid;
+  const LocationsCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.address = const Value.absent(),
+    this.isActive = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LocationsCompanion.insert({
+    required String id,
+    required String name,
+    this.address = const Value.absent(),
+    this.isActive = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name);
+  static Insertable<Location> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<String>? address,
+    Expression<bool>? isActive,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (address != null) 'address': address,
+      if (isActive != null) 'is_active': isActive,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LocationsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<String?>? address,
+    Value<bool>? isActive,
+    Value<int>? rowid,
+  }) {
+    return LocationsCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      address: address ?? this.address,
+      isActive: isActive ?? this.isActive,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (address.present) {
+      map['address'] = Variable<String>(address.value);
+    }
+    if (isActive.present) {
+      map['is_active'] = Variable<bool>(isActive.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocationsCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('address: $address, ')
+          ..write('isActive: $isActive, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $RestaurantTablesTable extends RestaurantTables
     with TableInfo<$RestaurantTablesTable, RestaurantTable> {
   @override
@@ -2201,6 +2511,17 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _locationIdMeta = const VerificationMeta(
+    'locationId',
+  );
+  @override
+  late final GeneratedColumn<String> locationId = GeneratedColumn<String>(
+    'location_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _tableIdMeta = const VerificationMeta(
     'tableId',
   );
@@ -2335,6 +2656,7 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
     id,
     invoiceNumber,
     customerId,
+    locationId,
     tableId,
     subtotal,
     discountAmount,
@@ -2379,6 +2701,12 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
       context.handle(
         _customerIdMeta,
         customerId.isAcceptableOrUnknown(data['customer_id']!, _customerIdMeta),
+      );
+    }
+    if (data.containsKey('location_id')) {
+      context.handle(
+        _locationIdMeta,
+        locationId.isAcceptableOrUnknown(data['location_id']!, _locationIdMeta),
       );
     }
     if (data.containsKey('table_id')) {
@@ -2483,6 +2811,10 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
         DriftSqlType.string,
         data['${effectivePrefix}customer_id'],
       ),
+      locationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}location_id'],
+      ),
       tableId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}table_id'],
@@ -2540,6 +2872,7 @@ class Order extends DataClass implements Insertable<Order> {
   final String id;
   final String invoiceNumber;
   final String? customerId;
+  final String? locationId;
   final String? tableId;
   final double subtotal;
   final double discountAmount;
@@ -2555,6 +2888,7 @@ class Order extends DataClass implements Insertable<Order> {
     required this.id,
     required this.invoiceNumber,
     this.customerId,
+    this.locationId,
     this.tableId,
     required this.subtotal,
     required this.discountAmount,
@@ -2574,6 +2908,9 @@ class Order extends DataClass implements Insertable<Order> {
     map['invoice_number'] = Variable<String>(invoiceNumber);
     if (!nullToAbsent || customerId != null) {
       map['customer_id'] = Variable<String>(customerId);
+    }
+    if (!nullToAbsent || locationId != null) {
+      map['location_id'] = Variable<String>(locationId);
     }
     if (!nullToAbsent || tableId != null) {
       map['table_id'] = Variable<String>(tableId);
@@ -2598,6 +2935,9 @@ class Order extends DataClass implements Insertable<Order> {
       customerId: customerId == null && nullToAbsent
           ? const Value.absent()
           : Value(customerId),
+      locationId: locationId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(locationId),
       tableId: tableId == null && nullToAbsent
           ? const Value.absent()
           : Value(tableId),
@@ -2623,6 +2963,7 @@ class Order extends DataClass implements Insertable<Order> {
       id: serializer.fromJson<String>(json['id']),
       invoiceNumber: serializer.fromJson<String>(json['invoiceNumber']),
       customerId: serializer.fromJson<String?>(json['customerId']),
+      locationId: serializer.fromJson<String?>(json['locationId']),
       tableId: serializer.fromJson<String?>(json['tableId']),
       subtotal: serializer.fromJson<double>(json['subtotal']),
       discountAmount: serializer.fromJson<double>(json['discountAmount']),
@@ -2643,6 +2984,7 @@ class Order extends DataClass implements Insertable<Order> {
       'id': serializer.toJson<String>(id),
       'invoiceNumber': serializer.toJson<String>(invoiceNumber),
       'customerId': serializer.toJson<String?>(customerId),
+      'locationId': serializer.toJson<String?>(locationId),
       'tableId': serializer.toJson<String?>(tableId),
       'subtotal': serializer.toJson<double>(subtotal),
       'discountAmount': serializer.toJson<double>(discountAmount),
@@ -2661,6 +3003,7 @@ class Order extends DataClass implements Insertable<Order> {
     String? id,
     String? invoiceNumber,
     Value<String?> customerId = const Value.absent(),
+    Value<String?> locationId = const Value.absent(),
     Value<String?> tableId = const Value.absent(),
     double? subtotal,
     double? discountAmount,
@@ -2676,6 +3019,7 @@ class Order extends DataClass implements Insertable<Order> {
     id: id ?? this.id,
     invoiceNumber: invoiceNumber ?? this.invoiceNumber,
     customerId: customerId.present ? customerId.value : this.customerId,
+    locationId: locationId.present ? locationId.value : this.locationId,
     tableId: tableId.present ? tableId.value : this.tableId,
     subtotal: subtotal ?? this.subtotal,
     discountAmount: discountAmount ?? this.discountAmount,
@@ -2697,6 +3041,9 @@ class Order extends DataClass implements Insertable<Order> {
       customerId: data.customerId.present
           ? data.customerId.value
           : this.customerId,
+      locationId: data.locationId.present
+          ? data.locationId.value
+          : this.locationId,
       tableId: data.tableId.present ? data.tableId.value : this.tableId,
       subtotal: data.subtotal.present ? data.subtotal.value : this.subtotal,
       discountAmount: data.discountAmount.present
@@ -2723,6 +3070,7 @@ class Order extends DataClass implements Insertable<Order> {
           ..write('id: $id, ')
           ..write('invoiceNumber: $invoiceNumber, ')
           ..write('customerId: $customerId, ')
+          ..write('locationId: $locationId, ')
           ..write('tableId: $tableId, ')
           ..write('subtotal: $subtotal, ')
           ..write('discountAmount: $discountAmount, ')
@@ -2743,6 +3091,7 @@ class Order extends DataClass implements Insertable<Order> {
     id,
     invoiceNumber,
     customerId,
+    locationId,
     tableId,
     subtotal,
     discountAmount,
@@ -2762,6 +3111,7 @@ class Order extends DataClass implements Insertable<Order> {
           other.id == this.id &&
           other.invoiceNumber == this.invoiceNumber &&
           other.customerId == this.customerId &&
+          other.locationId == this.locationId &&
           other.tableId == this.tableId &&
           other.subtotal == this.subtotal &&
           other.discountAmount == this.discountAmount &&
@@ -2779,6 +3129,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
   final Value<String> id;
   final Value<String> invoiceNumber;
   final Value<String?> customerId;
+  final Value<String?> locationId;
   final Value<String?> tableId;
   final Value<double> subtotal;
   final Value<double> discountAmount;
@@ -2795,6 +3146,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     this.id = const Value.absent(),
     this.invoiceNumber = const Value.absent(),
     this.customerId = const Value.absent(),
+    this.locationId = const Value.absent(),
     this.tableId = const Value.absent(),
     this.subtotal = const Value.absent(),
     this.discountAmount = const Value.absent(),
@@ -2812,6 +3164,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     required String id,
     required String invoiceNumber,
     this.customerId = const Value.absent(),
+    this.locationId = const Value.absent(),
     this.tableId = const Value.absent(),
     required double subtotal,
     this.discountAmount = const Value.absent(),
@@ -2833,6 +3186,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     Expression<String>? id,
     Expression<String>? invoiceNumber,
     Expression<String>? customerId,
+    Expression<String>? locationId,
     Expression<String>? tableId,
     Expression<double>? subtotal,
     Expression<double>? discountAmount,
@@ -2850,6 +3204,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
       if (id != null) 'id': id,
       if (invoiceNumber != null) 'invoice_number': invoiceNumber,
       if (customerId != null) 'customer_id': customerId,
+      if (locationId != null) 'location_id': locationId,
       if (tableId != null) 'table_id': tableId,
       if (subtotal != null) 'subtotal': subtotal,
       if (discountAmount != null) 'discount_amount': discountAmount,
@@ -2869,6 +3224,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     Value<String>? id,
     Value<String>? invoiceNumber,
     Value<String?>? customerId,
+    Value<String?>? locationId,
     Value<String?>? tableId,
     Value<double>? subtotal,
     Value<double>? discountAmount,
@@ -2886,6 +3242,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
       id: id ?? this.id,
       invoiceNumber: invoiceNumber ?? this.invoiceNumber,
       customerId: customerId ?? this.customerId,
+      locationId: locationId ?? this.locationId,
       tableId: tableId ?? this.tableId,
       subtotal: subtotal ?? this.subtotal,
       discountAmount: discountAmount ?? this.discountAmount,
@@ -2912,6 +3269,9 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     }
     if (customerId.present) {
       map['customer_id'] = Variable<String>(customerId.value);
+    }
+    if (locationId.present) {
+      map['location_id'] = Variable<String>(locationId.value);
     }
     if (tableId.present) {
       map['table_id'] = Variable<String>(tableId.value);
@@ -2958,6 +3318,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
           ..write('id: $id, ')
           ..write('invoiceNumber: $invoiceNumber, ')
           ..write('customerId: $customerId, ')
+          ..write('locationId: $locationId, ')
           ..write('tableId: $tableId, ')
           ..write('subtotal: $subtotal, ')
           ..write('discountAmount: $discountAmount, ')
@@ -4581,6 +4942,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $CategoriesTable categories = $CategoriesTable(this);
   late final $ItemsTable items = $ItemsTable(this);
   late final $CustomersTable customers = $CustomersTable(this);
+  late final $LocationsTable locations = $LocationsTable(this);
   late final $RestaurantTablesTable restaurantTables = $RestaurantTablesTable(
     this,
   );
@@ -4599,6 +4961,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     categories,
     items,
     customers,
+    locations,
     restaurantTables,
     orders,
     orderItems,
@@ -5953,6 +6316,181 @@ typedef $$CustomersTableProcessedTableManager =
       Customer,
       PrefetchHooks Function({bool rewardTransactionsRefs})
     >;
+typedef $$LocationsTableCreateCompanionBuilder =
+    LocationsCompanion Function({
+      required String id,
+      required String name,
+      Value<String?> address,
+      Value<bool> isActive,
+      Value<int> rowid,
+    });
+typedef $$LocationsTableUpdateCompanionBuilder =
+    LocationsCompanion Function({
+      Value<String> id,
+      Value<String> name,
+      Value<String?> address,
+      Value<bool> isActive,
+      Value<int> rowid,
+    });
+
+class $$LocationsTableFilterComposer
+    extends Composer<_$AppDatabase, $LocationsTable> {
+  $$LocationsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get address => $composableBuilder(
+    column: $table.address,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$LocationsTableOrderingComposer
+    extends Composer<_$AppDatabase, $LocationsTable> {
+  $$LocationsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get address => $composableBuilder(
+    column: $table.address,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$LocationsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $LocationsTable> {
+  $$LocationsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get address =>
+      $composableBuilder(column: $table.address, builder: (column) => column);
+
+  GeneratedColumn<bool> get isActive =>
+      $composableBuilder(column: $table.isActive, builder: (column) => column);
+}
+
+class $$LocationsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $LocationsTable,
+          Location,
+          $$LocationsTableFilterComposer,
+          $$LocationsTableOrderingComposer,
+          $$LocationsTableAnnotationComposer,
+          $$LocationsTableCreateCompanionBuilder,
+          $$LocationsTableUpdateCompanionBuilder,
+          (Location, BaseReferences<_$AppDatabase, $LocationsTable, Location>),
+          Location,
+          PrefetchHooks Function()
+        > {
+  $$LocationsTableTableManager(_$AppDatabase db, $LocationsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$LocationsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$LocationsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$LocationsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String?> address = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocationsCompanion(
+                id: id,
+                name: name,
+                address: address,
+                isActive: isActive,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                Value<String?> address = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocationsCompanion.insert(
+                id: id,
+                name: name,
+                address: address,
+                isActive: isActive,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$LocationsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $LocationsTable,
+      Location,
+      $$LocationsTableFilterComposer,
+      $$LocationsTableOrderingComposer,
+      $$LocationsTableAnnotationComposer,
+      $$LocationsTableCreateCompanionBuilder,
+      $$LocationsTableUpdateCompanionBuilder,
+      (Location, BaseReferences<_$AppDatabase, $LocationsTable, Location>),
+      Location,
+      PrefetchHooks Function()
+    >;
 typedef $$RestaurantTablesTableCreateCompanionBuilder =
     RestaurantTablesCompanion Function({
       required String id,
@@ -6166,6 +6704,7 @@ typedef $$OrdersTableCreateCompanionBuilder =
       required String id,
       required String invoiceNumber,
       Value<String?> customerId,
+      Value<String?> locationId,
       Value<String?> tableId,
       required double subtotal,
       Value<double> discountAmount,
@@ -6184,6 +6723,7 @@ typedef $$OrdersTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> invoiceNumber,
       Value<String?> customerId,
+      Value<String?> locationId,
       Value<String?> tableId,
       Value<double> subtotal,
       Value<double> discountAmount,
@@ -6242,6 +6782,11 @@ class $$OrdersTableFilterComposer
 
   ColumnFilters<String> get customerId => $composableBuilder(
     column: $table.customerId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get locationId => $composableBuilder(
+    column: $table.locationId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6350,6 +6895,11 @@ class $$OrdersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get locationId => $composableBuilder(
+    column: $table.locationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get tableId => $composableBuilder(
     column: $table.tableId,
     builder: (column) => ColumnOrderings(column),
@@ -6425,6 +6975,11 @@ class $$OrdersTableAnnotationComposer
 
   GeneratedColumn<String> get customerId => $composableBuilder(
     column: $table.customerId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get locationId => $composableBuilder(
+    column: $table.locationId,
     builder: (column) => column,
   );
 
@@ -6524,6 +7079,7 @@ class $$OrdersTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> invoiceNumber = const Value.absent(),
                 Value<String?> customerId = const Value.absent(),
+                Value<String?> locationId = const Value.absent(),
                 Value<String?> tableId = const Value.absent(),
                 Value<double> subtotal = const Value.absent(),
                 Value<double> discountAmount = const Value.absent(),
@@ -6540,6 +7096,7 @@ class $$OrdersTableTableManager
                 id: id,
                 invoiceNumber: invoiceNumber,
                 customerId: customerId,
+                locationId: locationId,
                 tableId: tableId,
                 subtotal: subtotal,
                 discountAmount: discountAmount,
@@ -6558,6 +7115,7 @@ class $$OrdersTableTableManager
                 required String id,
                 required String invoiceNumber,
                 Value<String?> customerId = const Value.absent(),
+                Value<String?> locationId = const Value.absent(),
                 Value<String?> tableId = const Value.absent(),
                 required double subtotal,
                 Value<double> discountAmount = const Value.absent(),
@@ -6574,6 +7132,7 @@ class $$OrdersTableTableManager
                 id: id,
                 invoiceNumber: invoiceNumber,
                 customerId: customerId,
+                locationId: locationId,
                 tableId: tableId,
                 subtotal: subtotal,
                 discountAmount: discountAmount,
@@ -7832,6 +8391,8 @@ class $AppDatabaseManager {
       $$ItemsTableTableManager(_db, _db.items);
   $$CustomersTableTableManager get customers =>
       $$CustomersTableTableManager(_db, _db.customers);
+  $$LocationsTableTableManager get locations =>
+      $$LocationsTableTableManager(_db, _db.locations);
   $$RestaurantTablesTableTableManager get restaurantTables =>
       $$RestaurantTablesTableTableManager(_db, _db.restaurantTables);
   $$OrdersTableTableManager get orders =>

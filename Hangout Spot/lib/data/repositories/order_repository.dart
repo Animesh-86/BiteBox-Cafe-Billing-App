@@ -7,6 +7,8 @@ import 'package:hangout_spot/data/providers/database_provider.dart';
 import 'package:hangout_spot/logic/billing/cart_provider.dart';
 import 'package:hangout_spot/logic/billing/session_provider.dart';
 import 'package:hangout_spot/logic/rewards/reward_provider.dart';
+import 'package:hangout_spot/services/logging_service.dart';
+import 'package:hangout_spot/logic/locations/location_provider.dart';
 
 class OrderRepository {
   final AppDatabase _db;
@@ -14,13 +16,16 @@ class OrderRepository {
   OrderRepository(this._db);
 
   // Stream of Held/Pending Orders
-  Stream<List<Order>> watchPendingOrders() {
-    return (_db.select(_db.orders)
-          ..where((tbl) => tbl.status.equals('pending'))
-          ..orderBy([
-            (t) =>
-                OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc),
-          ]))
+  Stream<List<Order>> watchPendingOrders({String? locationId}) {
+    final query = _db.select(_db.orders)
+      ..where((tbl) => tbl.status.equals('pending'));
+    if (locationId != null && locationId.trim().isNotEmpty) {
+      query.where((tbl) => tbl.locationId.equals(locationId));
+    }
+
+    return (query..orderBy([
+          (t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc),
+        ]))
         .watch();
   }
 
@@ -29,6 +34,22 @@ class OrderRepository {
     return (_db.select(
       _db.orderItems,
     )..where((t) => t.orderId.equals(orderId))).get();
+  }
+
+  Stream<List<Order>> watchOrdersByCustomer(
+    String customerId, {
+    String? locationId,
+  }) {
+    final query = _db.select(_db.orders)
+      ..where((t) => t.customerId.equals(customerId));
+    if (locationId != null && locationId.trim().isNotEmpty) {
+      query.where((t) => t.locationId.equals(locationId));
+    }
+
+    return (query..orderBy([
+          (t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc),
+        ]))
+        .watch();
   }
 
   Future<List<({OrderItem orderItem, Item realItem})>> getOrderDetails(
@@ -77,6 +98,11 @@ class OrderRepository {
             "INV-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}";
       }
 
+      final locationSetting = await (_db.select(
+        _db.settings,
+      )..where((t) => t.key.equals(CURRENT_LOCATION_ID_KEY))).getSingleOrNull();
+      final locationId = locationSetting?.value;
+
       await _db
           .into(_db.orders)
           .insert(
@@ -84,6 +110,7 @@ class OrderRepository {
               id: Value(orderId),
               invoiceNumber: Value(invoiceNum),
               customerId: Value(cart.customer?.id),
+              locationId: Value(locationId),
               subtotal: Value(cart.subtotal),
               discountAmount: Value(cart.totalDiscount),
               taxAmount: Value(cart.taxAmount),
@@ -199,7 +226,7 @@ class OrderRepository {
           );
     } catch (e) {
       // Customer not found, skip update
-      debugPrint("Error updating customer stats: $e");
+      LoggingService.logError('Error updating customer stats', e);
     }
   }
 }
