@@ -1606,47 +1606,57 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                       ),
                       const SizedBox(width: 8),
                       if (cart.customer != null)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
+                        FutureBuilder<bool>(
+                          future: ref.watch(
+                            isRewardSystemEnabledProvider.future,
                           ),
-                          decoration: BoxDecoration(
-                            color: Colors.orange.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: ref
-                              .watch(
-                                customerRewardBalanceProvider(
-                                  cart.customer!.id,
-                                ),
-                              )
-                              .when(
-                                data: (balance) => Text(
-                                  '${balance.toInt()} pts',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.orange,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                loading: () => const Text(
-                                  '... pts',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.orange,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                error: (_, __) => const Text(
-                                  '0 pts',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.orange,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
+                          builder: (context, snapshot) {
+                            if (!snapshot.hasData || !snapshot.data!) {
+                              return const SizedBox.shrink();
+                            }
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
                               ),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: ref
+                                  .watch(
+                                    customerRewardBalanceProvider(
+                                      cart.customer!.id,
+                                    ),
+                                  )
+                                  .when(
+                                    data: (balance) => Text(
+                                      '${balance.toInt()} pts',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.orange,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    loading: () => const Text(
+                                      '... pts',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.orange,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    error: (_, __) => const Text(
+                                      '0 pts',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.orange,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                            );
+                          },
                         ),
                       const Icon(
                         Icons.chevron_right,
@@ -1664,17 +1674,16 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
         // Cart Items
         Expanded(
           child: cart.items.isEmpty
-              ? const Center(
+              ? Center(
                   child: Text(
-                    'Cart is empty',
-                    style: TextStyle(color: Colors.white60),
+                    'Cart empty',
+                    style: TextStyle(color: Colors.white60, fontSize: 12),
                   ),
                 )
               : ListView.separated(
-                  controller: widget.scrollController,
                   padding: const EdgeInsets.all(12),
                   itemCount: cart.items.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final item = cart.items[index];
                     return GestureDetector(
@@ -1683,8 +1692,8 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                       child: Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.05),
-                          borderRadius: BorderRadius.circular(10),
+                          color: Colors.white.withOpacity(0.03),
+                          borderRadius: BorderRadius.circular(8),
                           border: Border.all(
                             color: Colors.white.withOpacity(0.1),
                           ),
@@ -1700,7 +1709,7 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                                     item.item.name,
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
-                                      fontSize: 14,
+                                      fontSize: 13,
                                       color: Colors.white,
                                     ),
                                     maxLines: 1,
@@ -1711,29 +1720,43 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                                   "₹${item.total.toStringAsFixed(0)}",
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
+                                    fontSize: 13,
+                                    color:
+                                        Theme.of(context).colorScheme.primary,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 6),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(
-                                  "₹${item.item.price} each",
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.white60,
-                                  ),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      "₹${item.item.price}",
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.white60,
+                                      ),
+                                    ),
+                                    if (item.item.discountPercent > 0 ||
+                                        item.discountAmount > 0)
+                                      Text(
+                                        'Discount: ₹${item.discountAmount.toStringAsFixed(0)}',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.orange.shade300,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                  ],
                                 ),
                                 Container(
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(8),
+                                    color: Colors.white.withOpacity(0.08),
+                                    borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Row(
                                     children: [
@@ -1747,9 +1770,9 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                                           child: Icon(
                                             Icons.remove,
                                             size: 16,
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.primary,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .primary,
                                           ),
                                         ),
                                       ),
@@ -1776,9 +1799,9 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                                           child: Icon(
                                             Icons.add,
                                             size: 16,
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.primary,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .primary,
                                           ),
                                         ),
                                       ),

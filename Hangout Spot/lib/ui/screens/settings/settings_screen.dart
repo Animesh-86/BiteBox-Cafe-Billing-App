@@ -202,6 +202,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return settingsAsync.when(
       data: (settings) {
         final isEnabled = settings[REWARD_FEATURE_TOGGLE_KEY] == 'true';
+        final earningRate =
+            double.tryParse(settings[REWARD_RATE_KEY] ?? '0.08') ?? 0.08;
+        final redemptionRate =
+            double.tryParse(settings[REDEMPTION_RATE_KEY] ?? '1.0') ?? 1.0;
+
+        if (_earningRateController.text.isEmpty) {
+          _earningRateController.text = (earningRate * 100).toStringAsFixed(1);
+        }
+        if (_redemptionRateController.text.isEmpty) {
+          _redemptionRateController.text = redemptionRate.toStringAsFixed(2);
+        }
 
         return Column(
           children: [
@@ -230,13 +241,66 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Earning Rate: ${((double.tryParse(settings[REWARD_RATE_KEY] ?? '0.08') ?? 0.08) * 100).toStringAsFixed(1)}%',
+                      'Earning Rate: ${(earningRate * 100).toStringAsFixed(1)}%',
                       style: const TextStyle(fontSize: 12, color: Colors.grey),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Redemption Rate: ₹${double.tryParse(settings[REDEMPTION_RATE_KEY] ?? '1.0') ?? 1.0}/point',
+                      'Redemption Rate: ₹${redemptionRate.toStringAsFixed(2)}/point',
                       style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _earningRateController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: 'Earning Rate (%)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _redemptionRateController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: 'Redemption Rate (₹/point)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          final earningPercent =
+                              double.tryParse(_earningRateController.text) ??
+                              (earningRate * 100);
+                          final redemption =
+                              double.tryParse(_redemptionRateController.text) ??
+                              redemptionRate;
+
+                          await ref
+                              .read(rewardNotifierProvider.notifier)
+                              .setRewardEarningRate(earningPercent / 100);
+                          await ref
+                              .read(rewardNotifierProvider.notifier)
+                              .setRedemptionRate(redemption);
+
+                          ref.invalidate(rewardSettingsProvider);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Reward rates updated'),
+                              ),
+                            );
+                          }
+                        },
+                        child: const Text('Save Rates'),
+                      ),
                     ),
                   ],
                 ),
