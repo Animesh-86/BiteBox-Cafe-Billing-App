@@ -38,6 +38,7 @@ class Items extends Table {
   RealColumn get discountPercent => real().withDefault(const Constant(0.0))();
   BoolColumn get isAvailable => boolean().withDefault(const Constant(true))();
   TextColumn get description => text().nullable()();
+  TextColumn get imageUrl => text().nullable()();
   BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
 
   @override
@@ -156,7 +157,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(openConnection());
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration {
@@ -212,6 +213,13 @@ class AppDatabase extends _$AppDatabase {
             await m.createTable(settings);
           } catch (e) {
             debugPrint('Migration: Settings table might already exist: $e');
+          }
+        }
+        if (from < 6) {
+          try {
+            await m.addColumn(items, items.imageUrl);
+          } catch (e) {
+            debugPrint('Migration: imageUrl column might already exist: $e');
           }
         }
       },

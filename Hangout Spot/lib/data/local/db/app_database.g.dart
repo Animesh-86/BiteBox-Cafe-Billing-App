@@ -839,6 +839,17 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _imageUrlMeta = const VerificationMeta(
+    'imageUrl',
+  );
+  @override
+  late final GeneratedColumn<String> imageUrl = GeneratedColumn<String>(
+    'image_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _isDeletedMeta = const VerificationMeta(
     'isDeleted',
   );
@@ -863,6 +874,7 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
     discountPercent,
     isAvailable,
     description,
+    imageUrl,
     isDeleted,
   ];
   @override
@@ -933,6 +945,12 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
         ),
       );
     }
+    if (data.containsKey('image_url')) {
+      context.handle(
+        _imageUrlMeta,
+        imageUrl.isAcceptableOrUnknown(data['image_url']!, _imageUrlMeta),
+      );
+    }
     if (data.containsKey('is_deleted')) {
       context.handle(
         _isDeletedMeta,
@@ -976,6 +994,10 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
         DriftSqlType.string,
         data['${effectivePrefix}description'],
       ),
+      imageUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}image_url'],
+      ),
       isDeleted: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_deleted'],
@@ -997,6 +1019,7 @@ class Item extends DataClass implements Insertable<Item> {
   final double discountPercent;
   final bool isAvailable;
   final String? description;
+  final String? imageUrl;
   final bool isDeleted;
   const Item({
     required this.id,
@@ -1006,6 +1029,7 @@ class Item extends DataClass implements Insertable<Item> {
     required this.discountPercent,
     required this.isAvailable,
     this.description,
+    this.imageUrl,
     required this.isDeleted,
   });
   @override
@@ -1019,6 +1043,9 @@ class Item extends DataClass implements Insertable<Item> {
     map['is_available'] = Variable<bool>(isAvailable);
     if (!nullToAbsent || description != null) {
       map['description'] = Variable<String>(description);
+    }
+    if (!nullToAbsent || imageUrl != null) {
+      map['image_url'] = Variable<String>(imageUrl);
     }
     map['is_deleted'] = Variable<bool>(isDeleted);
     return map;
@@ -1035,6 +1062,9 @@ class Item extends DataClass implements Insertable<Item> {
       description: description == null && nullToAbsent
           ? const Value.absent()
           : Value(description),
+      imageUrl: imageUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(imageUrl),
       isDeleted: Value(isDeleted),
     );
   }
@@ -1052,6 +1082,7 @@ class Item extends DataClass implements Insertable<Item> {
       discountPercent: serializer.fromJson<double>(json['discountPercent']),
       isAvailable: serializer.fromJson<bool>(json['isAvailable']),
       description: serializer.fromJson<String?>(json['description']),
+      imageUrl: serializer.fromJson<String?>(json['imageUrl']),
       isDeleted: serializer.fromJson<bool>(json['isDeleted']),
     );
   }
@@ -1066,6 +1097,7 @@ class Item extends DataClass implements Insertable<Item> {
       'discountPercent': serializer.toJson<double>(discountPercent),
       'isAvailable': serializer.toJson<bool>(isAvailable),
       'description': serializer.toJson<String?>(description),
+      'imageUrl': serializer.toJson<String?>(imageUrl),
       'isDeleted': serializer.toJson<bool>(isDeleted),
     };
   }
@@ -1078,6 +1110,7 @@ class Item extends DataClass implements Insertable<Item> {
     double? discountPercent,
     bool? isAvailable,
     Value<String?> description = const Value.absent(),
+    Value<String?> imageUrl = const Value.absent(),
     bool? isDeleted,
   }) => Item(
     id: id ?? this.id,
@@ -1087,6 +1120,7 @@ class Item extends DataClass implements Insertable<Item> {
     discountPercent: discountPercent ?? this.discountPercent,
     isAvailable: isAvailable ?? this.isAvailable,
     description: description.present ? description.value : this.description,
+    imageUrl: imageUrl.present ? imageUrl.value : this.imageUrl,
     isDeleted: isDeleted ?? this.isDeleted,
   );
   Item copyWithCompanion(ItemsCompanion data) {
@@ -1106,6 +1140,7 @@ class Item extends DataClass implements Insertable<Item> {
       description: data.description.present
           ? data.description.value
           : this.description,
+      imageUrl: data.imageUrl.present ? data.imageUrl.value : this.imageUrl,
       isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
     );
   }
@@ -1120,6 +1155,7 @@ class Item extends DataClass implements Insertable<Item> {
           ..write('discountPercent: $discountPercent, ')
           ..write('isAvailable: $isAvailable, ')
           ..write('description: $description, ')
+          ..write('imageUrl: $imageUrl, ')
           ..write('isDeleted: $isDeleted')
           ..write(')'))
         .toString();
@@ -1134,6 +1170,7 @@ class Item extends DataClass implements Insertable<Item> {
     discountPercent,
     isAvailable,
     description,
+    imageUrl,
     isDeleted,
   );
   @override
@@ -1147,6 +1184,7 @@ class Item extends DataClass implements Insertable<Item> {
           other.discountPercent == this.discountPercent &&
           other.isAvailable == this.isAvailable &&
           other.description == this.description &&
+          other.imageUrl == this.imageUrl &&
           other.isDeleted == this.isDeleted);
 }
 
@@ -1158,6 +1196,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
   final Value<double> discountPercent;
   final Value<bool> isAvailable;
   final Value<String?> description;
+  final Value<String?> imageUrl;
   final Value<bool> isDeleted;
   final Value<int> rowid;
   const ItemsCompanion({
@@ -1168,6 +1207,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     this.discountPercent = const Value.absent(),
     this.isAvailable = const Value.absent(),
     this.description = const Value.absent(),
+    this.imageUrl = const Value.absent(),
     this.isDeleted = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -1179,6 +1219,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     this.discountPercent = const Value.absent(),
     this.isAvailable = const Value.absent(),
     this.description = const Value.absent(),
+    this.imageUrl = const Value.absent(),
     this.isDeleted = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -1193,6 +1234,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     Expression<double>? discountPercent,
     Expression<bool>? isAvailable,
     Expression<String>? description,
+    Expression<String>? imageUrl,
     Expression<bool>? isDeleted,
     Expression<int>? rowid,
   }) {
@@ -1204,6 +1246,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
       if (discountPercent != null) 'discount_percent': discountPercent,
       if (isAvailable != null) 'is_available': isAvailable,
       if (description != null) 'description': description,
+      if (imageUrl != null) 'image_url': imageUrl,
       if (isDeleted != null) 'is_deleted': isDeleted,
       if (rowid != null) 'rowid': rowid,
     });
@@ -1217,6 +1260,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     Value<double>? discountPercent,
     Value<bool>? isAvailable,
     Value<String?>? description,
+    Value<String?>? imageUrl,
     Value<bool>? isDeleted,
     Value<int>? rowid,
   }) {
@@ -1228,6 +1272,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
       discountPercent: discountPercent ?? this.discountPercent,
       isAvailable: isAvailable ?? this.isAvailable,
       description: description ?? this.description,
+      imageUrl: imageUrl ?? this.imageUrl,
       isDeleted: isDeleted ?? this.isDeleted,
       rowid: rowid ?? this.rowid,
     );
@@ -1257,6 +1302,9 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     if (description.present) {
       map['description'] = Variable<String>(description.value);
     }
+    if (imageUrl.present) {
+      map['image_url'] = Variable<String>(imageUrl.value);
+    }
     if (isDeleted.present) {
       map['is_deleted'] = Variable<bool>(isDeleted.value);
     }
@@ -1276,6 +1324,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
           ..write('discountPercent: $discountPercent, ')
           ..write('isAvailable: $isAvailable, ')
           ..write('description: $description, ')
+          ..write('imageUrl: $imageUrl, ')
           ..write('isDeleted: $isDeleted, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -5076,6 +5125,7 @@ typedef $$ItemsTableCreateCompanionBuilder =
       Value<double> discountPercent,
       Value<bool> isAvailable,
       Value<String?> description,
+      Value<String?> imageUrl,
       Value<bool> isDeleted,
       Value<int> rowid,
     });
@@ -5088,6 +5138,7 @@ typedef $$ItemsTableUpdateCompanionBuilder =
       Value<double> discountPercent,
       Value<bool> isAvailable,
       Value<String?> description,
+      Value<String?> imageUrl,
       Value<bool> isDeleted,
       Value<int> rowid,
     });
@@ -5167,6 +5218,11 @@ class $$ItemsTableFilterComposer extends Composer<_$AppDatabase, $ItemsTable> {
 
   ColumnFilters<String> get description => $composableBuilder(
     column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get imageUrl => $composableBuilder(
+    column: $table.imageUrl,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5263,6 +5319,11 @@ class $$ItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get imageUrl => $composableBuilder(
+    column: $table.imageUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isDeleted => $composableBuilder(
     column: $table.isDeleted,
     builder: (column) => ColumnOrderings(column),
@@ -5324,6 +5385,9 @@ class $$ItemsTableAnnotationComposer
     column: $table.description,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get imageUrl =>
+      $composableBuilder(column: $table.imageUrl, builder: (column) => column);
 
   GeneratedColumn<bool> get isDeleted =>
       $composableBuilder(column: $table.isDeleted, builder: (column) => column);
@@ -5412,6 +5476,7 @@ class $$ItemsTableTableManager
                 Value<double> discountPercent = const Value.absent(),
                 Value<bool> isAvailable = const Value.absent(),
                 Value<String?> description = const Value.absent(),
+                Value<String?> imageUrl = const Value.absent(),
                 Value<bool> isDeleted = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ItemsCompanion(
@@ -5422,6 +5487,7 @@ class $$ItemsTableTableManager
                 discountPercent: discountPercent,
                 isAvailable: isAvailable,
                 description: description,
+                imageUrl: imageUrl,
                 isDeleted: isDeleted,
                 rowid: rowid,
               ),
@@ -5434,6 +5500,7 @@ class $$ItemsTableTableManager
                 Value<double> discountPercent = const Value.absent(),
                 Value<bool> isAvailable = const Value.absent(),
                 Value<String?> description = const Value.absent(),
+                Value<String?> imageUrl = const Value.absent(),
                 Value<bool> isDeleted = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ItemsCompanion.insert(
@@ -5444,6 +5511,7 @@ class $$ItemsTableTableManager
                 discountPercent: discountPercent,
                 isAvailable: isAvailable,
                 description: description,
+                imageUrl: imageUrl,
                 isDeleted: isDeleted,
                 rowid: rowid,
               ),

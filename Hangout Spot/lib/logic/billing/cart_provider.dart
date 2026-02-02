@@ -41,6 +41,8 @@ class CartState {
   final double paidCash;
   final double paidUPI;
   final double manualDiscount;
+  final bool canUndo;
+  final bool canRedo;
 
   CartState({
     this.orderId,
@@ -50,6 +52,8 @@ class CartState {
     this.paidCash = 0.0,
     this.paidUPI = 0.0,
     this.manualDiscount = 0.0,
+    this.canUndo = false,
+    this.canRedo = false,
   });
 
   // Alias for backward compatibility with new reward code
@@ -87,6 +91,8 @@ class CartState {
     double? paidCash,
     double? paidUPI,
     double? manualDiscount,
+    bool? canUndo,
+    bool? canRedo,
   }) {
     return CartState(
       orderId: orderId ?? this.orderId,
@@ -96,13 +102,51 @@ class CartState {
       paidCash: paidCash ?? this.paidCash,
       paidUPI: paidUPI ?? this.paidUPI,
       manualDiscount: manualDiscount ?? this.manualDiscount,
+      canUndo: canUndo ?? this.canUndo,
+      canRedo: canRedo ?? this.canRedo,
     );
   }
 }
 
 // --- notifier ---
 class CartNotifier extends StateNotifier<CartState> {
-  CartNotifier() : super(CartState());
+  CartNotifier() : super(CartState()) {
+    _pushState(state);
+  }
+
+  final List<CartState> _history = [];
+  int _historyIndex = -1;
+
+  void _pushState(CartState newState) {
+    if (_historyIndex < _history.length - 1) {
+      _history.removeRange(_historyIndex + 1, _history.length);
+    }
+    _history.add(newState.copyWith(canUndo: false, canRedo: false));
+    _historyIndex = _history.length - 1;
+    _applyState(newState, push: false);
+  }
+
+  void _applyState(CartState newState, {bool push = true}) {
+    if (push) {
+      _pushState(newState);
+      return;
+    }
+    final canUndo = _historyIndex > 0;
+    final canRedo = _historyIndex < _history.length - 1;
+    state = newState.copyWith(canUndo: canUndo, canRedo: canRedo);
+  }
+
+  void undo() {
+    if (_historyIndex <= 0) return;
+    _historyIndex -= 1;
+    _applyState(_history[_historyIndex], push: false);
+  }
+
+  void redo() {
+    if (_historyIndex >= _history.length - 1) return;
+    _historyIndex += 1;
+    _applyState(_history[_historyIndex], push: false);
+  }
 
   void addItem(Item item) {
     // Check if exists
@@ -118,17 +162,19 @@ class CartNotifier extends StateNotifier<CartState> {
       final old = state.items[index];
       final newItems = [...state.items];
       newItems[index] = old.copyWith(quantity: old.quantity + 1);
-      state = state.copyWith(items: newItems);
+      _applyState(state.copyWith(items: newItems));
     } else {
-      state = state.copyWith(
-        items: [
-          ...state.items,
-          CartItem(
-            id: const Uuid().v4(),
-            item: item,
-            discountAmount: discountAmount,
-          ),
-        ],
+      _applyState(
+        state.copyWith(
+          items: [
+            ...state.items,
+            CartItem(
+              id: const Uuid().v4(),
+              item: item,
+              discountAmount: discountAmount,
+            ),
+          ],
+        ),
       );
     }
   }
@@ -138,59 +184,69 @@ class CartNotifier extends StateNotifier<CartState> {
       removeItem(cartId);
       return;
     }
-    state = state.copyWith(
-      items: state.items.map((i) {
-        if (i.id == cartId) return i.copyWith(quantity: qty);
-        return i;
-      }).toList(),
+    _applyState(
+      state.copyWith(
+        items: state.items.map((i) {
+          if (i.id == cartId) return i.copyWith(quantity: qty);
+          return i;
+        }).toList(),
+      ),
     );
   }
 
   void removeItem(String cartId) {
-    state = state.copyWith(
-      items: state.items.where((i) => i.id != cartId).toList(),
+    _applyState(
+      state.copyWith(items: state.items.where((i) => i.id != cartId).toList()),
     );
   }
 
   // Remove item by ITEM ID (for toggle logic)
   void removeByItemId(String itemId) {
-    state = state.copyWith(
-      items: state.items.where((i) => i.item.id != itemId).toList(),
+    _applyState(
+      state.copyWith(
+        items: state.items.where((i) => i.item.id != itemId).toList(),
+      ),
     );
   }
 
   void updateNote(String cartId, String note) {
-    state = state.copyWith(
-      items: state.items.map((i) {
-        if (i.id == cartId) return i.copyWith(note: note);
-        return i;
-      }).toList(),
+    _applyState(
+      state.copyWith(
+        items: state.items.map((i) {
+          if (i.id == cartId) return i.copyWith(note: note);
+          return i;
+        }).toList(),
+      ),
     );
   }
 
   void updateItemDiscount(String cartId, double discount) {
-    state = state.copyWith(
-      items: state.items.map((i) {
-        if (i.id == cartId) return i.copyWith(discountAmount: discount);
-        return i;
-      }).toList(),
+    _applyState(
+      state.copyWith(
+        items: state.items.map((i) {
+          if (i.id == cartId) return i.copyWith(discountAmount: discount);
+          return i;
+        }).toList(),
+      ),
     );
   }
 
   void setCustomer(Customer? customer) {
-    state = state.copyWith(customer: customer);
+    _applyState(state.copyWith(customer: customer));
   }
 
   void setOrderId(String? orderId) {
-    state = state.copyWith(orderId: orderId);
+    _applyState(state.copyWith(orderId: orderId));
   }
 
   void setPaymentMode(String mode) {
-    state = state.copyWith(paymentMode: mode);
+    _applyState(state.copyWith(paymentMode: mode));
   }
 
   void setPaymentSplit(double cash, double upi) {
-    state = state.copyWith(paymentMode: 'Split', paidCash: cash, paidUPI: upi);
+    _applyState(
+      state.copyWith(paymentMode: 'Split', paidCash: cash, paidUPI: upi),
+    );
   }
 
   void setManualDiscount(double discount) {
@@ -208,11 +264,11 @@ class CartNotifier extends StateNotifier<CartState> {
     );
 
     final nextManual = discount.clamp(0.0, maxManual);
-    state = state.copyWith(manualDiscount: nextManual);
+    _applyState(state.copyWith(manualDiscount: nextManual));
   }
 
   void clearCart() {
-    state = CartState();
+    _applyState(CartState());
   }
 
   void loadOrder(
@@ -220,20 +276,22 @@ class CartNotifier extends StateNotifier<CartState> {
     List<({OrderItem orderItem, Item realItem})> details,
     Customer? customer,
   ) {
-    state = CartState(
-      orderId: order.id,
-      customer: customer,
-      items: details
-          .map(
-            (d) => CartItem(
-              id: const Uuid().v4(),
-              item: d.realItem, // Uses real item with taxPercent
-              quantity: d.orderItem.quantity,
-              note: d.orderItem.note,
-              discountAmount: d.orderItem.discountAmount,
-            ),
-          )
-          .toList(),
+    _applyState(
+      CartState(
+        orderId: order.id,
+        customer: customer,
+        items: details
+            .map(
+              (d) => CartItem(
+                id: const Uuid().v4(),
+                item: d.realItem, // Uses real item with taxPercent
+                quantity: d.orderItem.quantity,
+                note: d.orderItem.note,
+                discountAmount: d.orderItem.discountAmount,
+              ),
+            )
+            .toList(),
+      ),
     );
   }
 
@@ -255,7 +313,7 @@ class CartNotifier extends StateNotifier<CartState> {
       0.0,
       maxManual,
     );
-    state = state.copyWith(manualDiscount: nextManual);
+    _applyState(state.copyWith(manualDiscount: nextManual));
   }
 }
 

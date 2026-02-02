@@ -455,6 +455,61 @@ class AnalyticsRepository {
     return bundles.take(limit).toList();
   }
 
+  Future<List<MapEntry<DateTime, double>>> getDailySales(
+    DateTime start,
+    DateTime end,
+  ) async {
+    final rows = await _db
+        .customSelect(
+          "SELECT date(created_at) as day, SUM(total_amount) as total "
+          "FROM orders "
+          "WHERE status = 'completed' AND created_at >= ? AND created_at < ? "
+          "GROUP BY day ORDER BY day",
+          variables: [Variable.withDateTime(start), Variable.withDateTime(end)],
+          readsFrom: {_db.orders},
+        )
+        .get();
+
+    return rows.map((row) {
+      final day = row.read<String>('day') ?? '';
+      final date = DateTime.tryParse(day) ?? start;
+      final total = (row.read<num>('total') ?? 0).toDouble();
+      return MapEntry(date, total);
+    }).toList();
+  }
+
+  Future<List<MapEntry<String, double>>> getItemSalesShare(
+    DateTime start,
+    DateTime end, {
+    int limit = 5,
+  }) async {
+    final rows = await _db
+        .customSelect(
+          "SELECT oi.item_name as name, SUM(oi.quantity) as qty "
+          "FROM order_items oi "
+          "INNER JOIN orders o ON o.id = oi.order_id "
+          "WHERE o.status = 'completed' AND o.created_at >= ? AND o.created_at < ? "
+          "GROUP BY oi.item_name "
+          "ORDER BY qty DESC",
+          variables: [Variable.withDateTime(start), Variable.withDateTime(end)],
+          readsFrom: {_db.orderItems, _db.orders},
+        )
+        .get();
+
+    final totalQty = rows.fold<double>(
+      0,
+      (sum, row) => sum + ((row.read<int>('qty') ?? 0).toDouble()),
+    );
+    if (totalQty == 0) return [];
+
+    final topRows = rows.take(limit);
+    return topRows.map((row) {
+      final name = row.read<String>('name') ?? 'Unknown';
+      final qty = (row.read<int>('qty') ?? 0).toDouble();
+      return MapEntry(name, qty / totalQty);
+    }).toList();
+  }
+
   Future<String?> getSalesAnomalyNote(DateTime start, DateTime end) async {
     final todaySales = await getTodaySales();
     final avg = await getAverageDailySales(start, end);

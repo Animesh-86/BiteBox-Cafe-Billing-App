@@ -1,10 +1,16 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/ui/widgets/glass_container.dart';
 import 'package:drift/drift.dart' as drift;
+import 'package:hangout_spot/data/providers/database_provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/data/repositories/menu_repository.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'item_list_tab.dart';
 
 class ManageMenuScreen extends ConsumerWidget {
@@ -46,7 +52,19 @@ class ManageMenuScreen extends ConsumerWidget {
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        actions: [],
+        actions: [
+          IconButton(
+            tooltip: 'Export CSV',
+            icon: const Icon(Icons.file_download_outlined, size: 18),
+            onPressed: () => _exportMenuCsv(context, ref),
+          ),
+          IconButton(
+            tooltip: 'Import CSV',
+            icon: const Icon(Icons.file_upload_outlined, size: 18),
+            onPressed: () => _importMenuCsv(context, ref),
+          ),
+          const SizedBox(width: 4),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -201,6 +219,156 @@ class ManageMenuScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _exportMenuCsv(BuildContext context, WidgetRef ref) async {
+    final db = ref.read(appDatabaseProvider);
+    final categories = await db.select(db.categories).get();
+    final items = await db.select(db.items).get();
+
+    final categoryMap = {for (final c in categories) c.id: c.name};
+
+    final buffer = StringBuffer();
+    buffer.writeln(
+      'category,name,price,discountPercent,isAvailable,description,imageUrl',
+    );
+    for (final item in items) {
+      final categoryName = categoryMap[item.categoryId] ?? '';
+      buffer.writeln(
+        [
+          _escapeCsv(categoryName),
+          _escapeCsv(item.name),
+          item.price.toString(),
+          item.discountPercent.toString(),
+          item.isAvailable ? 'true' : 'false',
+          _escapeCsv(item.description ?? ''),
+          _escapeCsv(item.imageUrl ?? ''),
+        ].join(','),
+      );
+    }
+
+    final dir = await getTemporaryDirectory();
+    final file = File('${dir.path}/menu_export.csv');
+    await file.writeAsString(buffer.toString());
+    await Share.shareXFiles([XFile(file.path, mimeType: 'text/csv')]);
+  }
+
+  Future<void> _importMenuCsv(BuildContext context, WidgetRef ref) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['csv'],
+    );
+    if (result == null || result.files.isEmpty) return;
+
+    final path = result.files.single.path;
+    if (path == null) return;
+
+    final content = await File(path).readAsString();
+    final lines = content.split(RegExp(r'\r?\n'));
+    if (lines.length <= 1) return;
+
+    final db = ref.read(appDatabaseProvider);
+    final repo = ref.read(menuRepositoryProvider);
+    final categories = await db.select(db.categories).get();
+    final categoryByName = {
+      for (final c in categories) c.name.toLowerCase(): c,
+    };
+
+    int imported = 0;
+    for (int i = 1; i < lines.length; i++) {
+      final line = lines[i].trim();
+      if (line.isEmpty) continue;
+      final parts = _splitCsvLine(line);
+      if (parts.length < 2) continue;
+
+      final categoryName = parts[0].trim();
+      final name = parts.length > 1 ? parts[1].trim() : '';
+      if (name.isEmpty) continue;
+
+      final price = parts.length > 2 ? double.tryParse(parts[2]) ?? 0.0 : 0.0;
+      final discount = parts.length > 3
+          ? double.tryParse(parts[3]) ?? 0.0
+          : 0.0;
+      final isAvailable = parts.length > 4
+          ? parts[4].toLowerCase() != 'false'
+          : true;
+      final description = parts.length > 5 ? parts[5].trim() : '';
+      final imageUrl = parts.length > 6 ? parts[6].trim() : '';
+
+      Category? category = categoryByName[categoryName.toLowerCase().trim()];
+      if (category == null) {
+        final id = const Uuid().v4();
+        category = Category(
+          id: id,
+          name: categoryName.isEmpty ? 'Uncategorized' : categoryName,
+          color: 0xFFFFFFFF,
+          sortOrder: 0,
+          discountPercent: 0.0,
+          isDeleted: false,
+        );
+        await repo.addCategory(
+          CategoriesCompanion(
+            id: drift.Value(category.id),
+            name: drift.Value(category.name),
+            color: drift.Value(category.color),
+            sortOrder: drift.Value(category.sortOrder),
+            discountPercent: drift.Value(category.discountPercent),
+          ),
+        );
+        categoryByName[category.name.toLowerCase()] = category;
+      }
+
+      await repo.addItem(
+        ItemsCompanion(
+          id: drift.Value(const Uuid().v4()),
+          categoryId: drift.Value(category.id),
+          name: drift.Value(name),
+          price: drift.Value(price),
+          discountPercent: drift.Value(discount),
+          isAvailable: drift.Value(isAvailable),
+          description: drift.Value(description.isEmpty ? null : description),
+          imageUrl: drift.Value(imageUrl.isEmpty ? null : imageUrl),
+        ),
+      );
+      imported++;
+    }
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Imported $imported items')));
+    }
+  }
+
+  String _escapeCsv(String value) {
+    final needsQuotes = value.contains(',') || value.contains('"');
+    final escaped = value.replaceAll('"', '""');
+    return needsQuotes ? '"$escaped"' : escaped;
+  }
+
+  List<String> _splitCsvLine(String line) {
+    final result = <String>[];
+    final buffer = StringBuffer();
+    bool inQuotes = false;
+
+    for (int i = 0; i < line.length; i++) {
+      final char = line[i];
+      if (char == '"') {
+        if (inQuotes && i + 1 < line.length && line[i + 1] == '"') {
+          buffer.write('"');
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char == ',' && !inQuotes) {
+        result.add(buffer.toString());
+        buffer.clear();
+      } else {
+        buffer.write(char);
+      }
+    }
+    result.add(buffer.toString());
+    return result;
   }
 
   String _getCategoryName(WidgetRef ref, String? categoryId) {

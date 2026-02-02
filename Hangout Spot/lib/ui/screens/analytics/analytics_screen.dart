@@ -1,7 +1,15 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:hangout_spot/data/repositories/analytics_repository.dart';
+import 'package:intl/intl.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+
+final analyticsDateRangeProvider = StateProvider<DateTimeRange?>((ref) => null);
 
 class AnalyticsScreen extends ConsumerWidget {
   const AnalyticsScreen({super.key});
@@ -12,6 +20,18 @@ class AnalyticsScreen extends ConsumerWidget {
     final now = DateTime.now();
     final startOfDay = DateTime(now.year, now.month, now.day);
     final last7Start = startOfDay.subtract(const Duration(days: 6));
+    final selectedRange = ref.watch(analyticsDateRangeProvider);
+    final rangeStart = DateTime(
+      (selectedRange?.start ?? last7Start).year,
+      (selectedRange?.start ?? last7Start).month,
+      (selectedRange?.start ?? last7Start).day,
+    );
+    final rangeEnd = DateTime(
+      (selectedRange?.end ?? now).year,
+      (selectedRange?.end ?? now).month,
+      (selectedRange?.end ?? now).day,
+    ).add(const Duration(days: 1));
+    final rangeLabel = _formatRange(rangeStart, rangeEnd);
     final theme = Theme.of(context);
     final width = MediaQuery.of(context).size.width;
     final isWide = width > 900;
@@ -22,6 +42,32 @@ class AnalyticsScreen extends ConsumerWidget {
         backgroundColor: Colors.transparent,
         appBar: AppBar(
           title: const Text('Analytics & Insights'),
+          actions: [
+            TextButton.icon(
+              onPressed: () async {
+                final picked = await showDateRangePicker(
+                  context: context,
+                  firstDate: DateTime(2023),
+                  lastDate: DateTime.now(),
+                  initialDateRange:
+                      selectedRange ??
+                      DateTimeRange(start: last7Start, end: now),
+                );
+                if (picked != null) {
+                  ref.read(analyticsDateRangeProvider.notifier).state = picked;
+                }
+              },
+              icon: const Icon(Icons.date_range, size: 18),
+              label: Text(rangeLabel, style: const TextStyle(fontSize: 12)),
+            ),
+            IconButton(
+              tooltip: 'Export Report',
+              icon: const Icon(Icons.file_download_outlined, size: 18),
+              onPressed: () =>
+                  _showExportSheet(context, analytics, rangeStart, rangeEnd),
+            ),
+            const SizedBox(width: 4),
+          ],
           bottom: TabBar(
             indicatorColor: theme.colorScheme.primary,
             labelColor: theme.colorScheme.primary,
@@ -38,23 +84,26 @@ class AnalyticsScreen extends ConsumerWidget {
             // Overview Tab
             _OverviewTab(
               analytics: analytics,
-              last7Start: last7Start,
-              now: now,
+              rangeStart: rangeStart,
+              rangeEnd: rangeEnd,
+              rangeLabel: rangeLabel,
               isWide: isWide,
             ),
 
             // Trends Tab
             _TrendsTab(
               analytics: analytics,
-              last7Start: last7Start,
-              now: now,
+              rangeStart: rangeStart,
+              rangeEnd: rangeEnd,
+              rangeLabel: rangeLabel,
             ),
 
             // Forecast Tab
             _ForecastTab(
               analytics: analytics,
-              last7Start: last7Start,
-              now: now,
+              rangeStart: rangeStart,
+              rangeEnd: rangeEnd,
+              rangeLabel: rangeLabel,
             ),
           ],
         ),
@@ -66,14 +115,16 @@ class AnalyticsScreen extends ConsumerWidget {
 // Overview Tab
 class _OverviewTab extends StatelessWidget {
   final AnalyticsRepository analytics;
-  final DateTime last7Start;
-  final DateTime now;
+  final DateTime rangeStart;
+  final DateTime rangeEnd;
+  final String rangeLabel;
   final bool isWide;
 
   const _OverviewTab({
     required this.analytics,
-    required this.last7Start,
-    required this.now,
+    required this.rangeStart,
+    required this.rangeEnd,
+    required this.rangeLabel,
     required this.isWide,
   });
 
@@ -97,7 +148,7 @@ class _OverviewTab extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Key metrics for today and last 7 days',
+            'Key metrics for $rangeLabel',
             style: TextStyle(
               fontSize: 14,
               color: theme.colorScheme.onSurface.withOpacity(0.7),
@@ -108,10 +159,10 @@ class _OverviewTab extends StatelessWidget {
           // Key Metrics Grid
           FutureBuilder(
             future: Future.wait([
-              analytics.getTodaySales(),
-              analytics.getTodayOrdersCount(),
-              analytics.getAverageOrderValue(last7Start, now),
-              analytics.getRepeatCustomerRate(last7Start, now),
+              analytics.getSessionSales(rangeStart, rangeEnd),
+              analytics.getSessionOrdersCount(rangeStart, rangeEnd),
+              analytics.getAverageOrderValue(rangeStart, rangeEnd),
+              analytics.getRepeatCustomerRate(rangeStart, rangeEnd),
             ]),
             builder: (context, snapshot) {
               if (!snapshot.hasData) {
@@ -135,11 +186,11 @@ class _OverviewTab extends StatelessWidget {
                       SizedBox(
                         width: cardWidth,
                         child: _MetricCard(
-                          title: "Today's Sales",
+                          title: "Sales",
                           value: "₹${data[0].toStringAsFixed(0)}",
                           icon: Icons.currency_rupee,
                           iconColor: const Color(0xFFFFD54F),
-                          subtitle: "Revenue today",
+                          subtitle: rangeLabel,
                         ),
                       ),
                       SizedBox(
@@ -149,7 +200,7 @@ class _OverviewTab extends StatelessWidget {
                           value: "${data[1]}",
                           icon: Icons.receipt_long,
                           iconColor: const Color(0xFF64B5F6),
-                          subtitle: "Completed today",
+                          subtitle: rangeLabel,
                         ),
                       ),
                       SizedBox(
@@ -159,7 +210,7 @@ class _OverviewTab extends StatelessWidget {
                           value: "₹${data[2].toStringAsFixed(0)}",
                           icon: Icons.shopping_cart,
                           iconColor: const Color(0xFFFFB74D),
-                          subtitle: "Last 7 days",
+                          subtitle: rangeLabel,
                         ),
                       ),
                       SizedBox(
@@ -169,7 +220,7 @@ class _OverviewTab extends StatelessWidget {
                           value: "${(data[3] * 100).toStringAsFixed(0)}%",
                           icon: Icons.loyalty,
                           iconColor: const Color(0xFFBA68C8),
-                          subtitle: "Returning customers",
+                          subtitle: rangeLabel,
                         ),
                       ),
                     ],
@@ -199,8 +250,8 @@ class _OverviewTab extends StatelessWidget {
           const SizedBox(height: 16),
           FutureBuilder(
             future: Future.wait([
-              analytics.getSalesAnomalyNote(last7Start, now),
-              analytics.getTopBundles(last7Start, now),
+              analytics.getSalesAnomalyNote(rangeStart, rangeEnd),
+              analytics.getTopBundles(rangeStart, rangeEnd),
             ]),
             builder: (context, snapshot) {
               if (!snapshot.hasData) {
@@ -265,7 +316,7 @@ class _OverviewTab extends StatelessWidget {
                       ],
                       const SizedBox(height: 12),
                       Text(
-                        'Based on the last 7 days of order data',
+                        'Based on $rangeLabel',
                         style: TextStyle(
                           fontSize: 12,
                           color: theme.colorScheme.onSurface.withOpacity(0.5),
@@ -295,16 +346,16 @@ class _OverviewTab extends StatelessWidget {
                     width: cardWidth,
                     child: _CustomerSegmentsCard(
                       analytics: analytics,
-                      last7Start: last7Start,
-                      now: now,
+                      last7Start: rangeStart,
+                      now: rangeEnd,
                     ),
                   ),
                   SizedBox(
                     width: cardWidth,
                     child: _DiscountImpactCard(
                       analytics: analytics,
-                      last7Start: last7Start,
-                      now: now,
+                      last7Start: rangeStart,
+                      now: rangeEnd,
                     ),
                   ),
                 ],
@@ -320,13 +371,15 @@ class _OverviewTab extends StatelessWidget {
 // Trends Tab
 class _TrendsTab extends StatelessWidget {
   final AnalyticsRepository analytics;
-  final DateTime last7Start;
-  final DateTime now;
+  final DateTime rangeStart;
+  final DateTime rangeEnd;
+  final String rangeLabel;
 
   const _TrendsTab({
     required this.analytics,
-    required this.last7Start,
-    required this.now,
+    required this.rangeStart,
+    required this.rangeEnd,
+    required this.rangeLabel,
   });
 
   @override
@@ -348,7 +401,7 @@ class _TrendsTab extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Analyzing patterns from the last 7 days',
+            'Analyzing patterns for $rangeLabel',
             style: TextStyle(
               fontSize: 14,
               color: theme.colorScheme.onSurface.withOpacity(0.7),
@@ -356,15 +409,77 @@ class _TrendsTab extends StatelessWidget {
           ),
           const SizedBox(height: 24),
 
+          _ModernSectionCard(
+            title: 'Daily Sales Trend',
+            subtitle: 'Revenue by day',
+            icon: Icons.show_chart,
+            child: SizedBox(
+              height: 220,
+              child: FutureBuilder(
+                future: analytics.getDailySales(rangeStart, rangeEnd),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final points =
+                      snapshot.data as List<MapEntry<DateTime, double>>;
+                  if (points.isEmpty) {
+                    return Center(
+                      child: Text(
+                        'No data available',
+                        style: TextStyle(
+                          color: theme.colorScheme.onSurface.withOpacity(0.5),
+                        ),
+                      ),
+                    );
+                  }
+                  return _buildLineChart(points, theme.colorScheme.primary);
+                },
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          _ModernSectionCard(
+            title: 'Item Share',
+            subtitle: 'Top items contribution',
+            icon: Icons.pie_chart,
+            child: SizedBox(
+              height: 220,
+              child: FutureBuilder(
+                future: analytics.getItemSalesShare(rangeStart, rangeEnd),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final shares =
+                      snapshot.data as List<MapEntry<String, double>>;
+                  if (shares.isEmpty) {
+                    return Center(
+                      child: Text(
+                        'No data available',
+                        style: TextStyle(
+                          color: theme.colorScheme.onSurface.withOpacity(0.5),
+                        ),
+                      ),
+                    );
+                  }
+                  return _buildPieChart(shares, theme);
+                },
+              ),
+            ),
+          ),
+
           // Peak Hours Chart
           _ModernSectionCard(
             title: 'Peak Hours',
-            subtitle: 'Order distribution by hour (last 7 days)',
+            subtitle: 'Order distribution by hour',
             icon: Icons.access_time,
             child: SizedBox(
               height: 250,
               child: FutureBuilder(
-                future: analytics.getPeakHours(last7Start, now),
+                future: analytics.getPeakHours(rangeStart, rangeEnd),
                 builder: (context, snapshot) {
                   if (!snapshot.hasData) {
                     return const Center(child: CircularProgressIndicator());
@@ -397,21 +512,48 @@ class _TrendsTab extends StatelessWidget {
 
           const SizedBox(height: 20),
 
+          _ModernSectionCard(
+            title: 'Hourly Heat Map',
+            subtitle: 'Intensity by hour',
+            icon: Icons.grid_on,
+            child: FutureBuilder(
+              future: analytics.getPeakHours(rangeStart, rangeEnd),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final data = snapshot.data as List<MapEntry<int, double>>;
+                if (data.isEmpty) {
+                  return Center(
+                    child: Text(
+                      'No data available',
+                      style: TextStyle(
+                        color: theme.colorScheme.onSurface.withOpacity(0.5),
+                      ),
+                    ),
+                  );
+                }
+                return _buildHeatMap(data, theme.colorScheme.primary);
+              },
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
           // Top Selling Items
           _ModernSectionCard(
             title: 'Top Selling Items',
-            subtitle: 'Best performers (last 7 days)',
+            subtitle: 'Best performers',
             icon: Icons.star,
             child: SizedBox(
               height: 250,
               child: FutureBuilder(
-                future: analytics.getTopSellingItemsSince(last7Start, now),
+                future: analytics.getTopSellingItemsSince(rangeStart, rangeEnd),
                 builder: (context, snapshot) {
                   if (!snapshot.hasData) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  final items =
-                      snapshot.data as List<MapEntry<String, double>>;
+                  final items = snapshot.data as List<MapEntry<String, double>>;
                   if (items.isEmpty) {
                     return Center(
                       child: Text(
@@ -440,7 +582,7 @@ class _TrendsTab extends StatelessWidget {
             subtitle: 'Items needing attention',
             icon: Icons.warning_amber_rounded,
             child: FutureBuilder(
-              future: analytics.getLowSellingItemsSince(last7Start, now),
+              future: analytics.getLowSellingItemsSince(rangeStart, rangeEnd),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
                   return const Center(child: CircularProgressIndicator());
@@ -519,13 +661,15 @@ class _TrendsTab extends StatelessWidget {
 // Forecast Tab
 class _ForecastTab extends StatelessWidget {
   final AnalyticsRepository analytics;
-  final DateTime last7Start;
-  final DateTime now;
+  final DateTime rangeStart;
+  final DateTime rangeEnd;
+  final String rangeLabel;
 
   const _ForecastTab({
     required this.analytics,
-    required this.last7Start,
-    required this.now,
+    required this.rangeStart,
+    required this.rangeEnd,
+    required this.rangeLabel,
   });
 
   @override
@@ -547,7 +691,7 @@ class _ForecastTab extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Predictions based on historical data',
+            'Predictions based on $rangeLabel',
             style: TextStyle(
               fontSize: 14,
               color: theme.colorScheme.onSurface.withOpacity(0.7),
@@ -561,7 +705,7 @@ class _ForecastTab extends StatelessWidget {
             subtitle: 'Next day average forecast',
             icon: Icons.trending_up,
             child: FutureBuilder(
-              future: analytics.getDemandForecast(last7Start, now),
+              future: analytics.getDemandForecast(rangeStart, rangeEnd),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
                   return const Center(child: CircularProgressIndicator());
@@ -596,7 +740,9 @@ class _ForecastTab extends StatelessWidget {
                         vertical: 12,
                       ),
                       leading: CircleAvatar(
-                        backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+                        backgroundColor: theme.colorScheme.primary.withOpacity(
+                          0.1,
+                        ),
                         child: Icon(
                           Icons.inventory,
                           color: theme.colorScheme.primary,
@@ -647,7 +793,7 @@ class _ForecastTab extends StatelessWidget {
             subtitle: 'Popular item combinations',
             icon: Icons.local_offer,
             child: FutureBuilder(
-              future: analytics.getTopBundles(last7Start, now),
+              future: analytics.getTopBundles(rangeStart, rangeEnd),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
                   return const Center(child: CircularProgressIndicator());
@@ -682,7 +828,9 @@ class _ForecastTab extends StatelessWidget {
                         vertical: 12,
                       ),
                       leading: CircleAvatar(
-                        backgroundColor: const Color(0xFFBA68C8).withOpacity(0.1),
+                        backgroundColor: const Color(
+                          0xFFBA68C8,
+                        ).withOpacity(0.1),
                         child: const Icon(
                           Icons.shopping_bag,
                           color: Color(0xFFBA68C8),
@@ -807,6 +955,299 @@ class _MetricCard extends StatelessWidget {
   }
 }
 
+String _formatRange(DateTime start, DateTime endExclusive) {
+  final end = endExclusive.subtract(const Duration(days: 1));
+  final fmt = DateFormat('d MMM');
+  if (start.year == end.year) {
+    return '${fmt.format(start)} - ${fmt.format(end)}';
+  }
+  final fmtYear = DateFormat('d MMM yyyy');
+  return '${fmtYear.format(start)} - ${fmtYear.format(end)}';
+}
+
+Future<void> _showExportSheet(
+  BuildContext context,
+  AnalyticsRepository analytics,
+  DateTime start,
+  DateTime end,
+) async {
+  showModalBottomSheet(
+    context: context,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (ctx) => Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.table_chart_outlined),
+            title: const Text('Export CSV'),
+            onTap: () async {
+              Navigator.pop(ctx);
+              await _exportAnalyticsCsv(context, analytics, start, end);
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.picture_as_pdf_outlined),
+            title: const Text('Export PDF'),
+            onTap: () async {
+              Navigator.pop(ctx);
+              await _exportAnalyticsPdf(context, analytics, start, end);
+            },
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Future<void> _exportAnalyticsCsv(
+  BuildContext context,
+  AnalyticsRepository analytics,
+  DateTime start,
+  DateTime end,
+) async {
+  final sales = await analytics.getSessionSales(start, end);
+  final orders = await analytics.getSessionOrdersCount(start, end);
+  final avgOrder = await analytics.getAverageOrderValue(start, end);
+  final repeat = await analytics.getRepeatCustomerRate(start, end);
+  final topItems = await analytics.getTopSellingItemsSince(start, end);
+  final bundles = await analytics.getTopBundles(start, end);
+
+  final buffer = StringBuffer();
+  buffer.writeln('Metric,Value');
+  buffer.writeln('Sales,${sales.toStringAsFixed(2)}');
+  buffer.writeln('Orders,$orders');
+  buffer.writeln('AvgOrderValue,${avgOrder.toStringAsFixed(2)}');
+  buffer.writeln('RepeatRate,${(repeat * 100).toStringAsFixed(1)}%');
+  buffer.writeln('');
+  buffer.writeln('Top Items');
+  buffer.writeln('Item,Units');
+  for (final item in topItems) {
+    buffer.writeln('${item.key},${item.value.toStringAsFixed(0)}');
+  }
+  buffer.writeln('');
+  buffer.writeln('Top Bundles');
+  buffer.writeln('Bundle,Orders');
+  for (final bundle in bundles) {
+    buffer.writeln('${bundle.key},${bundle.value}');
+  }
+
+  final dir = await getTemporaryDirectory();
+  final file = File('${dir.path}/analytics_export.csv');
+  await file.writeAsString(buffer.toString());
+  await Share.shareXFiles([XFile(file.path, mimeType: 'text/csv')]);
+}
+
+Future<void> _exportAnalyticsPdf(
+  BuildContext context,
+  AnalyticsRepository analytics,
+  DateTime start,
+  DateTime end,
+) async {
+  final sales = await analytics.getSessionSales(start, end);
+  final orders = await analytics.getSessionOrdersCount(start, end);
+  final avgOrder = await analytics.getAverageOrderValue(start, end);
+  final repeat = await analytics.getRepeatCustomerRate(start, end);
+  final topItems = await analytics.getTopSellingItemsSince(start, end);
+  final bundles = await analytics.getTopBundles(start, end);
+
+  final pdf = pw.Document();
+  pdf.addPage(
+    pw.Page(
+      build: (context) {
+        return pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text(
+              'Analytics Report',
+              style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+            ),
+            pw.SizedBox(height: 8),
+            pw.Text('Range: ${_formatRange(start, end)}'),
+            pw.SizedBox(height: 16),
+            pw.Text(
+              'Summary',
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+            ),
+            pw.Text('Sales: ₹${sales.toStringAsFixed(2)}'),
+            pw.Text('Orders: $orders'),
+            pw.Text('Avg Order: ₹${avgOrder.toStringAsFixed(2)}'),
+            pw.Text('Repeat Rate: ${(repeat * 100).toStringAsFixed(1)}%'),
+            pw.SizedBox(height: 12),
+            pw.Text(
+              'Top Items',
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+            ),
+            pw.Column(
+              children: topItems
+                  .map(
+                    (e) => pw.Text('${e.key} • ${e.value.toStringAsFixed(0)}'),
+                  )
+                  .toList(),
+            ),
+            pw.SizedBox(height: 12),
+            pw.Text(
+              'Top Bundles',
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+            ),
+            pw.Column(
+              children: bundles
+                  .map((e) => pw.Text('${e.key} • ${e.value} orders'))
+                  .toList(),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+
+  final dir = await getTemporaryDirectory();
+  final file = File('${dir.path}/analytics_report.pdf');
+  await file.writeAsBytes(await pdf.save());
+  await Share.shareXFiles([XFile(file.path, mimeType: 'application/pdf')]);
+}
+
+Widget _buildLineChart(List<MapEntry<DateTime, double>> points, Color color) {
+  final spots = <FlSpot>[];
+  for (int i = 0; i < points.length; i++) {
+    spots.add(FlSpot(i.toDouble(), points[i].value));
+  }
+  return LineChart(
+    LineChartData(
+      gridData: FlGridData(show: false),
+      titlesData: FlTitlesData(
+        leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        bottomTitles: AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: true,
+            getTitlesWidget: (value, meta) {
+              final index = value.toInt();
+              if (index < 0 || index >= points.length) return const Text('');
+              final date = points[index].key;
+              return Text(DateFormat('d').format(date));
+            },
+          ),
+        ),
+      ),
+      borderData: FlBorderData(show: false),
+      lineBarsData: [
+        LineChartBarData(
+          spots: spots,
+          isCurved: true,
+          color: color,
+          barWidth: 3,
+          dotData: FlDotData(show: false),
+          belowBarData: BarAreaData(show: true, color: color.withOpacity(0.15)),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _buildPieChart(List<MapEntry<String, double>> shares, ThemeData theme) {
+  final colors = [
+    theme.colorScheme.primary,
+    const Color(0xFF64B5F6),
+    const Color(0xFFFFB74D),
+    const Color(0xFFBA68C8),
+    const Color(0xFF81C784),
+  ];
+  return Row(
+    children: [
+      Expanded(
+        child: PieChart(
+          PieChartData(
+            sectionsSpace: 2,
+            centerSpaceRadius: 30,
+            sections: shares.asMap().entries.map((e) {
+              final color = colors[e.key % colors.length];
+              return PieChartSectionData(
+                color: color,
+                value: e.value.value * 100,
+                title: '${(e.value.value * 100).toStringAsFixed(0)}%',
+                radius: 60,
+                titleStyle: const TextStyle(fontSize: 10, color: Colors.white),
+              );
+            }).toList(),
+          ),
+        ),
+      ),
+      const SizedBox(width: 12),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: shares
+              .asMap()
+              .entries
+              .map(
+                (e) => Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: colors[e.key % colors.length],
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          e.value.key,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+              .toList(),
+        ),
+      ),
+    ],
+  );
+}
+
+Widget _buildHeatMap(List<MapEntry<int, double>> hours, Color baseColor) {
+  final maxValue = hours.fold<double>(
+    0,
+    (max, e) => e.value > max ? e.value : max,
+  );
+  return Wrap(
+    spacing: 6,
+    runSpacing: 6,
+    children: List.generate(24, (index) {
+      final value = hours.firstWhere(
+        (e) => e.key == index,
+        orElse: () => MapEntry(index, 0),
+      );
+      final intensity = maxValue == 0 ? 0 : (value.value / maxValue);
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 18,
+            height: 18,
+            decoration: BoxDecoration(
+              color: baseColor.withOpacity(0.15 + (0.75 * intensity)),
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text('${index}h', style: const TextStyle(fontSize: 9)),
+        ],
+      );
+    }),
+  );
+}
+
 class _CustomerSegmentsCard extends StatelessWidget {
   final AnalyticsRepository analytics;
   final DateTime last7Start;
@@ -912,10 +1353,7 @@ class _SegmentItem extends StatelessWidget {
             Container(
               width: 12,
               height: 12,
-              decoration: BoxDecoration(
-                color: color,
-                shape: BoxShape.circle,
-              ),
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             ),
             const SizedBox(width: 12),
             Text(
@@ -1179,7 +1617,9 @@ Widget _buildModernBarChart(
   String Function(int index) labelBuilder,
   Color color,
 ) {
-  final maxValue = values.isEmpty ? 1.0 : values.reduce((a, b) => a > b ? a : b);
+  final maxValue = values.isEmpty
+      ? 1.0
+      : values.reduce((a, b) => a > b ? a : b);
   return BarChart(
     BarChartData(
       alignment: BarChartAlignment.spaceAround,
@@ -1220,10 +1660,7 @@ Widget _buildModernBarChart(
             getTitlesWidget: (value, meta) {
               return Text(
                 value.toInt().toString(),
-                style: const TextStyle(
-                  fontSize: 10,
-                  color: Color(0xFF9E9E9E),
-                ),
+                style: const TextStyle(fontSize: 10, color: Color(0xFF9E9E9E)),
               );
             },
           ),

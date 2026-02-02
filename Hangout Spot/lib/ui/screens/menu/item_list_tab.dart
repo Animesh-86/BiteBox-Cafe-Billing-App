@@ -8,6 +8,8 @@ import 'package:hangout_spot/ui/widgets/glass_container.dart';
 
 // Local state for Admin Menu Selection
 final adminSelectedCategoryProvider = StateProvider<String?>((ref) => null);
+final menuItemSearchProvider = StateProvider<String>((ref) => '');
+final menuAvailabilityFilterProvider = StateProvider<String>((ref) => 'all');
 
 class ItemListTab extends ConsumerWidget {
   const ItemListTab({super.key});
@@ -16,12 +18,26 @@ class ItemListTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final allItemsAsync = ref.watch(allItemsStreamProvider);
     final selectedCat = ref.watch(adminSelectedCategoryProvider);
+    final query = ref.watch(menuItemSearchProvider).trim().toLowerCase();
+    final availability = ref.watch(menuAvailabilityFilterProvider);
 
     return allItemsAsync.when(
       data: (items) {
-        final filtered = (selectedCat == null || selectedCat == 'all')
+        var filtered = (selectedCat == null || selectedCat == 'all')
             ? items
             : items.where((i) => i.categoryId == selectedCat).toList();
+
+        if (availability == 'available') {
+          filtered = filtered.where((i) => i.isAvailable).toList();
+        } else if (availability == 'out') {
+          filtered = filtered.where((i) => !i.isAvailable).toList();
+        }
+
+        if (query.isNotEmpty) {
+          filtered = filtered
+              .where((i) => i.name.toLowerCase().contains(query))
+              .toList();
+        }
 
         if (filtered.isEmpty) {
           return Center(
@@ -66,28 +82,89 @@ class ItemListTab extends ConsumerWidget {
           );
         }
 
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            final crossAxisCount = (constraints.maxWidth / 140).floor().clamp(
-              2,
-              6,
-            );
-            return GridView.builder(
-              padding: const EdgeInsets.only(bottom: 8),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: crossAxisCount,
-                childAspectRatio: 0.7,
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 10,
+        return Column(
+          children: [
+            TextField(
+              onChanged: (value) =>
+                  ref.read(menuItemSearchProvider.notifier).state = value,
+              decoration: InputDecoration(
+                hintText: 'Search items...',
+                prefixIcon: const Icon(Icons.search, size: 18),
+                suffixIcon: query.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.close, size: 18),
+                        onPressed: () =>
+                            ref.read(menuItemSearchProvider.notifier).state =
+                                '',
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.05),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
               ),
-              itemCount: filtered.length,
-              itemBuilder: (context, index) => _AdminItemCard(
-                item: filtered[index],
-                onEdit: () =>
-                    _showAddEditDialog(context, ref, item: filtered[index]),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              children: [
+                ChoiceChip(
+                  label: const Text('All'),
+                  selected: availability == 'all',
+                  onSelected: (_) =>
+                      ref.read(menuAvailabilityFilterProvider.notifier).state =
+                          'all',
+                ),
+                ChoiceChip(
+                  label: const Text('Available'),
+                  selected: availability == 'available',
+                  onSelected: (_) =>
+                      ref.read(menuAvailabilityFilterProvider.notifier).state =
+                          'available',
+                ),
+                ChoiceChip(
+                  label: const Text('Out of stock'),
+                  selected: availability == 'out',
+                  onSelected: (_) =>
+                      ref.read(menuAvailabilityFilterProvider.notifier).state =
+                          'out',
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final crossAxisCount = (constraints.maxWidth / 140)
+                      .floor()
+                      .clamp(2, 6);
+                  return GridView.builder(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: crossAxisCount,
+                      childAspectRatio: 0.7,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                    ),
+                    itemCount: filtered.length,
+                    itemBuilder: (context, index) => _AdminItemCard(
+                      item: filtered[index],
+                      onEdit: () => _showAddEditDialog(
+                        context,
+                        ref,
+                        item: filtered[index],
+                      ),
+                    ),
+                  );
+                },
               ),
-            );
-          },
+            ),
+          ],
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -154,25 +231,20 @@ class _AdminItemCard extends ConsumerWidget {
                   ),
                 ),
                 child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: item.isAvailable
-                          ? theme.colorScheme.primary.withOpacity(0.2)
-                          : Colors.grey.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Text(
-                      item.name.isNotEmpty ? item.name[0].toUpperCase() : "?",
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
-                        color: item.isAvailable
-                            ? theme.colorScheme.primary
-                            : Colors.grey[400],
-                      ),
-                    ),
-                  ),
+                  child: (item.imageUrl != null && item.imageUrl!.isNotEmpty)
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.network(
+                            item.imageUrl!,
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            height: double.infinity,
+                            errorBuilder: (context, error, stackTrace) {
+                              return _FallbackItemBadge(item: item);
+                            },
+                          ),
+                        )
+                      : _FallbackItemBadge(item: item),
                 ),
               ),
             ),
@@ -251,6 +323,36 @@ class _AdminItemCard extends ConsumerWidget {
   }
 }
 
+class _FallbackItemBadge extends StatelessWidget {
+  final Item item;
+
+  const _FallbackItemBadge({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: item.isAvailable
+            ? theme.colorScheme.primary.withOpacity(0.2)
+            : Colors.grey.withOpacity(0.2),
+        shape: BoxShape.circle,
+      ),
+      child: Text(
+        item.name.isNotEmpty ? item.name[0].toUpperCase() : "?",
+        style: TextStyle(
+          fontSize: 24,
+          fontWeight: FontWeight.w700,
+          color: item.isAvailable
+              ? theme.colorScheme.primary
+              : Colors.grey[400],
+        ),
+      ),
+    );
+  }
+}
+
 class _ItemDialog extends ConsumerStatefulWidget {
   final Item? item;
   final List<Category> categories;
@@ -264,6 +366,8 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
   late TextEditingController _nameController;
   late TextEditingController _priceController;
   late TextEditingController _discountController;
+  late TextEditingController _descriptionController;
+  late TextEditingController _imageUrlController;
   String? _selectedCategoryId;
 
   @override
@@ -275,6 +379,12 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
     );
     _discountController = TextEditingController(
       text: widget.item?.discountPercent.toString() ?? '0.0',
+    );
+    _descriptionController = TextEditingController(
+      text: widget.item?.description ?? '',
+    );
+    _imageUrlController = TextEditingController(
+      text: widget.item?.imageUrl ?? '',
     );
     final openCategory = ref.read(adminSelectedCategoryProvider);
     _selectedCategoryId =
@@ -403,6 +513,43 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
               keyboardType: TextInputType.number,
               style: const TextStyle(color: Colors.white, fontSize: 14),
             ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _imageUrlController,
+              decoration: InputDecoration(
+                labelText: 'Image URL (optional)',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                prefixIcon: const Icon(Icons.image_outlined, size: 20),
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.05),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
+              ),
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _descriptionController,
+              decoration: InputDecoration(
+                labelText: 'Description (optional)',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                prefixIcon: const Icon(Icons.notes_outlined, size: 20),
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.05),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
+              ),
+              maxLines: 2,
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+            ),
           ],
         ),
       ),
@@ -449,6 +596,16 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
                     name: drift.Value(_nameController.text),
                     price: drift.Value(price),
                     discountPercent: drift.Value(discount),
+                    description: drift.Value<String?>(
+                      _descriptionController.text.trim().isEmpty
+                          ? null
+                          : _descriptionController.text.trim(),
+                    ),
+                    imageUrl: drift.Value<String?>(
+                      _imageUrlController.text.trim().isEmpty
+                          ? null
+                          : _imageUrlController.text.trim(),
+                    ),
                   ),
                 );
               } else {
@@ -458,6 +615,16 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
                     name: _nameController.text,
                     price: price,
                     discountPercent: discount,
+                    description: drift.Value<String?>(
+                      _descriptionController.text.trim().isEmpty
+                          ? null
+                          : _descriptionController.text.trim(),
+                    ),
+                    imageUrl: drift.Value<String?>(
+                      _imageUrlController.text.trim().isEmpty
+                          ? null
+                          : _imageUrlController.text.trim(),
+                    ),
                   ),
                 );
               }

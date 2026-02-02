@@ -15,6 +15,7 @@ import 'package:timeago/timeago.dart' as timeago;
 // Providers
 final selectedCategoryProvider = StateProvider<String?>((ref) => null);
 final sidebarFlexProvider = StateProvider<double>((ref) => 20.0);
+final itemSearchQueryProvider = StateProvider<String>((ref) => '');
 
 class BillingScreen extends ConsumerWidget {
   const BillingScreen({super.key});
@@ -397,6 +398,7 @@ class _ItemsGrid extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final allItemsAsync = ref.watch(allItemsStreamProvider);
     final selectedCat = ref.watch(selectedCategoryProvider);
+    final query = ref.watch(itemSearchQueryProvider).trim().toLowerCase();
     final screenWidth = MediaQuery.of(context).size.width;
     final isTablet = screenWidth > 600;
 
@@ -405,9 +407,15 @@ class _ItemsGrid extends ConsumerWidget {
         // Filter to show only available items
         final availableItems = items.where((i) => i.isAvailable).toList();
 
-        final filtered = (selectedCat == null || selectedCat == 'all')
+        var filtered = (selectedCat == null || selectedCat == 'all')
             ? availableItems
             : availableItems.where((i) => i.categoryId == selectedCat).toList();
+
+        if (query.isNotEmpty) {
+          filtered = filtered
+              .where((i) => i.name.toLowerCase().contains(query))
+              .toList();
+        }
 
         if (filtered.isEmpty) {
           return Center(
@@ -422,16 +430,51 @@ class _ItemsGrid extends ConsumerWidget {
             ? ((screenWidth - 50) / 180).floor().clamp(2, 5)
             : 2;
 
-        return GridView.builder(
-          padding: const EdgeInsets.all(10),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossAxisCount,
-            childAspectRatio: 0.7,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-          ),
-          itemCount: filtered.length,
-          itemBuilder: (context, index) => _ItemCard(item: filtered[index]),
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: TextField(
+                onChanged: (value) =>
+                    ref.read(itemSearchQueryProvider.notifier).state = value,
+                decoration: InputDecoration(
+                  hintText: 'Search items...',
+                  prefixIcon: const Icon(Icons.search, size: 18),
+                  suffixIcon: query.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.close, size: 18),
+                          onPressed: () =>
+                              ref.read(itemSearchQueryProvider.notifier).state =
+                                  '',
+                        )
+                      : null,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  filled: true,
+                  fillColor: Colors.white.withOpacity(0.04),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: GridView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: crossAxisCount,
+                  childAspectRatio: 0.7,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                ),
+                itemCount: filtered.length,
+                itemBuilder: (context, index) =>
+                    _ItemCard(item: filtered[index]),
+              ),
+            ),
+          ],
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -507,23 +550,20 @@ class _ItemCard extends ConsumerWidget {
                           size: 28,
                           color: colorScheme.primary,
                         )
-                      : Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.05),
-                            shape: BoxShape.circle,
+                      : (item.imageUrl != null && item.imageUrl!.isNotEmpty)
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.network(
+                            item.imageUrl!,
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            height: double.infinity,
+                            errorBuilder: (context, error, stackTrace) {
+                              return _ItemLetterBadge(item: item);
+                            },
                           ),
-                          child: Text(
-                            item.name.isNotEmpty
-                                ? item.name[0].toUpperCase()
-                                : "?",
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white.withOpacity(0.3),
-                            ),
-                          ),
-                        ),
+                        )
+                      : _ItemLetterBadge(item: item),
                 ),
               ),
             ),
@@ -581,6 +621,31 @@ class _ItemCard extends ConsumerWidget {
   }
 }
 
+class _ItemLetterBadge extends StatelessWidget {
+  final Item item;
+
+  const _ItemLetterBadge({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        shape: BoxShape.circle,
+      ),
+      child: Text(
+        item.name.isNotEmpty ? item.name[0].toUpperCase() : "?",
+        style: TextStyle(
+          fontSize: 24,
+          fontWeight: FontWeight.w700,
+          color: Colors.white.withOpacity(0.3),
+        ),
+      ),
+    );
+  }
+}
+
 /// Cart Panel (Tablet/Desktop)
 class _CartPanel extends ConsumerStatefulWidget {
   const _CartPanel();
@@ -631,25 +696,39 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                       ),
                     ],
                   ),
-                  if (cart.items.isNotEmpty)
-                    GestureDetector(
-                      onTap: () => notifier.clearCart(),
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: Colors.red.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: Colors.red.withOpacity(0.3),
+                  Row(
+                    children: [
+                      IconButton(
+                        onPressed: cart.canUndo ? notifier.undo : null,
+                        icon: const Icon(Icons.undo, size: 18),
+                        tooltip: 'Undo',
+                      ),
+                      IconButton(
+                        onPressed: cart.canRedo ? notifier.redo : null,
+                        icon: const Icon(Icons.redo, size: 18),
+                        tooltip: 'Redo',
+                      ),
+                      if (cart.items.isNotEmpty)
+                        GestureDetector(
+                          onTap: () => notifier.clearCart(),
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: Colors.red.withOpacity(0.3),
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.delete_outline,
+                              size: 16,
+                              color: Colors.red.shade400,
+                            ),
                           ),
                         ),
-                        child: Icon(
-                          Icons.delete_outline,
-                          size: 16,
-                          color: Colors.red.shade400,
-                        ),
-                      ),
-                    ),
+                    ],
+                  ),
                 ],
               ),
               if (cart.items.isNotEmpty) const SizedBox(height: 8),
@@ -799,10 +878,10 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                                           item.quantity - 1,
                                         ),
                                         child: Padding(
-                                          padding: const EdgeInsets.all(4),
+                                          padding: const EdgeInsets.all(6),
                                           child: Icon(
                                             Icons.remove,
-                                            size: 14,
+                                            size: 18,
                                             color: Theme.of(
                                               context,
                                             ).colorScheme.primary,
@@ -828,10 +907,10 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                                           item.quantity + 1,
                                         ),
                                         child: Padding(
-                                          padding: const EdgeInsets.all(4),
+                                          padding: const EdgeInsets.all(6),
                                           child: Icon(
                                             Icons.add,
-                                            size: 14,
+                                            size: 18,
                                             color: Theme.of(
                                               context,
                                             ).colorScheme.primary,
@@ -1468,6 +1547,16 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                   ),
                   Row(
                     children: [
+                      IconButton(
+                        onPressed: cart.canUndo ? notifier.undo : null,
+                        icon: const Icon(Icons.undo, size: 20),
+                        tooltip: 'Undo',
+                      ),
+                      IconButton(
+                        onPressed: cart.canRedo ? notifier.redo : null,
+                        icon: const Icon(Icons.redo, size: 20),
+                        tooltip: 'Redo',
+                      ),
                       if (cart.items.isNotEmpty)
                         GestureDetector(
                           onTap: () {
@@ -1756,10 +1845,10 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                                           item.quantity - 1,
                                         ),
                                         child: Padding(
-                                          padding: const EdgeInsets.all(6),
+                                          padding: const EdgeInsets.all(8),
                                           child: Icon(
                                             Icons.remove,
-                                            size: 16,
+                                            size: 20,
                                             color: Theme.of(
                                               context,
                                             ).colorScheme.primary,
@@ -1785,10 +1874,10 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                                           item.quantity + 1,
                                         ),
                                         child: Padding(
-                                          padding: const EdgeInsets.all(6),
+                                          padding: const EdgeInsets.all(8),
                                           child: Icon(
                                             Icons.add,
-                                            size: 16,
+                                            size: 20,
                                             color: Theme.of(
                                               context,
                                             ).colorScheme.primary,
