@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/data/repositories/analytics_repository.dart';
 import 'package:hangout_spot/logic/billing/session_provider.dart';
-import 'package:hangout_spot/data/repositories/order_repository.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:intl/intl.dart';
 
@@ -183,14 +182,14 @@ class DashboardScreen extends ConsumerWidget {
                 border: Border.all(color: theme.dividerColor.withOpacity(0.5)),
               ),
               child: StreamBuilder<List<Order>>(
-                stream: ref.watch(orderRepositoryProvider).watchPendingOrders(),
+                stream: sessionManager.watchSessionOrders(),
                 builder: (context, snapshot) {
                   if (!snapshot.hasData || snapshot.data!.isEmpty) {
                     return Padding(
                       padding: const EdgeInsets.all(20),
                       child: Center(
                         child: Text(
-                          "No active orders",
+                          "No recent orders",
                           style: TextStyle(
                             color: theme.colorScheme.onSurface.withOpacity(0.5),
                           ),
@@ -218,7 +217,7 @@ class DashboardScreen extends ConsumerWidget {
                           ),
                         ),
                         title: Text(
-                          "Order #${order.invoiceNumber}",
+                          "Order ${order.invoiceNumber}",
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                         subtitle: Text(

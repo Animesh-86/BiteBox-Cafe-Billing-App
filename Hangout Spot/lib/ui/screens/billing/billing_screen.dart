@@ -667,12 +667,17 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                         ).colorScheme.primary.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: Text(
-                        '#${1000 + DateTime.now().millisecondsSinceEpoch % 9000}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.primary,
+                      child: FutureBuilder<String>(
+                        future: ref
+                            .watch(sessionManagerProvider)
+                            .getNextInvoiceNumber(),
+                        builder: (context, snapshot) => Text(
+                          snapshot.data ?? '... ',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
                         ),
                       ),
                     ),
@@ -1448,12 +1453,17 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Your Order',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                  FutureBuilder<String>(
+                    future: ref
+                        .watch(sessionManagerProvider)
+                        .getNextInvoiceNumber(),
+                    builder: (context, snapshot) => Text(
+                      'Order - ${snapshot.data ?? '...'}',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                   Row(
@@ -1517,27 +1527,6 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
               if (cart.items.isNotEmpty)
                 Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.primary.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        '#${1000 + DateTime.now().millisecondsSinceEpoch % 9000}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                    ),
-                    if (cart.customer != null) const SizedBox(width: 10),
                     if (cart.customer != null)
                       const Icon(Icons.person, size: 14, color: Colors.white60),
                     if (cart.customer != null) const SizedBox(width: 4),
@@ -1721,8 +1710,9 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 13,
-                                    color:
-                                        Theme.of(context).colorScheme.primary,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
                                   ),
                                 ),
                               ],
@@ -1770,9 +1760,9 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                                           child: Icon(
                                             Icons.remove,
                                             size: 16,
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .primary,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.primary,
                                           ),
                                         ),
                                       ),
@@ -1799,9 +1789,9 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                                           child: Icon(
                                             Icons.add,
                                             size: 16,
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .primary,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.primary,
                                           ),
                                         ),
                                       ),
