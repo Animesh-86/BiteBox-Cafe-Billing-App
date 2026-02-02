@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "601209636538",
+    "project_id": "hangout-spot-pos",
+    "storage_bucket": "hangout-spot-pos.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:601209636538:android:3625ef8a3960c56f506483",
+        "android_client_info": {
+          "package_name": "com.hangoutspot.pos"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "601209636538-nijnhougiccp7ocdau29jjh6e66d98ru.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBHcDCxEYqCakaZ-hckoXqvPtpajsjtB4g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "601209636538-nijnhougiccp7ocdau29jjh6e66d98ru.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
