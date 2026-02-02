@@ -39,49 +39,6 @@ class ItemListTab extends ConsumerWidget {
               .toList();
         }
 
-        if (filtered.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.primary.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.restaurant_menu_rounded,
-                    size: 40,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.primary.withOpacity(0.5),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  "No items in this category",
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.6),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  "Tap the + button to add items",
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.4),
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
-
         return Column(
           children: [
             TextField(
@@ -138,31 +95,77 @@ class ItemListTab extends ConsumerWidget {
             ),
             const SizedBox(height: 10),
             Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final crossAxisCount = (constraints.maxWidth / 140)
-                      .floor()
-                      .clamp(2, 6);
-                  return GridView.builder(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: crossAxisCount,
-                      childAspectRatio: 0.7,
-                      crossAxisSpacing: 10,
-                      mainAxisSpacing: 10,
-                    ),
-                    itemCount: filtered.length,
-                    itemBuilder: (context, index) => _AdminItemCard(
-                      item: filtered[index],
-                      onEdit: () => _showAddEditDialog(
-                        context,
-                        ref,
-                        item: filtered[index],
+              child: filtered.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.primary.withOpacity(0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.restaurant_menu_rounded,
+                              size: 40,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.primary.withOpacity(0.5),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            query.isNotEmpty || availability != 'all'
+                                ? "No items match your filters"
+                                : "No items in this category",
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.6),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            query.isNotEmpty || availability != 'all'
+                                ? "Try clearing search or filters"
+                                : "Tap the + button to add items",
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.4),
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
                       ),
+                    )
+                  : LayoutBuilder(
+                      builder: (context, constraints) {
+                        final crossAxisCount = (constraints.maxWidth / 140)
+                            .floor()
+                            .clamp(2, 6);
+                        return GridView.builder(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: crossAxisCount,
+                                childAspectRatio: 0.7,
+                                crossAxisSpacing: 10,
+                                mainAxisSpacing: 10,
+                              ),
+                          itemCount: filtered.length,
+                          itemBuilder: (context, index) => _AdminItemCard(
+                            item: filtered[index],
+                            onEdit: () => _showAddEditDialog(
+                              context,
+                              ref,
+                              item: filtered[index],
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                  );
-                },
-              ),
             ),
           ],
         );

@@ -417,15 +417,6 @@ class _ItemsGrid extends ConsumerWidget {
               .toList();
         }
 
-        if (filtered.isEmpty) {
-          return Center(
-            child: Text(
-              "No items",
-              style: TextStyle(color: Colors.white60, fontSize: 14),
-            ),
-          );
-        }
-
         final crossAxisCount = isTablet
             ? ((screenWidth - 50) / 180).floor().clamp(2, 5)
             : 2;
@@ -461,18 +452,27 @@ class _ItemsGrid extends ConsumerWidget {
               ),
             ),
             Expanded(
-              child: GridView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: crossAxisCount,
-                  childAspectRatio: 0.7,
-                  crossAxisSpacing: 10,
-                  mainAxisSpacing: 10,
-                ),
-                itemCount: filtered.length,
-                itemBuilder: (context, index) =>
-                    _ItemCard(item: filtered[index]),
-              ),
+              child: filtered.isEmpty
+                  ? Center(
+                      child: Text(
+                        query.isNotEmpty
+                            ? "No items match your search"
+                            : "No items",
+                        style: TextStyle(color: Colors.white60, fontSize: 14),
+                      ),
+                    )
+                  : GridView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: crossAxisCount,
+                        childAspectRatio: 0.7,
+                        crossAxisSpacing: 10,
+                        mainAxisSpacing: 10,
+                      ),
+                      itemCount: filtered.length,
+                      itemBuilder: (context, index) =>
+                          _ItemCard(item: filtered[index]),
+                    ),
             ),
           ],
         );
