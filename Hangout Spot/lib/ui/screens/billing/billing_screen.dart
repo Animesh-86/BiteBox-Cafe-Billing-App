@@ -847,276 +847,240 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
         ),
 
         // Footer (Totals & Actions)
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.02),
-            borderRadius: const BorderRadius.vertical(
-              bottom: Radius.circular(20),
-            ),
-            border: Border(
-              top: BorderSide(color: Colors.white.withOpacity(0.1)),
-            ),
+        AnimatedPadding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
           ),
-          child: SingleChildScrollView(
-            child: Column(
-              children: [
-                // Discount Input
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.03),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.white.withOpacity(0.1)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.discount,
-                        size: 16,
-                        color: Colors.white60,
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Discount %',
-                        style: TextStyle(fontSize: 11, color: Colors.white70),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          keyboardType: TextInputType.number,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.white,
-                          ),
-                          decoration: InputDecoration(
-                            hintText: '0',
-                            hintStyle: TextStyle(
-                              color: Colors.white.withOpacity(0.3),
-                            ),
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 6,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(6),
-                              borderSide: BorderSide(
-                                color: Colors.white.withOpacity(0.2),
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(6),
-                              borderSide: BorderSide(
-                                color: Colors.white.withOpacity(0.2),
-                              ),
-                            ),
-                          ),
-                          onChanged: (value) {
-                            final percent = double.tryParse(value) ?? 0.0;
-                            final discountAmount =
-                                cart.subtotal * (percent / 100);
-                            notifier.setManualDiscount(discountAmount);
-                          },
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeOut,
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.02),
+              borderRadius: const BorderRadius.vertical(
+                bottom: Radius.circular(20),
+              ),
+              border: Border(
+                top: BorderSide(color: Colors.white.withOpacity(0.1)),
+              ),
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  // Discount Input
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.03),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.white.withOpacity(0.1)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.discount,
+                          size: 16,
+                          color: Colors.white60,
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 10),
-                // Payment Method
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.03),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.white.withOpacity(0.1)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.payment,
-                            size: 16,
-                            color: Colors.white60,
-                          ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'Payment',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.white70,
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Discount %',
+                          style: TextStyle(fontSize: 11, color: Colors.white70),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            keyboardType: TextInputType.number,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.white,
                             ),
+                            decoration: InputDecoration(
+                              hintText: '0',
+                              hintStyle: TextStyle(
+                                color: Colors.white.withOpacity(0.3),
+                              ),
+                              isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 6,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(6),
+                                borderSide: BorderSide(
+                                  color: Colors.white.withOpacity(0.2),
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(6),
+                                borderSide: BorderSide(
+                                  color: Colors.white.withOpacity(0.2),
+                                ),
+                              ),
+                            ),
+                            onChanged: (value) {
+                              final percent = double.tryParse(value) ?? 0.0;
+                              final discountAmount =
+                                  cart.subtotal * (percent / 100);
+                              notifier.setManualDiscount(discountAmount);
+                            },
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 6,
-                        children: [
-                          _PaymentChip(
-                            label: 'Cash',
-                            isSelected: cart.paymentMode == 'Cash',
-                            onTap: () => notifier.setPaymentMode('Cash'),
-                          ),
-                          _PaymentChip(
-                            label: 'UPI',
-                            isSelected: cart.paymentMode == 'UPI',
-                            onTap: () => notifier.setPaymentMode('UPI'),
-                          ),
-                          _PaymentChip(
-                            label: 'Split',
-                            isSelected: cart.paymentMode == 'Split',
-                            onTap: () => notifier.setPaymentMode('Split'),
-                          ),
-                        ],
-                      ),
-                      if (cart.paymentMode == 'Split')
-                        const SizedBox(height: 8),
-                      if (cart.paymentMode == 'Split')
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Payment Method
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.03),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.white.withOpacity(0.1)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Row(
                           children: [
-                            Expanded(
-                              child: TextField(
-                                keyboardType: TextInputType.number,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.white,
-                                ),
-                                decoration: InputDecoration(
-                                  labelText: 'Cash',
-                                  labelStyle: const TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.white60,
-                                  ),
-                                  isDense: true,
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 6,
-                                  ),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                ),
-                                onChanged: (value) {
-                                  final cash = double.tryParse(value) ?? 0.0;
-                                  final upi = cart.grandTotal - cash;
-                                  notifier.setPaymentSplit(
-                                    cash,
-                                    upi > 0 ? upi : 0,
-                                  );
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: TextField(
-                                controller: TextEditingController(
-                                  text: cart.paidUPI > 0
-                                      ? cart.paidUPI.toStringAsFixed(2)
-                                      : '',
-                                ),
-                                keyboardType: TextInputType.number,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.white,
-                                ),
-                                decoration: InputDecoration(
-                                  labelText: 'UPI',
-                                  labelStyle: const TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.white60,
-                                  ),
-                                  isDense: true,
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 6,
-                                  ),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                ),
-                                onChanged: (value) {
-                                  final upi = double.tryParse(value) ?? 0.0;
-                                  final cash = cart.grandTotal - upi;
-                                  notifier.setPaymentSplit(
-                                    cash > 0 ? cash : 0,
-                                    upi,
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 10),
-                // Price Breakdown
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.03),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Subtotal',
-                            style: TextStyle(
-                              fontSize: 11,
+                            const Icon(
+                              Icons.payment,
+                              size: 16,
                               color: Colors.white60,
                             ),
-                          ),
-                          Text(
-                            "₹${cart.subtotal.toStringAsFixed(2)}",
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: Colors.white70,
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (cart.totalDiscount > 0) const SizedBox(height: 4),
-                      if (cart.totalDiscount > 0)
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
+                            const SizedBox(width: 8),
                             const Text(
-                              'Discount',
+                              'Payment',
                               style: TextStyle(
                                 fontSize: 11,
-                                color: Colors.white60,
-                              ),
-                            ),
-                            Text(
-                              "-₹${cart.totalDiscount.toStringAsFixed(2)}",
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: Colors.green,
+                                color: Colors.white70,
                               ),
                             ),
                           ],
                         ),
-                      if (cart.taxAmount > 0) const SizedBox(height: 4),
-                      if (cart.taxAmount > 0)
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 6,
+                          children: [
+                            _PaymentChip(
+                              label: 'Cash',
+                              isSelected: cart.paymentMode == 'Cash',
+                              onTap: () => notifier.setPaymentMode('Cash'),
+                            ),
+                            _PaymentChip(
+                              label: 'UPI',
+                              isSelected: cart.paymentMode == 'UPI',
+                              onTap: () => notifier.setPaymentMode('UPI'),
+                            ),
+                            _PaymentChip(
+                              label: 'Split',
+                              isSelected: cart.paymentMode == 'Split',
+                              onTap: () => notifier.setPaymentMode('Split'),
+                            ),
+                          ],
+                        ),
+                        if (cart.paymentMode == 'Split')
+                          const SizedBox(height: 8),
+                        if (cart.paymentMode == 'Split')
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  keyboardType: TextInputType.number,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.white,
+                                  ),
+                                  decoration: InputDecoration(
+                                    labelText: 'Cash',
+                                    labelStyle: const TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.white60,
+                                    ),
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 6,
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                  ),
+                                  onChanged: (value) {
+                                    final cash = double.tryParse(value) ?? 0.0;
+                                    final upi = cart.grandTotal - cash;
+                                    notifier.setPaymentSplit(
+                                      cash,
+                                      upi > 0 ? upi : 0,
+                                    );
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: TextField(
+                                  controller: TextEditingController(
+                                    text: cart.paidUPI > 0
+                                        ? cart.paidUPI.toStringAsFixed(2)
+                                        : '',
+                                  ),
+                                  keyboardType: TextInputType.number,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.white,
+                                  ),
+                                  decoration: InputDecoration(
+                                    labelText: 'UPI',
+                                    labelStyle: const TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.white60,
+                                    ),
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 6,
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                  ),
+                                  onChanged: (value) {
+                                    final upi = double.tryParse(value) ?? 0.0;
+                                    final cash = cart.grandTotal - upi;
+                                    notifier.setPaymentSplit(
+                                      cash > 0 ? cash : 0,
+                                      upi,
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  // Price Breakdown
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.03),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      children: [
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             const Text(
-                              'Tax',
+                              'Subtotal',
                               style: TextStyle(
                                 fontSize: 11,
                                 color: Colors.white60,
                               ),
                             ),
                             Text(
-                              "+₹${cart.taxAmount.toStringAsFixed(2)}",
+                              "₹${cart.subtotal.toStringAsFixed(2)}",
                               style: const TextStyle(
                                 fontSize: 11,
                                 color: Colors.white70,
@@ -1124,137 +1088,180 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                             ),
                           ],
                         ),
-                      const Divider(height: 12, color: Colors.white24),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Total',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            "₹${cart.grandTotal.toStringAsFixed(2)}",
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      // Reward Points Display
-                      if (cart.selectedCustomer != null)
-                        FutureBuilder<bool>(
-                          future: ref.watch(
-                            isRewardSystemEnabledProvider.future,
-                          ),
-                          builder: (context, snapshot) {
-                            if (!snapshot.hasData || !snapshot.data!) {
-                              return const SizedBox.shrink();
-                            }
-
-                            final rewardBaseAmount =
-                                cart.grandTotal + cart.manualDiscount;
-                            final pointsEarned =
-                                (rewardBaseAmount * REWARD_EARNING_RATE)
-                                    .floor();
-
-                            if (pointsEarned == 0) {
-                              return const SizedBox.shrink();
-                            }
-
-                            return Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.orange.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(
-                                  color: Colors.orange.withOpacity(0.3),
+                        if (cart.totalDiscount > 0) const SizedBox(height: 4),
+                        if (cart.totalDiscount > 0)
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Discount',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.white60,
                                 ),
                               ),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Icons.card_giftcard,
-                                        size: 14,
-                                        color: Colors.orange[300],
-                                      ),
-                                      const SizedBox(width: 6),
-                                      const Text(
-                                        'Rewards Earned',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: Colors.orange,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  Text(
-                                    '+$pointsEarned pts',
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.orange,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
+                              Text(
+                                "-₹${cart.totalDiscount.toStringAsFixed(2)}",
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.green,
+                                ),
                               ),
-                            );
-                          },
+                            ],
+                          ),
+                        if (cart.taxAmount > 0) const SizedBox(height: 4),
+                        if (cart.taxAmount > 0)
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Tax',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.white60,
+                                ),
+                              ),
+                              Text(
+                                "+₹${cart.taxAmount.toStringAsFixed(2)}",
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ],
+                          ),
+                        const Divider(height: 12, color: Colors.white24),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Total',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              "₹${cart.grandTotal.toStringAsFixed(2)}",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
+                          ],
                         ),
+                        const SizedBox(height: 8),
+                        // Reward Points Display
+                        if (cart.selectedCustomer != null)
+                          FutureBuilder<bool>(
+                            future: ref.watch(
+                              isRewardSystemEnabledProvider.future,
+                            ),
+                            builder: (context, snapshot) {
+                              if (!snapshot.hasData || !snapshot.data!) {
+                                return const SizedBox.shrink();
+                              }
+
+                              final rewardBaseAmount =
+                                  cart.grandTotal + cart.manualDiscount;
+                              final pointsEarned =
+                                  (rewardBaseAmount * REWARD_EARNING_RATE)
+                                      .floor();
+
+                              if (pointsEarned == 0) {
+                                return const SizedBox.shrink();
+                              }
+
+                              return Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: Colors.orange.withOpacity(0.3),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.card_giftcard,
+                                          size: 14,
+                                          color: Colors.orange[300],
+                                        ),
+                                        const SizedBox(width: 6),
+                                        const Text(
+                                          'Rewards Earned',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.orange,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Text(
+                                      '+$pointsEarned pts',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.orange,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => _holdOrder(context, ref),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(
+                              color: Colors.white.withOpacity(0.2),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                          ),
+                          child: const Text(
+                            'Hold',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => _checkout(context, ref),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            backgroundColor: Theme.of(
+                              context,
+                            ).colorScheme.primary,
+                          ),
+                          child: const Text(
+                            'Pay',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => _holdOrder(context, ref),
-                        style: OutlinedButton.styleFrom(
-                          side: BorderSide(
-                            color: Colors.white.withOpacity(0.2),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                        ),
-                        child: const Text(
-                          'Hold',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () => _checkout(context, ref),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          backgroundColor: Theme.of(
-                            context,
-                          ).colorScheme.primary,
-                        ),
-                        child: const Text(
-                          'Pay',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -1549,7 +1556,7 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                   ],
                 ),
               // Customer Selection & Rewards Section
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               GestureDetector(
                 onTap: () => _showCustomerSelect(context, ref),
                 child: Container(
@@ -2119,13 +2126,46 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                                         ),
                                       ],
                                     ),
-                                    Text(
-                                      '₹${(balance * 1.0).toStringAsFixed(2)}',
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.orange,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      children: [
+                                        Text(
+                                          '₹${(balance * 1.0).toStringAsFixed(2)}',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.orange,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        if (balance >= MIN_REDEMPTION_POINTS)
+                                          TextButton(
+                                            onPressed: () =>
+                                                _showRedemptionDialog(
+                                                  context,
+                                                  ref,
+                                                ),
+                                            style: TextButton.styleFrom(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 2,
+                                                  ),
+                                              minimumSize: const Size(0, 0),
+                                              tapTargetSize:
+                                                  MaterialTapTargetSize
+                                                      .shrinkWrap,
+                                            ),
+                                            child: const Text(
+                                              'Redeem',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: Colors.orange,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
                                     ),
                                   ],
                                 ),
@@ -2157,7 +2197,7 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                   Expanded(
                     child: ElevatedButton(
                       onPressed: cart.items.isNotEmpty
-                          ? () => _showRedemptionDialog(context, ref)
+                          ? () => _checkout(context, ref)
                           : null,
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 12),
@@ -2206,7 +2246,7 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
       customerRewardBalanceProvider(customer.id).future,
     );
 
-    if (balance <= 0) {
+    if (balance < MIN_REDEMPTION_POINTS) {
       await _checkout(context, ref);
       return;
     }
@@ -2250,12 +2290,19 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                         'Redeemed $pointsToRedeem points for ₹${discountAmount.toStringAsFixed(2)} discount',
                   );
 
-              await _checkout(context, ref);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Applied ₹${discountAmount.toStringAsFixed(2)} discount',
+                    ),
+                  ),
+                );
+              }
             }
           },
           onSkip: () {
             Navigator.pop(ctx);
-            _checkout(context, ref);
           },
         ),
       );
