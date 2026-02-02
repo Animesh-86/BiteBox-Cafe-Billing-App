@@ -143,7 +143,7 @@ class OrderRepository {
               ..where((tbl) => tbl.key.equals('reward_system_enabled')))
             .getSingleOrNull();
 
-    if (settings == null || settings.value != 'true') {
+    if (settings != null && settings.value != 'true') {
       return; // Reward system disabled
     }
 

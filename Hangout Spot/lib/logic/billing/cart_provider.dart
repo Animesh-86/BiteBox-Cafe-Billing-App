@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
@@ -65,7 +67,8 @@ class CartState {
     double custDiscount = customer != null
         ? (afterItemDiscount * (customer!.discountPercent / 100))
         : 0.0;
-    return itemDiscounts + custDiscount + manualDiscount;
+    final rawDiscount = itemDiscounts + custDiscount + manualDiscount;
+    return rawDiscount.clamp(0.0, subtotal);
   }
 
   double get taxAmount {
@@ -73,7 +76,8 @@ class CartState {
     return 0.0;
   }
 
-  double get grandTotal => subtotal - totalDiscount;
+  double get grandTotal =>
+      (subtotal - totalDiscount).clamp(0.0, double.infinity);
 
   CartState copyWith({
     String? orderId,
@@ -190,7 +194,21 @@ class CartNotifier extends StateNotifier<CartState> {
   }
 
   void setManualDiscount(double discount) {
-    state = state.copyWith(manualDiscount: discount);
+    final itemDiscounts = state.items.fold(
+      0.0,
+      (sum, item) => sum + item.discountAmount,
+    );
+    final afterItemDiscount = state.subtotal - itemDiscounts;
+    final custDiscount = state.customer != null
+        ? (afterItemDiscount * (state.customer!.discountPercent / 100))
+        : 0.0;
+    final maxManual = math.max(
+      0.0,
+      state.subtotal - itemDiscounts - custDiscount,
+    );
+
+    final nextManual = discount.clamp(0.0, maxManual);
+    state = state.copyWith(manualDiscount: nextManual);
   }
 
   void clearCart() {
@@ -220,9 +238,24 @@ class CartNotifier extends StateNotifier<CartState> {
   }
 
   void applyManualDiscount(double discountAmount) {
-    state = state.copyWith(
-      manualDiscount: state.manualDiscount + discountAmount,
+    final itemDiscounts = state.items.fold(
+      0.0,
+      (sum, item) => sum + item.discountAmount,
     );
+    final afterItemDiscount = state.subtotal - itemDiscounts;
+    final custDiscount = state.customer != null
+        ? (afterItemDiscount * (state.customer!.discountPercent / 100))
+        : 0.0;
+    final maxManual = math.max(
+      0.0,
+      state.subtotal - itemDiscounts - custDiscount,
+    );
+
+    final nextManual = (state.manualDiscount + discountAmount).clamp(
+      0.0,
+      maxManual,
+    );
+    state = state.copyWith(manualDiscount: nextManual);
   }
 }
 

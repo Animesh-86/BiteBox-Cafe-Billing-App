@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
@@ -446,15 +448,16 @@ class _ItemCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cartItems = ref.watch(cartProvider).items;
+    final notifier = ref.read(cartProvider.notifier);
     final inCart = cartItems.any((i) => i.item.id == item.id);
     final colorScheme = Theme.of(context).colorScheme;
 
     return GestureDetector(
       onTap: () {
         if (inCart) {
-          ref.read(cartProvider.notifier).removeByItemId(item.id);
+          notifier.removeByItemId(item.id);
         } else {
-          ref.read(cartProvider.notifier).addItem(item);
+          notifier.addItem(item);
         }
       },
       child: Container(
@@ -1145,63 +1148,69 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                       ),
                       const SizedBox(height: 8),
                       // Reward Points Display
-                      FutureBuilder<bool>(
-                        future: ref.watch(isRewardSystemEnabledProvider.future),
-                        builder: (context, snapshot) {
-                          if (!snapshot.hasData || !snapshot.data!) {
-                            return const SizedBox.shrink();
-                          }
+                      if (cart.selectedCustomer != null)
+                        FutureBuilder<bool>(
+                          future: ref.watch(
+                            isRewardSystemEnabledProvider.future,
+                          ),
+                          builder: (context, snapshot) {
+                            if (!snapshot.hasData || !snapshot.data!) {
+                              return const SizedBox.shrink();
+                            }
 
-                          final customer = cart.selectedCustomer;
-                          if (customer == null) {
-                            return const SizedBox.shrink();
-                          }
+                            final rewardBaseAmount =
+                                cart.grandTotal + cart.manualDiscount;
+                            final pointsEarned =
+                                (rewardBaseAmount * REWARD_EARNING_RATE)
+                                    .floor();
 
-                          final pointsEarned =
-                              (cart.grandTotal * REWARD_EARNING_RATE).floor();
+                            if (pointsEarned == 0) {
+                              return const SizedBox.shrink();
+                            }
 
-                          return Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: Colors.orange.withOpacity(0.3),
+                            return Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: Colors.orange.withOpacity(0.3),
+                                ),
                               ),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.card_giftcard,
-                                      size: 14,
-                                      color: Colors.orange[300],
-                                    ),
-                                    const SizedBox(width: 6),
-                                    const Text(
-                                      'Rewards Earned',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.orange,
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.card_giftcard,
+                                        size: 14,
+                                        color: Colors.orange[300],
                                       ),
-                                    ),
-                                  ],
-                                ),
-                                Text(
-                                  '+$pointsEarned pts',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.orange,
-                                    fontWeight: FontWeight.bold,
+                                      const SizedBox(width: 6),
+                                      const Text(
+                                        'Rewards Earned',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.orange,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
+                                  Text(
+                                    '+$pointsEarned pts',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.orange,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
                     ],
                   ),
                 ),
@@ -1305,13 +1314,18 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
             sessionManager: sessionManager,
           );
 
-      // Process reward points if customer is selected
+      // Update customer stats and reward points if customer is selected
       if (cart.selectedCustomer != null) {
+        await ref
+            .read(orderRepositoryProvider)
+            .updateCustomerStats(cart.selectedCustomer!.id, cart.grandTotal);
+
+        final rewardBaseAmount = cart.grandTotal + cart.manualDiscount;
         await ref
             .read(orderRepositoryProvider)
             .processRewardForOrder(
               orderId,
-              cart.grandTotal,
+              rewardBaseAmount,
               cart.selectedCustomer?.id,
             );
       }
@@ -1594,26 +1608,38 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                             color: Colors.orange.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          child: StreamBuilder<double>(
-                            stream: Stream.fromFuture(
-                              ref.read(
+                          child: ref
+                              .watch(
                                 customerRewardBalanceProvider(
                                   cart.customer!.id,
-                                ).future,
-                              ),
-                            ),
-                            builder: (context, snapshot) {
-                              final balance = snapshot.data ?? 0.0;
-                              return Text(
-                                '${balance.toInt()} pts',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.orange,
-                                  fontWeight: FontWeight.bold,
                                 ),
-                              );
-                            },
-                          ),
+                              )
+                              .when(
+                                data: (balance) => Text(
+                                  '${balance.toInt()} pts',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.orange,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                loading: () => const Text(
+                                  '... pts',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.orange,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                error: (_, __) => const Text(
+                                  '0 pts',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.orange,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
                         ),
                       const Icon(
                         Icons.chevron_right,
@@ -2050,62 +2076,64 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                     // Show reward points if customer selected
                     if (cart.customer != null) ...[
                       const SizedBox(height: 12),
-                      FutureBuilder<double>(
-                        future: ref.read(
-                          customerRewardBalanceProvider(
-                            cart.customer!.id,
-                          ).future,
-                        ),
-                        builder: (context, snapshot) {
-                          final balance = snapshot.data ?? 0.0;
-                          if (balance <= 0) {
-                            return const SizedBox.shrink();
-                          }
-                          return Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: Colors.orange.withOpacity(0.3),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                      ref
+                          .watch(
+                            customerRewardBalanceProvider(cart.customer!.id),
+                          )
+                          .when(
+                            data: (balance) {
+                              if (balance <= 0) {
+                                return const SizedBox.shrink();
+                              }
+                              return Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: Colors.orange.withOpacity(0.3),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
-                                    const Text(
-                                      'Reward Points',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.orange,
-                                      ),
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Reward Points',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.orange,
+                                          ),
+                                        ),
+                                        Text(
+                                          '${balance.toInt()} points available',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.white70,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                     Text(
-                                      '${balance.toInt()} points available',
+                                      '₹${(balance * 1.0).toStringAsFixed(2)}',
                                       style: const TextStyle(
                                         fontSize: 12,
-                                        color: Colors.white70,
+                                        color: Colors.orange,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
                                   ],
                                 ),
-                                Text(
-                                  '₹${(balance * 1.0).toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.orange,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
+                              );
+                            },
+                            loading: () => const SizedBox.shrink(),
+                            error: (_, __) => const SizedBox.shrink(),
+                          ),
                     ],
                   ],
                 ),
@@ -2189,7 +2217,9 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
       final redemptionRate =
           double.tryParse(settings[REDEMPTION_RATE_KEY] ?? '1.0') ?? 1.0;
 
-      final maxRedemption = (balance * redemptionRate).floor();
+      final maxRedemption = math
+          .min(balance * redemptionRate, cart.grandTotal)
+          .floor();
 
       showDialog(
         context: context,
@@ -2276,16 +2306,20 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
             sessionManager: sessionManager,
           );
 
-      // Update customer stats if customer selected
+      // Update customer stats and reward points if customer selected
       if (cart.customer != null) {
         await ref
             .read(orderRepositoryProvider)
             .updateCustomerStats(cart.customer!.id, cart.grandTotal);
 
-        // Process reward points
+        final rewardBaseAmount = cart.grandTotal + cart.manualDiscount;
         await ref
             .read(orderRepositoryProvider)
-            .processRewardForOrder(orderId, cart.grandTotal, cart.customer?.id);
+            .processRewardForOrder(
+              orderId,
+              rewardBaseAmount,
+              cart.customer?.id,
+            );
       }
 
       ref.read(cartProvider.notifier).clearCart();

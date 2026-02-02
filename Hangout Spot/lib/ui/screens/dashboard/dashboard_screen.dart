@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/data/repositories/analytics_repository.dart';
+import 'package:hangout_spot/logic/billing/session_provider.dart';
 import 'package:hangout_spot/data/repositories/order_repository.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:intl/intl.dart';
@@ -11,6 +12,10 @@ class DashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final analytics = ref.watch(analyticsRepositoryProvider);
+    final sessionManager = ref.watch(sessionManagerProvider);
+    final sessionInfo = sessionManager.getSessionInfo();
+    final sessionStart = sessionInfo['opensAt'] as DateTime;
+    final sessionEnd = sessionInfo['closesAt'] as DateTime;
     final width = MediaQuery.of(context).size.width;
     final isWide = width > 900;
     final theme = Theme.of(context);
@@ -87,7 +92,10 @@ class DashboardScreen extends ConsumerWidget {
                     SizedBox(
                       width: cardWidth,
                       child: FutureBuilder<double>(
-                        future: analytics.getTodaySales(),
+                        future: analytics.getSessionSales(
+                          sessionStart,
+                          sessionEnd,
+                        ),
                         builder: (context, snapshot) => _StatCard(
                           title: "Total Sales",
                           value: snapshot.hasData
@@ -103,7 +111,10 @@ class DashboardScreen extends ConsumerWidget {
                     SizedBox(
                       width: cardWidth,
                       child: FutureBuilder<int>(
-                        future: analytics.getTodayOrdersCount(),
+                        future: analytics.getSessionOrdersCount(
+                          sessionStart,
+                          sessionEnd,
+                        ),
                         builder: (context, snapshot) => _StatCard(
                           title: "Orders",
                           value: snapshot.hasData ? "${snapshot.data}" : "...",
@@ -116,7 +127,10 @@ class DashboardScreen extends ConsumerWidget {
                     SizedBox(
                       width: cardWidth,
                       child: FutureBuilder<int>(
-                        future: analytics.getTotalItemsSold(),
+                        future: analytics.getSessionItemsSold(
+                          sessionStart,
+                          sessionEnd,
+                        ),
                         builder: (context, snapshot) => _StatCard(
                           title: "Items Sold",
                           value: snapshot.hasData ? "${snapshot.data}" : "...",
@@ -129,7 +143,10 @@ class DashboardScreen extends ConsumerWidget {
                     SizedBox(
                       width: cardWidth,
                       child: FutureBuilder<int>(
-                        future: analytics.getUniqueCustomersCount(),
+                        future: analytics.getSessionUniqueCustomersCount(
+                          sessionStart,
+                          sessionEnd,
+                        ),
                         builder: (context, snapshot) => _StatCard(
                           title: "Customers",
                           value: snapshot.hasData ? "${snapshot.data}" : "...",
@@ -192,9 +209,8 @@ class DashboardScreen extends ConsumerWidget {
                           vertical: 8,
                         ),
                         leading: CircleAvatar(
-                          backgroundColor: theme.colorScheme.primary.withOpacity(
-                            0.1,
-                          ),
+                          backgroundColor: theme.colorScheme.primary
+                              .withOpacity(0.1),
                           child: Icon(
                             Icons.local_cafe,
                             size: 20,

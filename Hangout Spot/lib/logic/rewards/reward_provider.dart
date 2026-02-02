@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/data/providers/database_provider.dart';
+import 'package:hangout_spot/logic/billing/cart_provider.dart';
 import 'package:uuid/uuid.dart';
 
 // Constants for reward system
@@ -45,26 +46,26 @@ final isRewardSystemEnabledProvider = FutureProvider<bool>((ref) async {
 });
 
 // Get customer's current reward balance
-final customerRewardBalanceProvider = FutureProvider.family<double, String>((
+final customerRewardBalanceProvider = StreamProvider.family<double, String>((
   ref,
   customerId,
-) async {
+) {
   final db = ref.watch(appDatabaseProvider);
 
-  final transactions = await (db.select(
-    db.rewardTransactions,
-  )..where((tbl) => tbl.customerId.equals(customerId))).get();
-
-  double balance = 0.0;
-  for (var transaction in transactions) {
-    if (transaction.type == 'earn') {
-      balance += transaction.amount;
-    } else if (transaction.type == 'redeem') {
-      balance -= transaction.amount;
-    }
-  }
-
-  return balance;
+  return (db.select(db.rewardTransactions)
+        ..where((tbl) => tbl.customerId.equals(customerId)))
+      .watch()
+      .map((transactions) {
+        double balance = 0.0;
+        for (var transaction in transactions) {
+          if (transaction.type == 'earn') {
+            balance += transaction.amount;
+          } else if (transaction.type == 'redeem') {
+            balance -= transaction.amount;
+          }
+        }
+        return balance;
+      });
 });
 
 // Get reward transaction history for a customer
@@ -202,6 +203,18 @@ class RewardNotifier extends StateNotifier<void> {
     );
 
     await _db.into(_db.settings).insertOnConflictUpdate(setting);
+  }
+
+  /// Clear all reward transactions (for testing/debugging)
+  Future<void> clearAllRewards() async {
+    await _db.delete(_db.rewardTransactions).go();
+  }
+
+  /// Clear rewards for a specific customer
+  Future<void> clearCustomerRewards(String customerId) async {
+    await (_db.delete(
+      _db.rewardTransactions,
+    )..where((tbl) => tbl.customerId.equals(customerId))).go();
   }
 
   // Helper method to get customer balance
