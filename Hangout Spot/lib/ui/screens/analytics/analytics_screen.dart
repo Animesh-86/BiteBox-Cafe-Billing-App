@@ -502,7 +502,7 @@ class _TrendsTab extends StatelessWidget {
                   );
                   return _buildModernBarChart(
                     hours.map((e) => e.value).toList(),
-                    (index) => "${hours[index].key}:00",
+                    (index) => _formatHour(hours[index].key),
                     theme.colorScheme.primary,
                   );
                 },
@@ -1241,7 +1241,8 @@ Widget _buildHeatMap(List<MapEntry<int, double>> hours, Color baseColor) {
             ),
           ),
           const SizedBox(height: 2),
-          Text('${index}h', style: const TextStyle(fontSize: 9)),
+          const SizedBox(height: 2),
+          Text(_formatHour(index), style: const TextStyle(fontSize: 9)),
         ],
       );
     }),
@@ -1639,6 +1640,10 @@ Widget _buildModernBarChart(
             getTitlesWidget: (val, meta) {
               final index = val.toInt();
               if (index < 0 || index >= values.length) return const SizedBox();
+              // Reduce clutter for dense data (e.g. 24 hours)
+              if (values.length > 15 && index % 4 != 0) {
+                return const SizedBox();
+              }
               return Padding(
                 padding: const EdgeInsets.only(top: 8.0),
                 child: Text(
@@ -1651,6 +1656,7 @@ Widget _buildModernBarChart(
               );
             },
             reservedSize: 40,
+            interval: 1,
           ),
         ),
         leftTitles: AxisTitles(
@@ -1703,4 +1709,11 @@ Widget _buildModernBarChart(
 String _truncate(String text, int len) {
   if (text.length <= len) return text;
   return "${text.substring(0, len)}...";
+}
+
+String _formatHour(int hour) {
+  if (hour == 0) return '12 AM';
+  if (hour == 12) return '12 PM';
+  if (hour < 12) return '$hour AM';
+  return '${hour - 12} PM';
 }

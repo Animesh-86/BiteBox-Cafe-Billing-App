@@ -99,5 +99,17 @@ class AppTheme {
       textColor: _onSurface,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
     ),
+    switchTheme: SwitchThemeData(
+      thumbColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) return _primary;
+        return Colors.grey.shade400;
+      }),
+      trackColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected))
+          return _primary.withOpacity(0.5);
+        return Colors.grey.shade800;
+      }),
+      overlayColor: WidgetStateProperty.all(_primary.withOpacity(0.1)),
+    ),
   );
 }

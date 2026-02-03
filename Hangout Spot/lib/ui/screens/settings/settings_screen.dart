@@ -1,27 +1,21 @@
-import 'dart:async';
-
+import 'dart:ui';
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:drift/drift.dart' as drift;
-import 'package:hangout_spot/data/repositories/auth_repository.dart';
-import 'package:hangout_spot/data/repositories/sync_repository.dart';
-import 'package:hangout_spot/ui/screens/auth/login_screen.dart';
-import 'package:hangout_spot/data/providers/theme_provider.dart';
-import 'package:hangout_spot/logic/rewards/reward_provider.dart';
-import 'package:hangout_spot/data/providers/database_provider.dart';
-import 'package:hangout_spot/data/local/db/app_database.dart';
-import 'package:hangout_spot/logic/offers/promo_provider.dart';
-import 'package:hangout_spot/logic/locations/location_provider.dart';
-import 'package:uuid/uuid.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-const String CLOUD_AUTO_SYNC_ENABLED_KEY = 'cloud_auto_sync_enabled';
-const String CLOUD_AUTO_SYNC_INTERVAL_KEY = 'cloud_auto_sync_interval_minutes';
-const int DEFAULT_AUTO_SYNC_INTERVAL_MINUTES = 15;
-const String STORE_NAME_KEY = 'store_name';
-const String STORE_ADDRESS_KEY = 'store_address';
-const String STORE_LOGO_URL_KEY = 'store_logo_url';
-const String RECEIPT_FOOTER_KEY = 'receipt_footer';
-const String RECEIPT_SHOW_THANK_YOU_KEY = 'receipt_show_thank_you';
+import 'package:hangout_spot/data/repositories/auth_repository.dart';
+
+import 'package:hangout_spot/ui/screens/auth/login_screen.dart';
+import 'package:hangout_spot/utils/constants/app_keys.dart';
+import 'sections/appearance_settings.dart';
+import 'sections/backup_settings.dart';
+import 'sections/locations_settings.dart';
+import 'sections/loyalty_settings.dart';
+import 'sections/promo_settings.dart';
+import 'sections/receipt_settings.dart';
+import 'widgets/settings_shared.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -31,900 +25,367 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  bool _isSyncing = false;
-  bool _autoSyncEnabled = false;
-  int _autoSyncIntervalMinutes = DEFAULT_AUTO_SYNC_INTERVAL_MINUTES;
-  bool _syncSettingsLoaded = false;
-  Timer? _autoSyncTimer;
-  late TextEditingController _earningRateController;
-  late TextEditingController _redemptionRateController;
-  late TextEditingController _storeNameController;
-  late TextEditingController _storeAddressController;
-  late TextEditingController _storeLogoController;
-  late TextEditingController _receiptFooterController;
-  bool _showThankYou = true;
+  // STORE DETAILS CONTROLLERS
+  final TextEditingController _storeNameController = TextEditingController();
+  final TextEditingController _storeAddressController = TextEditingController();
+  final TextEditingController _storePhoneController = TextEditingController();
+  final TextEditingController _storeEmailController = TextEditingController();
+
+  String? _storeLogoPath;
   bool _storeSettingsLoaded = false;
-  late TextEditingController _promoTitleController;
-  late TextEditingController _promoDiscountController;
-  late TextEditingController _promoBundleController;
-  bool _promoEnabled = false;
-  DateTime? _promoStart;
-  DateTime? _promoEnd;
-  bool _promoSettingsLoaded = false;
 
   @override
   void initState() {
     super.initState();
-    _earningRateController = TextEditingController();
-    _redemptionRateController = TextEditingController();
-    _storeNameController = TextEditingController();
-    _storeAddressController = TextEditingController();
-    _storeLogoController = TextEditingController();
-    _receiptFooterController = TextEditingController();
-    _promoTitleController = TextEditingController();
-    _promoDiscountController = TextEditingController();
-    _promoBundleController = TextEditingController();
-    _loadSyncSettings();
     _loadStoreSettings();
-    _loadPromoSettings();
   }
 
   @override
   void dispose() {
-    _autoSyncTimer?.cancel();
-    _earningRateController.dispose();
-    _redemptionRateController.dispose();
     _storeNameController.dispose();
     _storeAddressController.dispose();
-    _storeLogoController.dispose();
-    _receiptFooterController.dispose();
-    _promoTitleController.dispose();
-    _promoDiscountController.dispose();
-    _promoBundleController.dispose();
+    _storePhoneController.dispose();
+    _storeEmailController.dispose();
     super.dispose();
   }
 
-  Future<void> _sync({bool showSnackBar = true}) async {
-    if (_isSyncing) return;
-    setState(() => _isSyncing = true);
-    try {
-      await ref.read(syncRepositoryProvider).backupData();
-      if (mounted && showSnackBar)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("Backup Successful!")));
-    } catch (e) {
-      if (mounted && showSnackBar)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Backup Failed: $e")));
-    } finally {
-      if (mounted) setState(() => _isSyncing = false);
-    }
-  }
-
-  Future<void> _loadSyncSettings() async {
-    final db = ref.read(appDatabaseProvider);
-    final settings =
-        await (db.select(db.settings)..where(
-              (tbl) => tbl.key.isIn([
-                CLOUD_AUTO_SYNC_ENABLED_KEY,
-                CLOUD_AUTO_SYNC_INTERVAL_KEY,
-              ]),
-            ))
-            .get();
-
-    final map = <String, String>{for (final s in settings) s.key: s.value};
-
-    final enabled = map[CLOUD_AUTO_SYNC_ENABLED_KEY] == 'true';
-    final interval =
-        int.tryParse(
-          map[CLOUD_AUTO_SYNC_INTERVAL_KEY] ??
-              DEFAULT_AUTO_SYNC_INTERVAL_MINUTES.toString(),
-        ) ??
-        DEFAULT_AUTO_SYNC_INTERVAL_MINUTES;
-
-    if (mounted) {
-      setState(() {
-        _autoSyncEnabled = enabled;
-        _autoSyncIntervalMinutes = interval;
-        _syncSettingsLoaded = true;
-      });
-    }
-
-    _applyAutoSync();
-  }
-
-  Future<void> _saveSyncSetting(String key, String value) async {
-    final db = ref.read(appDatabaseProvider);
-    await db
-        .into(db.settings)
-        .insert(
-          SettingsCompanion(key: drift.Value(key), value: drift.Value(value)),
-          mode: drift.InsertMode.insertOrReplace,
-        );
-  }
-
   Future<void> _loadStoreSettings() async {
-    final db = ref.read(appDatabaseProvider);
-    final settings =
-        await (db.select(db.settings)..where(
-              (tbl) => tbl.key.isIn([
-                STORE_NAME_KEY,
-                STORE_ADDRESS_KEY,
-                STORE_LOGO_URL_KEY,
-                RECEIPT_FOOTER_KEY,
-                RECEIPT_SHOW_THANK_YOU_KEY,
-              ]),
-            ))
-            .get();
-
-    final map = <String, String>{for (final s in settings) s.key: s.value};
-    _storeNameController.text = map[STORE_NAME_KEY] ?? 'Hangout Spot';
-    _storeAddressController.text = map[STORE_ADDRESS_KEY] ?? '';
-    _storeLogoController.text = map[STORE_LOGO_URL_KEY] ?? '';
-    _receiptFooterController.text = map[RECEIPT_FOOTER_KEY] ?? '';
-    _showThankYou = (map[RECEIPT_SHOW_THANK_YOU_KEY] ?? 'true') == 'true';
-
-    if (mounted) {
-      setState(() => _storeSettingsLoaded = true);
-    }
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _storeNameController.text = prefs.getString(STORE_NAME_KEY) ?? '';
+      _storeAddressController.text = prefs.getString(STORE_ADDRESS_KEY) ?? '';
+      _storePhoneController.text = prefs.getString(STORE_PHONE_KEY) ?? '';
+      _storeLogoPath = prefs.getString(STORE_LOGO_KEY);
+      _storeSettingsLoaded = true;
+    });
   }
 
   Future<void> _saveStoreSettings() async {
-    final db = ref.read(appDatabaseProvider);
-    final entries = <MapEntry<String, String>>[
-      MapEntry(STORE_NAME_KEY, _storeNameController.text.trim()),
-      MapEntry(STORE_ADDRESS_KEY, _storeAddressController.text.trim()),
-      MapEntry(STORE_LOGO_URL_KEY, _storeLogoController.text.trim()),
-      MapEntry(RECEIPT_FOOTER_KEY, _receiptFooterController.text.trim()),
-      MapEntry(RECEIPT_SHOW_THANK_YOU_KEY, _showThankYou.toString()),
-    ];
-
-    for (final entry in entries) {
-      await db
-          .into(db.settings)
-          .insert(
-            SettingsCompanion(
-              key: drift.Value(entry.key),
-              value: drift.Value(entry.value),
-            ),
-            mode: drift.InsertMode.insertOrReplace,
-          );
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(STORE_NAME_KEY, _storeNameController.text);
+    await prefs.setString(STORE_ADDRESS_KEY, _storeAddressController.text);
+    await prefs.setString(STORE_PHONE_KEY, _storePhoneController.text);
+    if (_storeLogoPath != null) {
+      await prefs.setString(STORE_LOGO_KEY, _storeLogoPath!);
     }
   }
 
-  Future<void> _loadPromoSettings() async {
-    final db = ref.read(appDatabaseProvider);
-    final settings =
-        await (db.select(db.settings)..where(
-              (tbl) => tbl.key.isIn([
-                PROMO_ENABLED_KEY,
-                PROMO_TITLE_KEY,
-                PROMO_START_KEY,
-                PROMO_END_KEY,
-                PROMO_DISCOUNT_PERCENT_KEY,
-                PROMO_BUNDLE_ITEM_IDS_KEY,
-              ]),
-            ))
-            .get();
-
-    final map = <String, String>{for (final s in settings) s.key: s.value};
-    _promoEnabled = (map[PROMO_ENABLED_KEY] ?? 'false') == 'true';
-    _promoTitleController.text = map[PROMO_TITLE_KEY] ?? 'Valentine Combo';
-    _promoDiscountController.text = map[PROMO_DISCOUNT_PERCENT_KEY] ?? '0';
-    _promoBundleController.text = map[PROMO_BUNDLE_ITEM_IDS_KEY] ?? '';
-    _promoStart = DateTime.tryParse(map[PROMO_START_KEY] ?? '');
-    _promoEnd = DateTime.tryParse(map[PROMO_END_KEY] ?? '');
-
-    if (mounted) {
-      setState(() => _promoSettingsLoaded = true);
-    }
-  }
-
-  Future<void> _savePromoSettings() async {
-    final db = ref.read(appDatabaseProvider);
-    final entries = <MapEntry<String, String>>[
-      MapEntry(PROMO_ENABLED_KEY, _promoEnabled.toString()),
-      MapEntry(PROMO_TITLE_KEY, _promoTitleController.text.trim()),
-      MapEntry(PROMO_START_KEY, _promoStart?.toIso8601String() ?? ''),
-      MapEntry(PROMO_END_KEY, _promoEnd?.toIso8601String() ?? ''),
-      MapEntry(
-        PROMO_DISCOUNT_PERCENT_KEY,
-        _promoDiscountController.text.trim(),
-      ),
-      MapEntry(PROMO_BUNDLE_ITEM_IDS_KEY, _promoBundleController.text.trim()),
-    ];
-
-    for (final entry in entries) {
-      await db
-          .into(db.settings)
-          .insert(
-            SettingsCompanion(
-              key: drift.Value(entry.key),
-              value: drift.Value(entry.value),
-            ),
-            mode: drift.InsertMode.insertOrReplace,
-          );
-    }
-  }
-
-  void _applyAutoSync() {
-    _autoSyncTimer?.cancel();
-    if (!_autoSyncEnabled) return;
-
-    _autoSyncTimer = Timer.periodic(
-      Duration(minutes: _autoSyncIntervalMinutes),
-      (_) => _sync(showSnackBar: false),
+  Future<void> _pickImage() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
     );
-  }
 
-  Future<void> _restore() async {
-    setState(() => _isSyncing = true);
-    try {
-      await ref.read(syncRepositoryProvider).restoreData();
-      if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("Restore Successful!")));
-    } catch (e) {
-      if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Restore Failed: $e")));
-    } finally {
-      if (mounted) setState(() => _isSyncing = false);
+    if (result != null && result.files.single.path != null) {
+      setState(() {
+        _storeLogoPath = result.files.single.path;
+      });
+      await _saveStoreSettings();
     }
   }
 
-  Future<void> _setCurrentLocation(String locationId) async {
-    final db = ref.read(appDatabaseProvider);
-    await db
-        .into(db.settings)
-        .insert(
-          SettingsCompanion(
-            key: const drift.Value(CURRENT_LOCATION_ID_KEY),
-            value: drift.Value(locationId),
-          ),
-          mode: drift.InsertMode.insertOrReplace,
-        );
+  void _navigateTo(Widget screen) {
+    Navigator.of(context).push(MaterialPageRoute(builder: (context) => screen));
   }
 
-  Future<void> _showAddLocationDialog() async {
-    final nameController = TextEditingController();
-    final addressController = TextEditingController();
-
-    await showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Add Location'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(labelText: 'Location name'),
+  Widget _buildNavTile(
+    String title,
+    IconData icon,
+    String subtitle,
+    Widget screen,
+  ) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E1E).withOpacity(0.6),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: ListTile(
+            contentPadding: const EdgeInsets.all(16),
+            leading: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Theme.of(context).primaryColor.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                color: Theme.of(context).primaryColor,
+                size: 24,
+              ),
             ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: addressController,
-              decoration: const InputDecoration(labelText: 'Address'),
+            title: Text(
+              title,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
-          ],
+            subtitle: Text(
+              subtitle,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.5),
+                fontSize: 13,
+              ),
+            ),
+            trailing: Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 16,
+              color: Colors.white.withOpacity(0.3),
+            ),
+            onTap: () => _navigateTo(screen),
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              final name = nameController.text.trim();
-              final address = addressController.text.trim();
-              if (name.isEmpty) return;
-              final db = ref.read(appDatabaseProvider);
-              final id = const Uuid().v4();
-              await db
-                  .into(db.locations)
-                  .insert(
-                    LocationsCompanion(
-                      id: drift.Value(id),
-                      name: drift.Value(name),
-                      address: drift.Value(address.isEmpty ? null : address),
-                    ),
-                  );
-              await _setCurrentLocation(id);
-              if (mounted) Navigator.pop(ctx);
-            },
-            child: const Text('Add'),
-          ),
-        ],
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final user = ref.read(authRepositoryProvider).currentUser;
-    final themeMode = ref.watch(themeProvider);
-    final locationsAsync = ref.watch(locationsStreamProvider);
-    final currentLocationIdAsync = ref.watch(currentLocationIdProvider);
+    final user = ref.watch(authRepositoryProvider).currentUser;
+    if (_storeEmailController.text != user?.email) {
+      _storeEmailController.text = user?.email ?? '';
+    }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
-      body: Column(
+      extendBodyBehindAppBar: true,
+      body: Stack(
         children: [
-          Expanded(
-            child: ListView(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.store),
-                  title: const Text("Cafe Details"),
-                  subtitle: Text(user?.email ?? "Not logged in"),
-                ),
-                const Divider(),
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text(
-                    "Appearance",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.brightness_6),
-                  title: const Text("Theme"),
-                  subtitle: Text(
-                    themeMode == ThemeMode.system
-                        ? "System"
-                        : (themeMode == ThemeMode.light ? "Light" : "Dark"),
-                  ),
-                  trailing: DropdownButton<ThemeMode>(
-                    value: themeMode,
-                    underline: const SizedBox(),
-                    items: const [
-                      DropdownMenuItem(
-                        value: ThemeMode.system,
-                        child: Text("System"),
-                      ),
-                      DropdownMenuItem(
-                        value: ThemeMode.light,
-                        child: Text("Light"),
-                      ),
-                      DropdownMenuItem(
-                        value: ThemeMode.dark,
-                        child: Text("Dark"),
-                      ),
-                    ],
-                    onChanged: (val) {
-                      if (val != null)
-                        ref.read(themeProvider.notifier).setTheme(val);
-                    },
-                  ),
-                ),
-                const Divider(),
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text(
-                    "Store Information",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    children: [
-                      TextField(
-                        controller: _storeNameController,
-                        decoration: const InputDecoration(
-                          labelText: 'Store Name',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: _storeAddressController,
-                        decoration: const InputDecoration(
-                          labelText: 'Address',
-                          border: OutlineInputBorder(),
-                        ),
-                        maxLines: 2,
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: _storeLogoController,
-                        decoration: const InputDecoration(
-                          labelText: 'Logo URL (optional)',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: ElevatedButton(
-                          onPressed: _storeSettingsLoaded
-                              ? () async {
-                                  await _saveStoreSettings();
-                                  if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Store info saved'),
-                                      ),
-                                    );
-                                  }
-                                }
-                              : null,
-                          child: const Text('Save Store Info'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(),
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text(
-                    "Receipt Customization",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    children: [
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Show Thank You line'),
-                        value: _showThankYou,
-                        onChanged: (val) {
-                          setState(() => _showThankYou = val);
-                        },
-                      ),
-                      const SizedBox(height: 6),
-                      TextField(
-                        controller: _receiptFooterController,
-                        decoration: const InputDecoration(
-                          labelText: 'Receipt Footer Note',
-                          border: OutlineInputBorder(),
-                        ),
-                        maxLines: 2,
-                      ),
-                      const SizedBox(height: 10),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: ElevatedButton(
-                          onPressed: _storeSettingsLoaded
-                              ? () async {
-                                  await _saveStoreSettings();
-                                  if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Receipt settings saved'),
-                                      ),
-                                    );
-                                  }
-                                }
-                              : null,
-                          child: const Text('Save Receipt'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(),
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text(
-                    "Marketing Offers",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    children: [
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Enable limited-time offer'),
-                        value: _promoEnabled,
-                        onChanged: (val) {
-                          setState(() => _promoEnabled = val);
-                        },
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: _promoTitleController,
-                        decoration: const InputDecoration(
-                          labelText: 'Offer title',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: _promoDiscountController,
-                        decoration: const InputDecoration(
-                          labelText: 'Discount % for combo',
-                          border: OutlineInputBorder(),
-                        ),
-                        keyboardType: TextInputType.number,
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: _promoBundleController,
-                        decoration: const InputDecoration(
-                          labelText: 'Bundle Item IDs (comma separated)',
-                          border: OutlineInputBorder(),
-                          helperText:
-                              'Paste item IDs from menu export for combo offers',
-                        ),
-                        maxLines: 2,
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () async {
-                                final picked = await showDatePicker(
-                                  context: context,
-                                  initialDate: _promoStart ?? DateTime.now(),
-                                  firstDate: DateTime(2020),
-                                  lastDate: DateTime(2100),
-                                );
-                                if (picked != null && mounted) {
-                                  setState(
-                                    () => _promoStart = DateTime(
-                                      picked.year,
-                                      picked.month,
-                                      picked.day,
-                                    ),
-                                  );
-                                }
-                              },
-                              child: Text(
-                                _promoStart == null
-                                    ? 'Start Date'
-                                    : 'Start: ${_promoStart!.toLocal().toString().split(' ').first}',
-                              ),
-                            ),
+          SafeArea(
+            child: CustomScrollView(
+              slivers: [
+                // Custom Header
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+                    child: Text(
+                      "Settings",
+                      style: Theme.of(context).textTheme.headlineMedium
+                          ?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
                           ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () async {
-                                final picked = await showDatePicker(
-                                  context: context,
-                                  initialDate: _promoEnd ?? DateTime.now(),
-                                  firstDate: DateTime(2020),
-                                  lastDate: DateTime(2100),
-                                );
-                                if (picked != null && mounted) {
-                                  setState(
-                                    () => _promoEnd = DateTime(
-                                      picked.year,
-                                      picked.month,
-                                      picked.day,
-                                      23,
-                                      59,
-                                      59,
+                    ),
+                  ),
+                ),
+
+                // Content
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      // 1. Redesigned Store Profile
+                      SettingsSection(
+                        title: "Store Profile",
+                        icon: Icons.store_rounded,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Image Picker
+                              GestureDetector(
+                                onTap: _pickImage,
+                                child: Container(
+                                  width: 100,
+                                  height: 100,
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(
+                                      context,
+                                    ).primaryColor.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: Theme.of(
+                                        context,
+                                      ).primaryColor.withOpacity(0.3),
                                     ),
-                                  );
-                                }
-                              },
-                              child: Text(
-                                _promoEnd == null
-                                    ? 'End Date'
-                                    : 'End: ${_promoEnd!.toLocal().toString().split(' ').first}',
+                                    image: _storeLogoPath != null
+                                        ? DecorationImage(
+                                            image: FileImage(
+                                              File(_storeLogoPath!),
+                                            ),
+                                            fit: BoxFit.cover,
+                                          )
+                                        : null,
+                                  ),
+                                  child: _storeLogoPath == null
+                                      ? Icon(
+                                          Icons.add_a_photo_rounded,
+                                          size: 32,
+                                          color: Theme.of(context).primaryColor,
+                                        )
+                                      : null,
+                                ),
                               ),
+                              const SizedBox(width: 16),
+                              // Name and Address
+                              Expanded(
+                                child: Column(
+                                  children: [
+                                    SettingsTextField(
+                                      controller: _storeNameController,
+                                      label: "Store Name",
+                                      icon: Icons.storefront,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    SettingsTextField(
+                                      controller: _storeAddressController,
+                                      label: "Address",
+                                      icon: Icons.location_on_rounded,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          SettingsTextField(
+                            controller: _storePhoneController,
+                            label: "Phone Number",
+                            icon: Icons.phone_rounded,
+                            inputType: TextInputType.phone,
+                          ),
+                          const SizedBox(height: 12),
+                          SettingsTextField(
+                            controller: _storeEmailController,
+                            label: "Email",
+                            icon: Icons.email_rounded,
+                            inputType: TextInputType.emailAddress,
+                            readOnly: true,
+                          ),
+                          const SizedBox(height: 24),
+
+                          // Save & Logout Buttons
+                          Row(
+                            children: [
+                              Expanded(
+                                child: SettingsActionBtn(
+                                  label: "Save Profile",
+                                  onPressed: _storeSettingsLoaded
+                                      ? () async {
+                                          await _saveStoreSettings();
+                                          if (mounted) {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Store profile saved',
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        }
+                                      : null,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                ref.read(authRepositoryProvider).signOut();
+                                Navigator.of(context).pushAndRemoveUntil(
+                                  MaterialPageRoute(
+                                    builder: (_) => const LoginScreen(),
+                                  ),
+                                  (route) => false,
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red.withOpacity(0.1),
+                                foregroundColor: Colors.redAccent,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                                elevation: 0,
+                                side: BorderSide(
+                                  color: Colors.redAccent.withOpacity(0.5),
+                                ),
+                              ),
+                              icon: const Icon(Icons.logout_rounded, size: 20),
+                              label: const Text("Logout"),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 10),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: ElevatedButton(
-                          onPressed: _promoSettingsLoaded
-                              ? () async {
-                                  await _savePromoSettings();
-                                  if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Offer settings saved'),
-                                      ),
-                                    );
-                                  }
-                                }
-                              : null,
-                          child: const Text('Save Offer'),
-                        ),
+                      const SizedBox(height: 24),
+
+                      // Navigation Items
+                      _buildNavTile(
+                        "Locations",
+                        Icons.place_rounded,
+                        "Manage store locations",
+                        const LocationsSettingsScreen(),
                       ),
-                    ],
-                  ),
-                ),
-                const Divider(),
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text(
-                    "Locations",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    children: [
-                      locationsAsync.when(
-                        data: (locations) {
-                          final currentId = currentLocationIdAsync.valueOrNull;
-                          if (locations.isEmpty) {
-                            return const Text('No locations added yet');
-                          }
-                          return Column(
-                            children: locations
-                                .map(
-                                  (loc) => RadioListTile<String>(
-                                    contentPadding: EdgeInsets.zero,
-                                    title: Text(loc.name),
-                                    subtitle: Text(loc.address ?? ''),
-                                    value: loc.id,
-                                    groupValue: currentId,
-                                    onChanged: (val) {
-                                      if (val != null) {
-                                        _setCurrentLocation(val);
-                                      }
-                                    },
-                                  ),
-                                )
-                                .toList(),
-                          );
-                        },
-                        loading: () =>
-                            const Center(child: CircularProgressIndicator()),
-                        error: (e, _) => Text('Error: $e'),
+                      _buildNavTile(
+                        "Loyalty Program",
+                        Icons.stars_rounded,
+                        "Configure rewards and points",
+                        const LoyaltySettingsScreen(),
                       ),
-                      const SizedBox(height: 8),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: ElevatedButton.icon(
-                          onPressed: _showAddLocationDialog,
-                          icon: const Icon(Icons.add),
-                          label: const Text('Add Location'),
-                        ),
+                      _buildNavTile(
+                        "Active Promotion",
+                        Icons.local_offer_rounded,
+                        "Set up campaigns and discounts",
+                        const PromoSettingsScreen(),
                       ),
-                    ],
-                  ),
-                ),
-                const Divider(),
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text(
-                    "Loyalty & Rewards",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                _buildRewardSettingsSection(ref),
-                const Divider(),
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text(
-                    "Cloud Sync",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.sync),
-                  title: const Text("Auto Sync"),
-                  subtitle: const Text("Automatically backup to cloud"),
-                  trailing: Switch(
-                    value: _autoSyncEnabled,
-                    onChanged: !_syncSettingsLoaded
-                        ? null
-                        : (value) async {
-                            setState(() => _autoSyncEnabled = value);
-                            await _saveSyncSetting(
-                              CLOUD_AUTO_SYNC_ENABLED_KEY,
-                              value.toString(),
-                            );
-                            _applyAutoSync();
-                          },
-                  ),
-                ),
-                if (_autoSyncEnabled)
-                  ListTile(
-                    leading: const Icon(Icons.schedule),
-                    title: const Text("Sync Interval"),
-                    subtitle: Text("Every $_autoSyncIntervalMinutes minutes"),
-                    trailing: DropdownButton<int>(
-                      value: _autoSyncIntervalMinutes,
-                      items: const [15, 30, 60]
-                          .map(
-                            (m) => DropdownMenuItem<int>(
-                              value: m,
-                              child: Text("$m min"),
+                      _buildNavTile(
+                        "Receipt Config",
+                        Icons.receipt_long_rounded,
+                        "Customize printed receipts",
+                        const ReceiptSettingsScreen(),
+                      ),
+                      _buildNavTile(
+                        "Cloud Backup",
+                        Icons.cloud_sync_rounded,
+                        "Sync data and restore",
+                        const BackupSettingsScreen(),
+                      ),
+                      _buildNavTile(
+                        "Appearance",
+                        Icons.palette_rounded,
+                        "Change app theme",
+                        const AppearanceSettingsScreen(),
+                      ),
+
+                      const SizedBox(height: 48),
+
+                      Center(
+                        child: Column(
+                          children: [
+                            Text(
+                              "Hangout Spot v1.0.0",
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.3),
+                                fontSize: 12,
+                              ),
                             ),
-                          )
-                          .toList(),
-                      onChanged: (value) async {
-                        if (value == null) return;
-                        setState(() => _autoSyncIntervalMinutes = value);
-                        await _saveSyncSetting(
-                          CLOUD_AUTO_SYNC_INTERVAL_KEY,
-                          value.toString(),
-                        );
-                        _applyAutoSync();
-                      },
-                    ),
+                            const SizedBox(height: 4),
+                            Text(
+                              "Developed by Animesh Sharma",
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.3),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 80), // Bottom padding
+                    ]),
                   ),
-                ListTile(
-                  leading: const Icon(Icons.cloud_upload),
-                  title: const Text("Sync Now (Backup)"),
-                  subtitle: const Text("Upload local data to Cloud"),
-                  trailing: _isSyncing
-                      ? const CircularProgressIndicator()
-                      : null,
-                  onTap: _isSyncing ? null : _sync,
-                ),
-                ListTile(
-                  leading: const Icon(Icons.cloud_download),
-                  title: const Text("Restore from Cloud"),
-                  subtitle: const Text("Overwrite local data from Cloud"),
-                  onTap: _isSyncing ? null : _restore,
-                ),
-                const Divider(),
-                ListTile(
-                  leading: const Icon(Icons.logout, color: Colors.red),
-                  title: const Text(
-                    "Logout",
-                    style: TextStyle(color: Colors.red),
-                  ),
-                  onTap: () {
-                    ref.read(authRepositoryProvider).signOut();
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (_) => const LoginScreen()),
-                      (route) => false,
-                    );
-                  },
                 ),
               ],
             ),
           ),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: const [
-                  Text(
-                    "Hangout Spot v1.0.0",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    "Developed by Animesh Sharma",
-                    style: TextStyle(color: Colors.grey, fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-          ),
         ],
       ),
-    );
-  }
-
-  Widget _buildRewardSettingsSection(WidgetRef ref) {
-    final settingsAsync = ref.watch(rewardSettingsProvider);
-
-    return settingsAsync.when(
-      data: (settings) {
-        final isEnabled = settings[REWARD_FEATURE_TOGGLE_KEY] == 'true';
-        final earningRate =
-            double.tryParse(settings[REWARD_RATE_KEY] ?? '0.08') ?? 0.08;
-        final redemptionRate =
-            double.tryParse(settings[REDEMPTION_RATE_KEY] ?? '1.0') ?? 1.0;
-
-        if (_earningRateController.text.isEmpty) {
-          _earningRateController.text = (earningRate * 100).toStringAsFixed(1);
-        }
-        if (_redemptionRateController.text.isEmpty) {
-          _redemptionRateController.text = redemptionRate.toStringAsFixed(2);
-        }
-
-        return Column(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.card_giftcard),
-              title: const Text('Enable Reward System'),
-              subtitle: const Text('Allow customers to earn and redeem points'),
-              trailing: Switch(
-                value: isEnabled,
-                onChanged: (value) async {
-                  await ref
-                      .read(rewardNotifierProvider.notifier)
-                      .setRewardSystemEnabled(value);
-                  ref.invalidate(rewardSettingsProvider);
-                  ref.invalidate(isRewardSystemEnabledProvider);
-                },
-              ),
-            ),
-            if (isEnabled) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Earning Rate: ${(earningRate * 100).toStringAsFixed(1)}%',
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Redemption Rate: ₹${redemptionRate.toStringAsFixed(2)}/point',
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _earningRateController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: 'Earning Rate (%)',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: _redemptionRateController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: 'Redemption Rate (₹/point)',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          final earningPercent =
-                              double.tryParse(_earningRateController.text) ??
-                              (earningRate * 100);
-                          final redemption =
-                              double.tryParse(_redemptionRateController.text) ??
-                              redemptionRate;
-
-                          await ref
-                              .read(rewardNotifierProvider.notifier)
-                              .setRewardEarningRate(earningPercent / 100);
-                          await ref
-                              .read(rewardNotifierProvider.notifier)
-                              .setRedemptionRate(redemption);
-
-                          ref.invalidate(rewardSettingsProvider);
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Reward rates updated'),
-                              ),
-                            );
-                          }
-                        },
-                        child: const Text('Save Rates'),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ],
-        );
-      },
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, stack) => Center(child: Text('Error: $err')),
     );
   }
 }

@@ -308,24 +308,28 @@ class AnalyticsRepository {
     DateTime start,
     DateTime end,
   ) async {
-    final rows = await _db
-        .customSelect(
-          "SELECT strftime('%H', created_at, 'localtime') as hour, "
-          "COUNT(*) as orders "
-          "FROM orders "
-          "WHERE status = 'completed' AND created_at >= ? AND created_at < ? "
-          "GROUP BY hour ORDER BY hour",
-          variables: [Variable.withDateTime(start), Variable.withDateTime(end)],
-          readsFrom: {_db.orders},
-        )
-        .get();
+    final query = _db.selectOnly(_db.orders)
+      ..addColumns([_db.orders.createdAt])
+      ..where(_db.orders.status.equals('completed'))
+      ..where(_db.orders.createdAt.isBiggerOrEqualValue(start))
+      ..where(_db.orders.createdAt.isSmallerThanValue(end));
 
-    return rows.map((row) {
-      final hourStr = row.read<String>('hour') ?? '0';
-      final hour = int.tryParse(hourStr) ?? 0;
-      final orders = (row.read<int>('orders') ?? 0).toDouble();
-      return MapEntry(hour, orders);
-    }).toList();
+    final rows = await query.get();
+
+    final hourCounts = <int, int>{};
+
+    for (final row in rows) {
+      final date = row.read(_db.orders.createdAt);
+      if (date != null) {
+        final hour = date.hour;
+        hourCounts[hour] = (hourCounts[hour] ?? 0) + 1;
+      }
+    }
+
+    final sorted = hourCounts.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+
+    return sorted.map((e) => MapEntry(e.key, e.value.toDouble())).toList();
   }
 
   Future<List<MapEntry<String, double>>> getTopSellingItemsSince(
@@ -385,29 +389,46 @@ class AnalyticsRepository {
     DateTime end, {
     int limit = 10,
   }) async {
-    final rows = await _db
-        .customSelect(
-          "SELECT oi.item_name as name, "
-          "date(o.created_at) as day, "
-          "SUM(oi.quantity) as qty "
-          "FROM order_items oi "
-          "INNER JOIN orders o ON o.id = oi.order_id "
-          "WHERE o.status = 'completed' AND o.created_at >= ? AND o.created_at < ? "
-          "GROUP BY oi.item_name, date(o.created_at)",
-          variables: [Variable.withDateTime(start), Variable.withDateTime(end)],
-          readsFrom: {_db.orderItems, _db.orders},
-        )
-        .get();
+    // Determine the number of days in the range
+    final days = end.difference(start).inDays + 1;
+    if (days <= 0) return [];
 
-    final totals = <String, double>{};
+    // Query raw data: Item Name, CreatedAt, Quantity
+    final query =
+        _db.selectOnly(_db.orderItems).join([
+            innerJoin(
+              _db.orders,
+              _db.orders.id.equalsExp(_db.orderItems.orderId),
+            ),
+          ])
+          ..addColumns([
+            _db.orderItems.itemName,
+            _db.orders.createdAt,
+            _db.orderItems.quantity,
+          ])
+          ..where(_db.orders.status.equals('completed'))
+          ..where(_db.orders.createdAt.isBiggerOrEqualValue(start))
+          ..where(_db.orders.createdAt.isSmallerThanValue(end));
+
+    final rows = await query.get();
+
+    // Group by (Item Name) -> Total Quantity
+    // Note: The original logic aggregated by (Item, Date) then created a per-item total?
+    // Original query: GROUP BY oi.item_name, date(o.created_at)
+    // Then iterated rows to sum qty for item name.
+    // Effectively, it summed specific quantites for each day, then summed those totals.
+    // This is mathematically equivalent to SUM(quantity) for the item across the whole period.
+    // So we can just sum by itemName.
+
+    final itemTotals = <String, double>{};
     for (final row in rows) {
-      final name = row.read<String>('name') ?? 'Unknown';
-      final qty = (row.read<int>('qty') ?? 0).toDouble();
-      totals[name] = (totals[name] ?? 0) + qty;
+      final name = row.read(_db.orderItems.itemName) ?? 'Unknown';
+      final qty = (row.read(_db.orderItems.quantity) ?? 0).toDouble();
+      itemTotals[name] = (itemTotals[name] ?? 0) + qty;
     }
 
-    final days = end.difference(start).inDays + 1;
-    final forecast = totals.entries
+    // Calculate daily average
+    final forecast = itemTotals.entries
         .map((e) => MapEntry(e.key, e.value / days))
         .toList();
 
@@ -459,23 +480,30 @@ class AnalyticsRepository {
     DateTime start,
     DateTime end,
   ) async {
-    final rows = await _db
-        .customSelect(
-          "SELECT date(created_at) as day, SUM(total_amount) as total "
-          "FROM orders "
-          "WHERE status = 'completed' AND created_at >= ? AND created_at < ? "
-          "GROUP BY day ORDER BY day",
-          variables: [Variable.withDateTime(start), Variable.withDateTime(end)],
-          readsFrom: {_db.orders},
-        )
-        .get();
+    final query = _db.selectOnly(_db.orders)
+      ..addColumns([_db.orders.createdAt, _db.orders.totalAmount])
+      ..where(_db.orders.status.equals('completed'))
+      ..where(_db.orders.createdAt.isBiggerOrEqualValue(start))
+      ..where(_db.orders.createdAt.isSmallerThanValue(end));
 
-    return rows.map((row) {
-      final day = row.read<String>('day') ?? '';
-      final date = DateTime.tryParse(day) ?? start;
-      final total = (row.read<num>('total') ?? 0).toDouble();
-      return MapEntry(date, total);
-    }).toList();
+    final rows = await query.get();
+
+    final salesByDay = <DateTime, double>{};
+
+    for (final row in rows) {
+      final date = row.read(_db.orders.createdAt);
+      final total = row.read(_db.orders.totalAmount) ?? 0.0;
+      if (date != null) {
+        // Strip time component to group by day
+        final day = DateTime(date.year, date.month, date.day);
+        salesByDay[day] = (salesByDay[day] ?? 0) + total;
+      }
+    }
+
+    final sorted = salesByDay.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+
+    return sorted;
   }
 
   Future<List<MapEntry<String, double>>> getItemSalesShare(

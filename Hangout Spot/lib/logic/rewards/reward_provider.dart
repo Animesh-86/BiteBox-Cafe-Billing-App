@@ -4,14 +4,12 @@ import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/data/providers/database_provider.dart';
 import 'package:hangout_spot/logic/billing/cart_provider.dart';
 import 'package:uuid/uuid.dart';
+import '../../utils/constants/app_keys.dart';
 
 // Constants for reward system
 const double REWARD_EARNING_RATE = 0.08; // 8% of order amount
 const double REWARD_REDEMPTION_RATE = 1.0; // 1 point = 1 rupee
 const int MIN_REDEMPTION_POINTS = 60;
-const String REWARD_FEATURE_TOGGLE_KEY = 'reward_system_enabled';
-const String REWARD_RATE_KEY = 'reward_earning_rate';
-const String REDEMPTION_RATE_KEY = 'reward_redemption_rate';
 
 // Settings provider to get/set reward feature toggle
 final rewardSettingsProvider = FutureProvider<Map<String, String>>((ref) async {

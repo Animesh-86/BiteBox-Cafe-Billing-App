@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/data/repositories/analytics_repository.dart';
 import 'package:hangout_spot/logic/billing/session_provider.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
+import 'package:hangout_spot/data/repositories/auth_repository.dart';
 import 'package:intl/intl.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -11,6 +12,10 @@ class DashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final analytics = ref.watch(analyticsRepositoryProvider);
+    final authFunc = ref.watch(authRepositoryProvider);
+    final user = authFunc.currentUser;
+    final userName =
+        user?.displayName ?? user?.email?.split('@').first ?? 'Admin';
     final sessionManager = ref.watch(sessionManagerProvider);
     final sessionInfo = sessionManager.getSessionInfo();
     final sessionStart = sessionInfo['opensAt'] as DateTime;
@@ -60,15 +65,15 @@ class DashboardScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              "Welcome back, Admin",
+              "Welcome back,",
               style: TextStyle(
                 fontSize: 16,
                 color: theme.colorScheme.onSurface.withOpacity(0.7),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Text(
-              "Store Overview",
+              "Hello, $userName! 👋",
               style: TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
