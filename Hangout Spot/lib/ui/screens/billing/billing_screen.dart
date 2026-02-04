@@ -313,7 +313,7 @@ class _MobileLayout extends ConsumerWidget {
           child: Container(
             margin: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Theme.of(context).cardTheme.color,
+              color: _billingSurface(context, darkOpacity: 0.04),
               borderRadius: BorderRadius.circular(16),
               boxShadow: _billingShadow(context),
             ),
@@ -361,7 +361,7 @@ class _MobileLayout extends ConsumerWidget {
                 child: Container(
                   margin: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).cardTheme.color,
+                    color: _billingSurface(context, darkOpacity: 0.04),
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: _billingShadow(context),
                   ),

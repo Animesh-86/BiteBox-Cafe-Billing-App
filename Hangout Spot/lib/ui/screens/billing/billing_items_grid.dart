@@ -216,12 +216,18 @@ class BillingItemCard extends ConsumerWidget {
                 )
               : baseCardGradient,
           color: inCart ? null : baseCardColor,
+          border: Border.all(
+            color: isDark
+                ? colorScheme.outline.withOpacity(0.15)
+                : Colors.transparent,
+            width: 1,
+          ),
           borderRadius: BorderRadius.circular(10),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(inCart ? 0.12 : 0.08),
-              blurRadius: inCart ? 18 : 14,
-              offset: const Offset(0, 8),
+              color: Colors.black.withOpacity(inCart ? 0.15 : 0.1),
+              blurRadius: inCart ? 12 : 8,
+              offset: const Offset(0, 4),
             ),
           ],
         ),

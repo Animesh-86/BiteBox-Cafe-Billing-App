@@ -211,6 +211,12 @@ class _AdminItemCard extends ConsumerWidget {
         borderRadius: BorderRadius.circular(14),
         color: item.isAvailable ? cardLift : surface,
         opacity: 1,
+        border: Border.all(
+          color: isDark
+              ? theme.colorScheme.outline.withOpacity(0.15)
+              : Colors.transparent,
+          width: 1,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
