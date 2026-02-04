@@ -20,6 +20,63 @@ import 'package:hangout_spot/ui/screens/billing/billing_items_grid.dart';
 import 'package:hangout_spot/utils/constants/app_keys.dart';
 import 'package:uuid/uuid.dart';
 
+Color _billingSurface(BuildContext context, {double darkOpacity = 0.08}) {
+  final theme = Theme.of(context);
+  return theme.brightness == Brightness.dark
+      ? theme.colorScheme.surface.withOpacity(darkOpacity)
+      : theme.colorScheme.surface;
+}
+
+Color _billingSurfaceVariant(
+  BuildContext context, {
+  double darkOpacity = 0.12,
+}) {
+  final theme = Theme.of(context);
+  return theme.brightness == Brightness.dark
+      ? theme.colorScheme.surfaceVariant.withOpacity(darkOpacity)
+      : theme.colorScheme.surfaceVariant;
+}
+
+Color _billingOutline(BuildContext context, {double darkOpacity = 0.2}) {
+  final theme = Theme.of(context);
+  return theme.brightness == Brightness.dark
+      ? theme.colorScheme.outline.withOpacity(darkOpacity)
+      : theme.colorScheme.outline.withOpacity(0.6);
+}
+
+Color _billingText(BuildContext context) =>
+    Theme.of(context).colorScheme.onSurface;
+
+Color _billingMutedText(BuildContext context) =>
+    Theme.of(context).colorScheme.onSurfaceVariant;
+
+Widget _billingPricePill(BuildContext context, String text) {
+  final theme = Theme.of(context);
+  final isDark = theme.brightness == Brightness.dark;
+  final caramel = isDark
+      ? theme.colorScheme.secondary
+      : const Color(0xFFEDAD4C);
+  final coffeeDark = isDark
+      ? theme.colorScheme.onSurface
+      : const Color(0xFF98664D);
+
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(
+      color: caramel.withOpacity(0.25),
+      borderRadius: BorderRadius.circular(6),
+    ),
+    child: Text(
+      text,
+      style: TextStyle(
+        fontWeight: FontWeight.w700,
+        fontSize: 12,
+        color: coffeeDark,
+      ),
+    ),
+  );
+}
+
 class BillingScreen extends ConsumerWidget {
   const BillingScreen({super.key});
 
@@ -43,10 +100,11 @@ class _BillingView extends ConsumerWidget {
 
     final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: theme.colorScheme.background,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: theme.colorScheme.background,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
         title: Row(
           children: [
             Container(
@@ -182,9 +240,9 @@ class _TabletLayout extends ConsumerWidget {
           child: Container(
             margin: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.02),
+              color: _billingSurface(context, darkOpacity: 0.04),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white.withOpacity(0.1)),
+              border: Border.all(color: _billingOutline(context)),
             ),
             child: const _CategorySidebar(),
           ),
@@ -195,9 +253,9 @@ class _TabletLayout extends ConsumerWidget {
           child: Container(
             margin: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.02),
+              color: _billingSurface(context, darkOpacity: 0.04),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white.withOpacity(0.1)),
+              border: Border.all(color: _billingOutline(context)),
             ),
             child: const BillingItemsGrid(),
           ),
@@ -208,9 +266,9 @@ class _TabletLayout extends ConsumerWidget {
           child: Container(
             margin: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.03),
+              color: _billingSurface(context, darkOpacity: 0.06),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white.withOpacity(0.1)),
+              border: Border.all(color: _billingOutline(context)),
             ),
             child: const _CartPanel(),
           ),
@@ -247,7 +305,7 @@ class _MobileLayout extends ConsumerWidget {
               border: Border.all(
                 color:
                     Theme.of(context).dividerTheme.color ??
-                    Colors.white.withOpacity(0.1),
+                    _billingOutline(context),
               ),
             ),
             child: const _CategorySidebar(),
@@ -268,14 +326,14 @@ class _MobileLayout extends ConsumerWidget {
             },
             child: Container(
               width: 4,
-              color: Colors.white.withOpacity(0.1),
+              color: _billingOutline(context),
               child: MouseRegion(
                 child: Center(
                   child: Container(
                     width: 3,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.3),
+                      color: _billingOutline(context, darkOpacity: 0.4),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -299,7 +357,7 @@ class _MobileLayout extends ConsumerWidget {
                     border: Border.all(
                       color:
                           Theme.of(context).dividerTheme.color ??
-                          Colors.white.withOpacity(0.1),
+                          _billingOutline(context),
                     ),
                   ),
                   child: const BillingItemsGrid(),
@@ -310,9 +368,11 @@ class _MobileLayout extends ConsumerWidget {
                 Container(
                   margin: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.05),
+                    color: _billingSurface(context, darkOpacity: 0.08),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withOpacity(0.2)),
+                    border: Border.all(
+                      color: _billingOutline(context, darkOpacity: 0.3),
+                    ),
                   ),
                   child: const _CartMobileBottomBar(),
                 ),
@@ -495,7 +555,7 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
               bottom: BorderSide(
                 color:
                     Theme.of(context).dividerTheme.color ??
-                    Colors.white.withOpacity(0.1),
+                    _billingOutline(context),
               ),
             ),
           ),
@@ -603,9 +663,9 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                       Expanded(
                         child: Text(
                           cart.customer!.name,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
-                            color: Colors.white70,
+                            color: _billingMutedText(context),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -623,7 +683,10 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
               ? Center(
                   child: Text(
                     'Cart empty',
-                    style: TextStyle(color: Colors.white60, fontSize: 12),
+                    style: TextStyle(
+                      color: _billingMutedText(context),
+                      fontSize: 12,
+                    ),
                   ),
                 )
               : ListView.separated(
@@ -638,11 +701,9 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                       child: Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.03),
+                          color: _billingSurface(context, darkOpacity: 0.06),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.1),
-                          ),
+                          border: Border.all(color: _billingOutline(context)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -653,24 +714,18 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                                 Expanded(
                                   child: Text(
                                     item.item.name,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 12,
-                                      color: Colors.white,
+                                      color: _billingText(context),
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
-                                Text(
+                                _billingPricePill(
+                                  context,
                                   "₹${item.total.toStringAsFixed(0)}",
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
-                                  ),
                                 ),
                               ],
                             ),
@@ -683,9 +738,9 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                                   children: [
                                     Text(
                                       "₹${item.item.price}",
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 10,
-                                        color: Colors.white60,
+                                        color: _billingMutedText(context),
                                       ),
                                     ),
                                     if (item.item.discountPercent > 0 ||
@@ -702,7 +757,10 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                                 ),
                                 Container(
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.08),
+                                    color: _billingSurfaceVariant(
+                                      context,
+                                      darkOpacity: 0.16,
+                                    ),
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Row(
@@ -729,10 +787,10 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                                         ),
                                         child: Text(
                                           "${item.quantity}",
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontWeight: FontWeight.bold,
                                             fontSize: 11,
-                                            color: Colors.white,
+                                            color: _billingText(context),
                                           ),
                                         ),
                                       ),
@@ -775,13 +833,11 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.02),
+              color: _billingSurface(context, darkOpacity: 0.04),
               borderRadius: const BorderRadius.vertical(
                 bottom: Radius.circular(20),
               ),
-              border: Border(
-                top: BorderSide(color: Colors.white.withOpacity(0.1)),
-              ),
+              border: Border(top: BorderSide(color: _billingOutline(context))),
             ),
             child: SingleChildScrollView(
               child: Column(
@@ -790,34 +846,39 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.03),
+                      color: _billingSurfaceVariant(context, darkOpacity: 0.14),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.white.withOpacity(0.1)),
+                      border: Border.all(color: _billingOutline(context)),
                     ),
                     child: Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.discount,
                           size: 16,
-                          color: Colors.white60,
+                          color: _billingMutedText(context),
                         ),
                         const SizedBox(width: 8),
-                        const Text(
+                        Text(
                           'Discount %',
-                          style: TextStyle(fontSize: 11, color: Colors.white70),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: _billingMutedText(context),
+                          ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: TextField(
                             keyboardType: TextInputType.number,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: Colors.white,
+                              color: _billingText(context),
                             ),
                             decoration: InputDecoration(
                               hintText: '0',
                               hintStyle: TextStyle(
-                                color: Colors.white.withOpacity(0.3),
+                                color: _billingMutedText(
+                                  context,
+                                ).withOpacity(0.6),
                               ),
                               isDense: true,
                               contentPadding: const EdgeInsets.symmetric(
@@ -827,13 +888,13 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(6),
                                 borderSide: BorderSide(
-                                  color: Colors.white.withOpacity(0.2),
+                                  color: _billingOutline(context),
                                 ),
                               ),
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(6),
                                 borderSide: BorderSide(
-                                  color: Colors.white.withOpacity(0.2),
+                                  color: _billingOutline(context),
                                 ),
                               ),
                             ),
@@ -853,26 +914,26 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.03),
+                      color: _billingSurfaceVariant(context, darkOpacity: 0.14),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.white.withOpacity(0.1)),
+                      border: Border.all(color: _billingOutline(context)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.payment,
                               size: 16,
-                              color: Colors.white60,
+                              color: _billingMutedText(context),
                             ),
                             const SizedBox(width: 8),
-                            const Text(
+                            Text(
                               'Payment',
                               style: TextStyle(
                                 fontSize: 11,
-                                color: Colors.white70,
+                                color: _billingMutedText(context),
                               ),
                             ),
                           ],
@@ -906,15 +967,15 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                               Expanded(
                                 child: TextField(
                                   keyboardType: TextInputType.number,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 11,
-                                    color: Colors.white,
+                                    color: _billingText(context),
                                   ),
                                   decoration: InputDecoration(
                                     labelText: 'Cash',
-                                    labelStyle: const TextStyle(
+                                    labelStyle: TextStyle(
                                       fontSize: 10,
-                                      color: Colors.white60,
+                                      color: _billingMutedText(context),
                                     ),
                                     isDense: true,
                                     contentPadding: const EdgeInsets.symmetric(
@@ -944,15 +1005,15 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                                         : '',
                                   ),
                                   keyboardType: TextInputType.number,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 11,
-                                    color: Colors.white,
+                                    color: _billingText(context),
                                   ),
                                   decoration: InputDecoration(
                                     labelText: 'UPI',
-                                    labelStyle: const TextStyle(
+                                    labelStyle: TextStyle(
                                       fontSize: 10,
-                                      color: Colors.white60,
+                                      color: _billingMutedText(context),
                                     ),
                                     isDense: true,
                                     contentPadding: const EdgeInsets.symmetric(
@@ -983,7 +1044,7 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.03),
+                      color: _billingSurfaceVariant(context, darkOpacity: 0.12),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Column(
@@ -991,18 +1052,18 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
+                            Text(
                               'Subtotal',
                               style: TextStyle(
                                 fontSize: 11,
-                                color: Colors.white60,
+                                color: _billingMutedText(context),
                               ),
                             ),
                             Text(
                               "₹${cart.subtotal.toStringAsFixed(2)}",
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 11,
-                                color: Colors.white70,
+                                color: _billingMutedText(context),
                               ),
                             ),
                           ],
@@ -1012,11 +1073,11 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text(
+                              Text(
                                 'Promo',
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: Colors.white60,
+                                  color: _billingMutedText(context),
                                 ),
                               ),
                               Text(
@@ -1033,11 +1094,11 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text(
+                              Text(
                                 'Discount',
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: Colors.white60,
+                                  color: _billingMutedText(context),
                                 ),
                               ),
                               Text(
@@ -1054,31 +1115,34 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text(
+                              Text(
                                 'Tax',
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: Colors.white60,
+                                  color: _billingMutedText(context),
                                 ),
                               ),
                               Text(
                                 "+₹${cart.taxAmount.toStringAsFixed(2)}",
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 11,
-                                  color: Colors.white70,
+                                  color: _billingMutedText(context),
                                 ),
                               ),
                             ],
                           ),
-                        const Divider(height: 12, color: Colors.white24),
+                        Divider(
+                          height: 12,
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
+                            Text(
                               'Total',
                               style: TextStyle(
                                 fontSize: 13,
-                                color: Colors.white,
+                                color: _billingText(context),
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -1167,9 +1231,7 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                         child: OutlinedButton(
                           onPressed: () => _holdOrder(context, ref),
                           style: OutlinedButton.styleFrom(
-                            side: BorderSide(
-                              color: Colors.white.withOpacity(0.2),
-                            ),
+                            side: BorderSide(color: _billingOutline(context)),
                             padding: const EdgeInsets.symmetric(vertical: 10),
                           ),
                           child: const Text(
@@ -1388,14 +1450,17 @@ class _CartMobileBottomBar extends ConsumerWidget {
               children: [
                 Text(
                   "${cart.items.length} items",
-                  style: const TextStyle(fontSize: 12, color: Colors.white70),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: _billingMutedText(context),
+                  ),
                 ),
                 Text(
                   "₹${cart.grandTotal.toStringAsFixed(2)}",
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: _billingText(context),
                   ),
                 ),
               ],
@@ -1437,9 +1502,7 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(color: Colors.white.withOpacity(0.1)),
-            ),
+            border: Border(bottom: BorderSide(color: _billingOutline(context))),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1453,10 +1516,10 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                         .getNextInvoiceNumber(),
                     builder: (context, snapshot) => Text(
                       'Order - ${snapshot.data ?? '...'}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: _billingText(context),
                       ),
                     ),
                   ),
@@ -1521,7 +1584,10 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                       if (cart.items.isNotEmpty) const SizedBox(width: 8),
                       GestureDetector(
                         onTap: () => Navigator.pop(context),
-                        child: const Icon(Icons.close, color: Colors.white70),
+                        child: Icon(
+                          Icons.close,
+                          color: _billingMutedText(context),
+                        ),
                       ),
                     ],
                   ),
@@ -1532,15 +1598,19 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                 Row(
                   children: [
                     if (cart.customer != null)
-                      const Icon(Icons.person, size: 14, color: Colors.white60),
+                      Icon(
+                        Icons.person,
+                        size: 14,
+                        color: _billingMutedText(context),
+                      ),
                     if (cart.customer != null) const SizedBox(width: 4),
                     if (cart.customer != null)
                       Expanded(
                         child: Text(
                           cart.customer!.name,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: Colors.white70,
+                            color: _billingMutedText(context),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -1558,9 +1628,9 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                     vertical: 10,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.05),
+                    color: _billingSurface(context, darkOpacity: 0.08),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.white.withOpacity(0.1)),
+                    border: Border.all(color: _billingOutline(context)),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1569,27 +1639,27 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
+                            Text(
                               'Select Customer',
                               style: TextStyle(
                                 fontSize: 11,
-                                color: Colors.white60,
+                                color: _billingMutedText(context),
                               ),
                             ),
                             if (cart.customer == null)
-                              const Text(
+                              Text(
                                 'Tap to select',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.white70,
+                                  color: _billingMutedText(context),
                                 ),
                               )
                             else
                               Text(
                                 '${cart.customer!.name} (${cart.customer!.totalVisits} visits)',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.white,
+                                  color: _billingText(context),
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -1651,10 +1721,10 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                             );
                           },
                         ),
-                      const Icon(
+                      Icon(
                         Icons.chevron_right,
                         size: 18,
-                        color: Colors.white60,
+                        color: _billingMutedText(context),
                       ),
                     ],
                   ),
@@ -1670,7 +1740,10 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
               ? Center(
                   child: Text(
                     'Cart empty',
-                    style: TextStyle(color: Colors.white60, fontSize: 12),
+                    style: TextStyle(
+                      color: _billingMutedText(context),
+                      fontSize: 12,
+                    ),
                   ),
                 )
               : ListView.separated(
@@ -1685,11 +1758,9 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                       child: Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.03),
+                          color: _billingSurface(context, darkOpacity: 0.06),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.1),
-                          ),
+                          border: Border.all(color: _billingOutline(context)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1700,24 +1771,18 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                                 Expanded(
                                   child: Text(
                                     item.item.name,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 13,
-                                      color: Colors.white,
+                                      color: _billingText(context),
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
-                                Text(
+                                _billingPricePill(
+                                  context,
                                   "₹${item.total.toStringAsFixed(0)}",
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
-                                  ),
                                 ),
                               ],
                             ),
@@ -1730,9 +1795,9 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                                   children: [
                                     Text(
                                       "₹${item.item.price}",
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 11,
-                                        color: Colors.white60,
+                                        color: _billingMutedText(context),
                                       ),
                                     ),
                                     if (item.item.discountPercent > 0 ||
@@ -1749,7 +1814,10 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                                 ),
                                 Container(
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.08),
+                                    color: _billingSurfaceVariant(
+                                      context,
+                                      darkOpacity: 0.16,
+                                    ),
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Row(
@@ -1776,10 +1844,10 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                                         ),
                                         child: Text(
                                           "${item.quantity}",
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontWeight: FontWeight.bold,
                                             fontSize: 13,
-                                            color: Colors.white,
+                                            color: _billingText(context),
                                           ),
                                         ),
                                       ),
@@ -1816,10 +1884,8 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.03),
-            border: Border(
-              top: BorderSide(color: Colors.white.withOpacity(0.1)),
-            ),
+            color: _billingSurface(context, darkOpacity: 0.05),
+            border: Border(top: BorderSide(color: _billingOutline(context))),
           ),
           child: Column(
             children: [
@@ -1827,30 +1893,37 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.03),
+                  color: _billingSurfaceVariant(context, darkOpacity: 0.14),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                  border: Border.all(color: _billingOutline(context)),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.discount, size: 18, color: Colors.white60),
+                    Icon(
+                      Icons.discount,
+                      size: 18,
+                      color: _billingMutedText(context),
+                    ),
                     const SizedBox(width: 8),
-                    const Text(
+                    Text(
                       'Discount %',
-                      style: TextStyle(fontSize: 12, color: Colors.white70),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: _billingMutedText(context),
+                      ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: TextField(
                         keyboardType: TextInputType.number,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
-                          color: Colors.white,
+                          color: _billingText(context),
                         ),
                         decoration: InputDecoration(
                           hintText: '0',
                           hintStyle: TextStyle(
-                            color: Colors.white.withOpacity(0.3),
+                            color: _billingMutedText(context).withOpacity(0.6),
                           ),
                           isDense: true,
                           contentPadding: const EdgeInsets.symmetric(
@@ -1860,13 +1933,13 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(6),
                             borderSide: BorderSide(
-                              color: Colors.white.withOpacity(0.2),
+                              color: _billingOutline(context),
                             ),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(6),
                             borderSide: BorderSide(
-                              color: Colors.white.withOpacity(0.2),
+                              color: _billingOutline(context),
                             ),
                           ),
                         ),
@@ -1886,24 +1959,27 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.03),
+                  color: _billingSurfaceVariant(context, darkOpacity: 0.14),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                  border: Border.all(color: _billingOutline(context)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.payment,
                           size: 18,
-                          color: Colors.white60,
+                          color: _billingMutedText(context),
                         ),
                         const SizedBox(width: 8),
-                        const Text(
+                        Text(
                           'Payment Method',
-                          style: TextStyle(fontSize: 12, color: Colors.white70),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _billingMutedText(context),
+                          ),
                         ),
                       ],
                     ),
@@ -1935,15 +2011,15 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                           Expanded(
                             child: TextField(
                               keyboardType: TextInputType.number,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.white,
+                                color: _billingText(context),
                               ),
                               decoration: InputDecoration(
                                 labelText: 'Cash',
-                                labelStyle: const TextStyle(
+                                labelStyle: TextStyle(
                                   fontSize: 11,
-                                  color: Colors.white60,
+                                  color: _billingMutedText(context),
                                 ),
                                 isDense: true,
                                 contentPadding: const EdgeInsets.symmetric(
@@ -1973,15 +2049,15 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                                     : '',
                               ),
                               keyboardType: TextInputType.number,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.white,
+                                color: _billingText(context),
                               ),
                               decoration: InputDecoration(
                                 labelText: 'UPI',
-                                labelStyle: const TextStyle(
+                                labelStyle: TextStyle(
                                   fontSize: 11,
-                                  color: Colors.white60,
+                                  color: _billingMutedText(context),
                                 ),
                                 isDense: true,
                                 contentPadding: const EdgeInsets.symmetric(
@@ -2012,7 +2088,7 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.03),
+                  color: _billingSurfaceVariant(context, darkOpacity: 0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Column(
@@ -2020,15 +2096,18 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
+                        Text(
                           'Subtotal',
-                          style: TextStyle(fontSize: 12, color: Colors.white60),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _billingMutedText(context),
+                          ),
                         ),
                         Text(
                           "₹${cart.subtotal.toStringAsFixed(2)}",
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: Colors.white70,
+                            color: _billingMutedText(context),
                           ),
                         ),
                       ],
@@ -2038,11 +2117,11 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
+                          Text(
                             'Promo',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.white60,
+                              color: _billingMutedText(context),
                             ),
                           ),
                           Text(
@@ -2059,11 +2138,11 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
+                          Text(
                             'Discount',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.white60,
+                              color: _billingMutedText(context),
                             ),
                           ),
                           Text(
@@ -2080,31 +2159,34 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
+                          Text(
                             'Tax',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.white60,
+                              color: _billingMutedText(context),
                             ),
                           ),
                           Text(
                             "+₹${cart.taxAmount.toStringAsFixed(2)}",
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: Colors.white70,
+                              color: _billingMutedText(context),
                             ),
                           ),
                         ],
                       ),
-                    const Divider(height: 16, color: Colors.white24),
+                    Divider(
+                      height: 16,
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
+                        Text(
                           'Total',
                           style: TextStyle(
                             fontSize: 14,
-                            color: Colors.white,
+                            color: _billingText(context),
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -2156,9 +2238,9 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                                         ),
                                         Text(
                                           '${balance.toInt()} points available',
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 12,
-                                            color: Colors.white70,
+                                            color: _billingText(context),
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),
@@ -2225,7 +2307,7 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                           ? () => _holdOrder(context, ref)
                           : null,
                       style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: Colors.white.withOpacity(0.2)),
+                        side: BorderSide(color: _billingOutline(context)),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                       child: const Text('Hold', style: TextStyle(fontSize: 13)),
@@ -2460,7 +2542,7 @@ class _HeldOrdersButton extends ConsumerWidget {
                   backgroundColor: Colors.red,
                   child: Text(
                     "${snapshot.data!.length}",
-                    style: const TextStyle(fontSize: 9, color: Colors.white),
+                    style: TextStyle(fontSize: 9, color: _billingText(context)),
                   ),
                 ),
               );
@@ -2497,15 +2579,15 @@ class _HeldOrdersDialog extends ConsumerWidget {
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 border: Border(
-                  bottom: BorderSide(color: Colors.white.withOpacity(0.1)),
+                  bottom: BorderSide(color: _billingOutline(context)),
                 ),
               ),
-              child: const Text(
+              child: Text(
                 "Held Orders",
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  color: _billingText(context),
                 ),
               ),
             ),
@@ -2529,10 +2611,10 @@ class _HeldOrdersDialog extends ConsumerWidget {
                   final orders = snapshot.data ?? [];
 
                   if (orders.isEmpty) {
-                    return const Center(
+                    return Center(
                       child: Text(
                         "No held orders",
-                        style: TextStyle(color: Colors.white60),
+                        style: TextStyle(color: _billingMutedText(context)),
                       ),
                     );
                   }
@@ -2552,11 +2634,9 @@ class _HeldOrdersDialog extends ConsumerWidget {
                       return Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.05),
+                          color: _billingSurface(context, darkOpacity: 0.08),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.1),
-                          ),
+                          border: Border.all(color: _billingOutline(context)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2590,17 +2670,17 @@ class _HeldOrdersDialog extends ConsumerWidget {
                                 const SizedBox(height: 8),
                                 Text(
                                   "₹${order.totalAmount.toStringAsFixed(0)}",
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.white,
+                                    color: _billingText(context),
                                     fontSize: 16,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
                                   timeago.format(order.createdAt),
-                                  style: const TextStyle(
-                                    color: Colors.white60,
+                                  style: TextStyle(
+                                    color: _billingMutedText(context),
                                     fontSize: 11,
                                   ),
                                   maxLines: 1,
@@ -2695,10 +2775,14 @@ class _HeldOrdersDialog extends ConsumerWidget {
                                     final confirm = await showDialog<bool>(
                                       context: context,
                                       builder: (_) => AlertDialog(
-                                        backgroundColor: Colors.grey[900],
-                                        title: const Text(
+                                        backgroundColor: Theme.of(
+                                          context,
+                                        ).colorScheme.surface,
+                                        title: Text(
                                           "Delete?",
-                                          style: TextStyle(color: Colors.white),
+                                          style: TextStyle(
+                                            color: _billingText(context),
+                                          ),
                                         ),
                                         actions: [
                                           TextButton(
@@ -2775,12 +2859,12 @@ class _PaymentChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: isSelected
               ? Theme.of(context).colorScheme.primary.withOpacity(0.2)
-              : Colors.white.withOpacity(0.05),
+              : _billingSurfaceVariant(context, darkOpacity: 0.1),
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
             color: isSelected
                 ? Theme.of(context).colorScheme.primary
-                : Colors.white.withOpacity(0.2),
+                : _billingOutline(context),
           ),
         ),
         child: Text(
@@ -2790,7 +2874,7 @@ class _PaymentChip extends StatelessWidget {
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             color: isSelected
                 ? Theme.of(context).colorScheme.primary
-                : Colors.white70,
+                : _billingMutedText(context),
           ),
         ),
       ),

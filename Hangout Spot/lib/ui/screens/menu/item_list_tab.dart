@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' as drift;
@@ -5,6 +7,7 @@ import 'package:uuid/uuid.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/data/repositories/menu_repository.dart';
 import 'package:hangout_spot/ui/widgets/glass_container.dart';
+import 'package:file_picker/file_picker.dart';
 
 // Local state for Admin Menu Selection
 final adminSelectedCategoryProvider = StateProvider<String?>((ref) => null);
@@ -230,15 +233,7 @@ class _AdminItemCard extends ConsumerWidget {
                   child: (item.imageUrl != null && item.imageUrl!.isNotEmpty)
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(10),
-                          child: Image.network(
-                            item.imageUrl!,
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                            height: double.infinity,
-                            errorBuilder: (context, error, stackTrace) {
-                              return _FallbackItemBadge(item: item);
-                            },
-                          ),
+                          child: _buildItemImage(item.imageUrl!, item),
                         )
                       : _FallbackItemBadge(item: item),
                 ),
@@ -351,6 +346,35 @@ class _FallbackItemBadge extends StatelessWidget {
   }
 }
 
+Widget _buildItemImage(String path, Item item) {
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    return Image.network(
+      path,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      errorBuilder: (context, error, stackTrace) {
+        return _FallbackItemBadge(item: item);
+      },
+    );
+  }
+
+  final file = File(path);
+  if (file.existsSync()) {
+    return Image.file(
+      file,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      errorBuilder: (context, error, stackTrace) {
+        return _FallbackItemBadge(item: item);
+      },
+    );
+  }
+
+  return _FallbackItemBadge(item: item);
+}
+
 class _ItemDialog extends ConsumerStatefulWidget {
   final Item? item;
   final List<Category> categories;
@@ -364,7 +388,6 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
   late TextEditingController _nameController;
   late TextEditingController _priceController;
   late TextEditingController _discountController;
-  late TextEditingController _descriptionController;
   late TextEditingController _imageUrlController;
   String? _selectedCategoryId;
 
@@ -377,9 +400,6 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
     );
     _discountController = TextEditingController(
       text: widget.item?.discountPercent.toString() ?? '0.0',
-    );
-    _descriptionController = TextEditingController(
-      text: widget.item?.description ?? '',
     );
     _imageUrlController = TextEditingController(
       text: widget.item?.imageUrl ?? '',
@@ -528,7 +548,7 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
             TextField(
               controller: _imageUrlController,
               decoration: InputDecoration(
-                labelText: 'Image URL (optional)',
+                labelText: 'Item Image',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -540,26 +560,38 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
                   vertical: 12,
                 ),
               ),
+              readOnly: true,
               style: const TextStyle(color: Color(0xFF98664D), fontSize: 14),
+              onTap: () async {
+                final result = await FilePicker.platform.pickFiles(
+                  type: FileType.image,
+                );
+                if (result != null && result.files.single.path != null) {
+                  _imageUrlController.text = result.files.single.path!;
+                  if (mounted) setState(() {});
+                }
+              },
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: _descriptionController,
-              decoration: InputDecoration(
-                labelText: 'Description (optional)',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                prefixIcon: const Icon(Icons.notes_outlined, size: 20),
-                filled: true,
-                fillColor: surface,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 12,
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton.icon(
+                onPressed: () async {
+                  final result = await FilePicker.platform.pickFiles(
+                    type: FileType.image,
+                  );
+                  if (result != null && result.files.single.path != null) {
+                    _imageUrlController.text = result.files.single.path!;
+                    if (mounted) setState(() {});
+                  }
+                },
+                icon: const Icon(Icons.upload_rounded, size: 18),
+                label: const Text('Upload Image'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: coffee,
+                  foregroundColor: Colors.white,
                 ),
               ),
-              maxLines: 2,
-              style: const TextStyle(color: Color(0xFF98664D), fontSize: 14),
             ),
           ],
         ),
@@ -607,11 +639,6 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
                     name: drift.Value(_nameController.text),
                     price: drift.Value(price),
                     discountPercent: drift.Value(discount),
-                    description: drift.Value<String?>(
-                      _descriptionController.text.trim().isEmpty
-                          ? null
-                          : _descriptionController.text.trim(),
-                    ),
                     imageUrl: drift.Value<String?>(
                       _imageUrlController.text.trim().isEmpty
                           ? null
@@ -626,11 +653,7 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
                     name: _nameController.text,
                     price: price,
                     discountPercent: discount,
-                    description: drift.Value<String?>(
-                      _descriptionController.text.trim().isEmpty
-                          ? null
-                          : _descriptionController.text.trim(),
-                    ),
+                    description: drift.Value(widget.item?.description),
                     imageUrl: drift.Value<String?>(
                       _imageUrlController.text.trim().isEmpty
                           ? null

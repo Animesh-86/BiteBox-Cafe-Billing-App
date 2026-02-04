@@ -39,7 +39,7 @@ class AnalyticsScreen extends ConsumerWidget {
     return DefaultTabController(
       length: 3,
       child: Scaffold(
-        backgroundColor: Colors.transparent,
+        backgroundColor: theme.colorScheme.background,
         appBar: AppBar(
           title: const Text('Analytics & Insights'),
           actions: [
@@ -421,9 +421,9 @@ class _TrendsTab extends StatelessWidget {
                   if (!snapshot.hasData) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  final points =
+                  final rawPoints =
                       snapshot.data as List<MapEntry<DateTime, double>>;
-                  if (points.isEmpty) {
+                  if (rawPoints.isEmpty) {
                     return Center(
                       child: Text(
                         'No data available',
@@ -433,7 +433,13 @@ class _TrendsTab extends StatelessWidget {
                       ),
                     );
                   }
-                  return _buildLineChart(points, theme.colorScheme.primary);
+                  final salesMap = {for (final e in rawPoints) e.key: e.value};
+                  final totalDays = rangeEnd.difference(rangeStart).inDays;
+                  final filled = List.generate(totalDays, (i) {
+                    final day = rangeStart.add(Duration(days: i));
+                    return MapEntry(day, salesMap[day] ?? 0.0);
+                  });
+                  return _buildLineChart(filled, theme.colorScheme.primary);
                 },
               ),
             ),
@@ -899,7 +905,14 @@ class _MetricCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final cardColor = isDark
+        ? theme.colorScheme.surfaceVariant.withOpacity(0.4)
+        : theme.colorScheme.surface;
     return Card(
+      color: cardColor,
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -1117,6 +1130,13 @@ Widget _buildLineChart(List<MapEntry<DateTime, double>> points, Color color) {
   for (int i = 0; i < points.length; i++) {
     spots.add(FlSpot(i.toDouble(), points[i].value));
   }
+  final labelStep = points.length <= 5
+      ? 1
+      : points.length <= 10
+      ? 2
+      : points.length <= 16
+      ? 3
+      : 4;
   return LineChart(
     LineChartData(
       gridData: FlGridData(show: false),
@@ -1130,9 +1150,26 @@ Widget _buildLineChart(List<MapEntry<DateTime, double>> points, Color color) {
             getTitlesWidget: (value, meta) {
               final index = value.toInt();
               if (index < 0 || index >= points.length) return const Text('');
+              if (index % labelStep != 0) return const SizedBox();
               final date = points[index].key;
-              return Text(DateFormat('d').format(date));
+              return Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Transform.rotate(
+                  angle: -0.6,
+                  child: SizedBox(
+                    width: 44,
+                    child: Text(
+                      DateFormat('d MMM').format(date),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 9),
+                    ),
+                  ),
+                ),
+              );
             },
+            reservedSize: 44,
           ),
         ),
       ),
@@ -1265,7 +1302,14 @@ class _CustomerSegmentsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final cardColor = isDark
+        ? theme.colorScheme.surfaceVariant.withOpacity(0.4)
+        : theme.colorScheme.surface;
     return Card(
+      color: cardColor,
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -1644,21 +1688,33 @@ Widget _buildModernBarChart(
               final index = val.toInt();
               if (index < 0 || index >= values.length) return const SizedBox();
               // Reduce clutter for dense data (e.g. 24 hours)
-              if (values.length > 15 && index % 4 != 0) {
+              if (values.length > 12 && index % 3 != 0) {
+                return const SizedBox();
+              }
+              if (values.length > 6 && index % 2 != 0) {
                 return const SizedBox();
               }
               return Padding(
                 padding: const EdgeInsets.only(top: 8.0),
-                child: Text(
-                  labelBuilder(index),
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: Color(0xFF9E9E9E),
+                child: Transform.rotate(
+                  angle: -0.6,
+                  child: SizedBox(
+                    width: 60,
+                    child: Text(
+                      labelBuilder(index),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: Color(0xFF9E9E9E),
+                      ),
+                    ),
                   ),
                 ),
               );
             },
-            reservedSize: 40,
+            reservedSize: 60,
             interval: 1,
           ),
         ),

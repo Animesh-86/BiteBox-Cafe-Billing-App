@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
@@ -107,6 +109,67 @@ class BillingItemCard extends ConsumerWidget {
   final Item item;
   const BillingItemCard({super.key, required this.item});
 
+  Widget _buildPricePill(BuildContext context, String text, bool inCart) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final caramel = isDark
+        ? theme.colorScheme.secondary
+        : const Color(0xFFEDAD4C);
+    final coffeeDark = isDark
+        ? theme.colorScheme.onSurface
+        : const Color(0xFF98664D);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: inCart
+            ? theme.colorScheme.primary.withOpacity(0.18)
+            : caramel.withOpacity(0.25),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontWeight: FontWeight.w700,
+          fontSize: 12,
+          color: inCart ? theme.colorScheme.primary : coffeeDark,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildItemImage(BuildContext context) {
+    final imagePath = item.imageUrl;
+    if (imagePath == null || imagePath.isEmpty) {
+      return BillingItemLetterBadge(item: item);
+    }
+
+    final isNetwork = imagePath.startsWith('http');
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: isNetwork
+          ? Image.network(
+              imagePath,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
+              errorBuilder: (context, error, stackTrace) {
+                return BillingItemLetterBadge(item: item);
+              },
+            )
+          : Image.file(
+              File(imagePath),
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
+              errorBuilder: (context, error, stackTrace) {
+                return BillingItemLetterBadge(item: item);
+              },
+            ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cartItems = ref.watch(cartProvider).items;
@@ -178,20 +241,7 @@ class BillingItemCard extends ConsumerWidget {
                           size: 28,
                           color: colorScheme.primary,
                         )
-                      : (item.imageUrl != null && item.imageUrl!.isNotEmpty)
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: Image.network(
-                            item.imageUrl!,
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                            height: double.infinity,
-                            errorBuilder: (context, error, stackTrace) {
-                              return BillingItemLetterBadge(item: item);
-                            },
-                          ),
-                        )
-                      : BillingItemLetterBadge(item: item),
+                      : _buildItemImage(context),
                 ),
               ),
             ),
@@ -222,17 +272,10 @@ class BillingItemCard extends ConsumerWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
+                        _buildPricePill(
+                          context,
                           "₹${item.price.toStringAsFixed(0)}",
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                            color: inCart
-                                ? colorScheme.primary
-                                : Theme.of(
-                                    context,
-                                  ).colorScheme.onSurface.withOpacity(0.7),
-                          ),
+                          inCart,
                         ),
                         if (item.discountPercent > 0)
                           Text(

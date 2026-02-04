@@ -37,13 +37,19 @@ class DashboardScreen extends ConsumerWidget {
         : const Color(0xFFEDAD4C);
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       backgroundColor: cream,
       appBar: AppBar(
-        backgroundColor: cream,
-        title: const Text(
-          "Dashboard",
-          style: TextStyle(fontWeight: FontWeight.w700),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        iconTheme: IconThemeData(color: coffeeDark),
+        titleTextStyle: TextStyle(
+          fontWeight: FontWeight.w700,
+          fontSize: 20,
+          color: coffeeDark,
         ),
+        title: const Text("Dashboard"),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
@@ -72,19 +78,25 @@ class DashboardScreen extends ConsumerWidget {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              padding: const EdgeInsets.all(20),
+              width: double.infinity,
+              padding: EdgeInsets.fromLTRB(
+                24,
+                MediaQuery.of(context).padding.top + kToolbarHeight + 12,
+                24,
+                20,
+              ),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [caramel.withOpacity(0.18), coffee.withOpacity(0.10)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(20),
+                ),
                 border: Border.all(color: coffee.withOpacity(0.18)),
               ),
               child: Column(
@@ -133,183 +145,196 @@ class DashboardScreen extends ConsumerWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 24),
-
-            // Top Stats Grid
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final cardWidth = isWide
-                    ? (constraints.maxWidth - 48) / 4
-                    : (constraints.maxWidth - 16) / 2;
-                return Wrap(
-                  spacing: 16,
-                  runSpacing: 16,
-                  children: [
-                    SizedBox(
-                      width: cardWidth,
-                      child: FutureBuilder<double>(
-                        future: analytics.getSessionSales(
-                          sessionStart,
-                          sessionEnd,
-                        ),
-                        builder: (context, snapshot) => _StatCard(
-                          title: "Total Sales",
-                          value: snapshot.hasData
-                              ? snapshot.data!.toStringAsFixed(0)
-                              : "...",
-                          icon: Icons.currency_rupee,
-                          prefix: "₹",
-                          iconColor: theme.brightness == Brightness.dark
-                              ? theme.colorScheme.secondary
-                              : const Color(0xFFEDAD4C),
-                        ),
-                      ),
-                    ),
-                    SizedBox(
-                      width: cardWidth,
-                      child: FutureBuilder<int>(
-                        future: analytics.getSessionOrdersCount(
-                          sessionStart,
-                          sessionEnd,
-                        ),
-                        builder: (context, snapshot) => _StatCard(
-                          title: "Orders",
-                          value: snapshot.hasData ? "${snapshot.data}" : "...",
-                          icon: Icons.receipt_long,
-                          iconColor: theme.brightness == Brightness.dark
-                              ? theme.colorScheme.primary
-                              : const Color(0xFF95674D),
-                        ),
-                      ),
-                    ),
-                    SizedBox(
-                      width: cardWidth,
-                      child: FutureBuilder<int>(
-                        future: analytics.getSessionItemsSold(
-                          sessionStart,
-                          sessionEnd,
-                        ),
-                        builder: (context, snapshot) => _StatCard(
-                          title: "Items Sold",
-                          value: snapshot.hasData ? "${snapshot.data}" : "...",
-                          icon: Icons.inventory_2,
-                          iconColor: theme.brightness == Brightness.dark
-                              ? theme.colorScheme.onSurface
-                              : const Color(0xFF98664D),
-                        ),
-                      ),
-                    ),
-                    SizedBox(
-                      width: cardWidth,
-                      child: FutureBuilder<int>(
-                        future: analytics.getSessionUniqueCustomersCount(
-                          sessionStart,
-                          sessionEnd,
-                        ),
-                        builder: (context, snapshot) => _StatCard(
-                          title: "Customers",
-                          value: snapshot.hasData ? "${snapshot.data}" : "...",
-                          icon: Icons.people,
-                          iconColor: theme.brightness == Brightness.dark
-                              ? theme.colorScheme.secondary
-                              : const Color(0xFFEDAD4C),
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-
-            const SizedBox(height: 48),
-
-            // Recent Activity Section
-            Row(
-              children: [
-                Icon(Icons.history, color: theme.colorScheme.secondary),
-                const SizedBox(width: 8),
-                Text(
-                  "Live Activity",
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20,
-                    color: coffeeDark,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Top Stats Grid
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final cardWidth = isWide
+                          ? (constraints.maxWidth - 48) / 4
+                          : (constraints.maxWidth - 16) / 2;
+                      return Wrap(
+                        spacing: 16,
+                        runSpacing: 16,
+                        children: [
+                          SizedBox(
+                            width: cardWidth,
+                            child: FutureBuilder<double>(
+                              future: analytics.getSessionSales(
+                                sessionStart,
+                                sessionEnd,
+                              ),
+                              builder: (context, snapshot) => _StatCard(
+                                title: "Total Sales",
+                                value: snapshot.hasData
+                                    ? snapshot.data!.toStringAsFixed(0)
+                                    : "...",
+                                icon: Icons.currency_rupee,
+                                prefix: "₹",
+                                iconColor: theme.brightness == Brightness.dark
+                                    ? theme.colorScheme.secondary
+                                    : const Color(0xFFEDAD4C),
+                              ),
+                            ),
+                          ),
+                          SizedBox(
+                            width: cardWidth,
+                            child: FutureBuilder<int>(
+                              future: analytics.getSessionOrdersCount(
+                                sessionStart,
+                                sessionEnd,
+                              ),
+                              builder: (context, snapshot) => _StatCard(
+                                title: "Orders",
+                                value: snapshot.hasData
+                                    ? "${snapshot.data}"
+                                    : "...",
+                                icon: Icons.receipt_long,
+                                iconColor: theme.brightness == Brightness.dark
+                                    ? theme.colorScheme.primary
+                                    : const Color(0xFF95674D),
+                              ),
+                            ),
+                          ),
+                          SizedBox(
+                            width: cardWidth,
+                            child: FutureBuilder<int>(
+                              future: analytics.getSessionItemsSold(
+                                sessionStart,
+                                sessionEnd,
+                              ),
+                              builder: (context, snapshot) => _StatCard(
+                                title: "Items Sold",
+                                value: snapshot.hasData
+                                    ? "${snapshot.data}"
+                                    : "...",
+                                icon: Icons.inventory_2,
+                                iconColor: theme.brightness == Brightness.dark
+                                    ? theme.colorScheme.onSurface
+                                    : const Color(0xFF98664D),
+                              ),
+                            ),
+                          ),
+                          SizedBox(
+                            width: cardWidth,
+                            child: FutureBuilder<int>(
+                              future: analytics.getSessionUniqueCustomersCount(
+                                sessionStart,
+                                sessionEnd,
+                              ),
+                              builder: (context, snapshot) => _StatCard(
+                                title: "Customers",
+                                value: snapshot.hasData
+                                    ? "${snapshot.data}"
+                                    : "...",
+                                icon: Icons.people,
+                                iconColor: theme.brightness == Brightness.dark
+                                    ? theme.colorScheme.secondary
+                                    : const Color(0xFFEDAD4C),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
+                  const SizedBox(height: 48),
+                  // Recent Activity Section
+                  Row(
+                    children: [
+                      Icon(Icons.history, color: theme.colorScheme.secondary),
+                      const SizedBox(width: 8),
+                      Text(
+                        "Live Activity",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                          color: coffeeDark,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: cream,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: coffee.withOpacity(0.2)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 12,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: StreamBuilder<List<Order>>(
+                      stream: sessionManager.watchSessionOrders(),
+                      builder: (context, snapshot) {
+                        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                          return Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Center(
+                              child: Text(
+                                "No recent orders",
+                                style: TextStyle(
+                                  color: theme.colorScheme.onSurface
+                                      .withOpacity(0.5),
+                                ),
+                              ),
+                            ),
+                          );
+                        }
 
-            Container(
-              decoration: BoxDecoration(
-                color: cream,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: coffee.withOpacity(0.2)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 12,
-                    offset: const Offset(0, 6),
+                        final orders = snapshot.data!.take(5).toList();
+                        return Column(
+                          children: orders.map((order) {
+                            final timeAgo = _getTimeAgo(order.createdAt);
+                            return ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 8,
+                              ),
+                              leading: CircleAvatar(
+                                backgroundColor: theme.colorScheme.primary
+                                    .withOpacity(0.1),
+                                child: Icon(
+                                  Icons.local_cafe,
+                                  size: 20,
+                                  color: theme.colorScheme.primary,
+                                ),
+                              ),
+                              title: Text(
+                                "Order ${order.invoiceNumber}",
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              subtitle: Text(
+                                "$timeAgo • ${order.status}",
+                                style: TextStyle(
+                                  color: theme.colorScheme.onSurface
+                                      .withOpacity(0.5),
+                                ),
+                              ),
+                              trailing: Text(
+                                "₹${order.totalAmount.toStringAsFixed(0)}",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: theme.colorScheme.primary,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        );
+                      },
+                    ),
                   ),
                 ],
-              ),
-              child: StreamBuilder<List<Order>>(
-                stream: sessionManager.watchSessionOrders(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Center(
-                        child: Text(
-                          "No recent orders",
-                          style: TextStyle(
-                            color: theme.colorScheme.onSurface.withOpacity(0.5),
-                          ),
-                        ),
-                      ),
-                    );
-                  }
-
-                  final orders = snapshot.data!.take(5).toList();
-                  return Column(
-                    children: orders.map((order) {
-                      final timeAgo = _getTimeAgo(order.createdAt);
-                      return ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 8,
-                        ),
-                        leading: CircleAvatar(
-                          backgroundColor: theme.colorScheme.primary
-                              .withOpacity(0.1),
-                          child: Icon(
-                            Icons.local_cafe,
-                            size: 20,
-                            color: theme.colorScheme.primary,
-                          ),
-                        ),
-                        title: Text(
-                          "Order ${order.invoiceNumber}",
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: Text(
-                          "$timeAgo • ${order.status}",
-                          style: TextStyle(
-                            color: theme.colorScheme.onSurface.withOpacity(0.5),
-                          ),
-                        ),
-                        trailing: Text(
-                          "₹${order.totalAmount.toStringAsFixed(0)}",
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                            color: theme.colorScheme.primary,
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  );
-                },
               ),
             ),
           ],
