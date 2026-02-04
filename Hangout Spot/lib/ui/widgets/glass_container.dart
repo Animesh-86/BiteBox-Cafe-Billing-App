@@ -29,6 +29,8 @@ class GlassContainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       margin: margin,
       width: width,
@@ -42,8 +44,16 @@ class GlassContainer extends StatelessWidget {
             decoration: BoxDecoration(
               color: color.withOpacity(opacity),
               borderRadius: borderRadius ?? BorderRadius.circular(20),
-              border:
-                  border ?? Border.all(color: Colors.white.withOpacity(0.2)),
+              border: border,
+              boxShadow: [
+                BoxShadow(
+                  color: isDark
+                      ? Colors.black.withOpacity(0.35)
+                      : Colors.black.withOpacity(0.08),
+                  blurRadius: 18,
+                  offset: const Offset(0, 10),
+                ),
+              ],
             ),
             child: child,
           ),

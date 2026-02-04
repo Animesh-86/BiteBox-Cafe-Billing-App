@@ -175,7 +175,25 @@ class BillingItemCard extends ConsumerWidget {
     final cartItems = ref.watch(cartProvider).items;
     final notifier = ref.read(cartProvider.notifier);
     final inCart = cartItems.any((i) => i.item.id == item.id);
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final baseCardColor = isDark
+        ? colorScheme.surfaceVariant.withOpacity(0.6)
+        : colorScheme.surface;
+    final baseCardGradient = LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: isDark
+          ? [
+              colorScheme.surfaceVariant.withOpacity(0.75),
+              colorScheme.surfaceVariant.withOpacity(0.45),
+            ]
+          : [
+              colorScheme.surface.withOpacity(0.98),
+              colorScheme.surfaceVariant.withOpacity(0.7),
+            ],
+    );
 
     return GestureDetector(
       onTap: () {
@@ -196,19 +214,16 @@ class BillingItemCard extends ConsumerWidget {
                     colorScheme.primary.withOpacity(0.1),
                   ],
                 )
-              : null,
-          color: inCart
-              ? null
-              : Theme.of(context).cardTheme.color ??
-                    Colors.white.withOpacity(0.05),
+              : baseCardGradient,
+          color: inCart ? null : baseCardColor,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: inCart
-                ? colorScheme.primary
-                : Theme.of(context).dividerTheme.color ??
-                      Colors.white.withOpacity(0.1),
-            width: inCart ? 1.5 : 1,
-          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(inCart ? 0.12 : 0.08),
+              blurRadius: inCart ? 18 : 14,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -227,9 +242,9 @@ class BillingItemCard extends ConsumerWidget {
                       : null,
                   color: inCart
                       ? null
-                      : Theme.of(
-                          context,
-                        ).colorScheme.surfaceVariant.withOpacity(0.3),
+                      : (isDark
+                            ? colorScheme.surface.withOpacity(0.45)
+                            : colorScheme.surfaceVariant.withOpacity(0.5)),
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(10),
                   ),

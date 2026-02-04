@@ -97,7 +97,13 @@ class DashboardScreen extends ConsumerWidget {
                 borderRadius: const BorderRadius.vertical(
                   bottom: Radius.circular(20),
                 ),
-                border: Border.all(color: coffee.withOpacity(0.18)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 20,
+                    offset: const Offset(0, 12),
+                  ),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -262,7 +268,6 @@ class DashboardScreen extends ConsumerWidget {
                     decoration: BoxDecoration(
                       color: cream,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: coffee.withOpacity(0.2)),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withOpacity(0.05),
@@ -389,7 +394,6 @@ class _StatCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: cream,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: coffee.withOpacity(0.18)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(isDark ? 0.2 : 0.06),

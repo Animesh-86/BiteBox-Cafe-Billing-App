@@ -77,6 +77,19 @@ Widget _billingPricePill(BuildContext context, String text) {
   );
 }
 
+List<BoxShadow> _billingShadow(BuildContext context) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  return [
+    BoxShadow(
+      color: isDark
+          ? Colors.black.withOpacity(0.35)
+          : Colors.black.withOpacity(0.08),
+      blurRadius: 18,
+      offset: const Offset(0, 10),
+    ),
+  ];
+}
+
 class BillingScreen extends ConsumerWidget {
   const BillingScreen({super.key});
 
@@ -242,7 +255,7 @@ class _TabletLayout extends ConsumerWidget {
             decoration: BoxDecoration(
               color: _billingSurface(context, darkOpacity: 0.04),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: _billingOutline(context)),
+              boxShadow: _billingShadow(context),
             ),
             child: const _CategorySidebar(),
           ),
@@ -255,7 +268,7 @@ class _TabletLayout extends ConsumerWidget {
             decoration: BoxDecoration(
               color: _billingSurface(context, darkOpacity: 0.04),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: _billingOutline(context)),
+              boxShadow: _billingShadow(context),
             ),
             child: const BillingItemsGrid(),
           ),
@@ -268,7 +281,7 @@ class _TabletLayout extends ConsumerWidget {
             decoration: BoxDecoration(
               color: _billingSurface(context, darkOpacity: 0.06),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: _billingOutline(context)),
+              boxShadow: _billingShadow(context),
             ),
             child: const _CartPanel(),
           ),
@@ -302,11 +315,7 @@ class _MobileLayout extends ConsumerWidget {
             decoration: BoxDecoration(
               color: Theme.of(context).cardTheme.color,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color:
-                    Theme.of(context).dividerTheme.color ??
-                    _billingOutline(context),
-              ),
+              boxShadow: _billingShadow(context),
             ),
             child: const _CategorySidebar(),
           ),
@@ -354,11 +363,7 @@ class _MobileLayout extends ConsumerWidget {
                   decoration: BoxDecoration(
                     color: Theme.of(context).cardTheme.color,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color:
-                          Theme.of(context).dividerTheme.color ??
-                          _billingOutline(context),
-                    ),
+                    boxShadow: _billingShadow(context),
                   ),
                   child: const BillingItemsGrid(),
                 ),
@@ -370,9 +375,7 @@ class _MobileLayout extends ConsumerWidget {
                   decoration: BoxDecoration(
                     color: _billingSurface(context, darkOpacity: 0.08),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: _billingOutline(context, darkOpacity: 0.3),
-                    ),
+                    boxShadow: _billingShadow(context),
                   ),
                   child: const _CartMobileBottomBar(),
                 ),
@@ -703,7 +706,7 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                         decoration: BoxDecoration(
                           color: _billingSurface(context, darkOpacity: 0.06),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: _billingOutline(context)),
+                          boxShadow: _billingShadow(context),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -837,7 +840,7 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
               borderRadius: const BorderRadius.vertical(
                 bottom: Radius.circular(20),
               ),
-              border: Border(top: BorderSide(color: _billingOutline(context))),
+              boxShadow: _billingShadow(context),
             ),
             child: SingleChildScrollView(
               child: Column(
@@ -848,7 +851,7 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                     decoration: BoxDecoration(
                       color: _billingSurfaceVariant(context, darkOpacity: 0.14),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: _billingOutline(context)),
+                      boxShadow: _billingShadow(context),
                     ),
                     child: Row(
                       children: [
@@ -916,7 +919,7 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                     decoration: BoxDecoration(
                       color: _billingSurfaceVariant(context, darkOpacity: 0.14),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: _billingOutline(context)),
+                      boxShadow: _billingShadow(context),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1501,9 +1504,7 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
         // Header
         Container(
           padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            border: Border(bottom: BorderSide(color: _billingOutline(context))),
-          ),
+          decoration: BoxDecoration(boxShadow: _billingShadow(context)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1630,7 +1631,7 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                   decoration: BoxDecoration(
                     color: _billingSurface(context, darkOpacity: 0.08),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: _billingOutline(context)),
+                    boxShadow: _billingShadow(context),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1760,7 +1761,7 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                         decoration: BoxDecoration(
                           color: _billingSurface(context, darkOpacity: 0.06),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: _billingOutline(context)),
+                          boxShadow: _billingShadow(context),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1885,7 +1886,7 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: _billingSurface(context, darkOpacity: 0.05),
-            border: Border(top: BorderSide(color: _billingOutline(context))),
+            boxShadow: _billingShadow(context),
           ),
           child: Column(
             children: [
@@ -1895,7 +1896,7 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                 decoration: BoxDecoration(
                   color: _billingSurfaceVariant(context, darkOpacity: 0.14),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: _billingOutline(context)),
+                  boxShadow: _billingShadow(context),
                 ),
                 child: Row(
                   children: [
@@ -1961,7 +1962,7 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                 decoration: BoxDecoration(
                   color: _billingSurfaceVariant(context, darkOpacity: 0.14),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: _billingOutline(context)),
+                  boxShadow: _billingShadow(context),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -2577,11 +2578,7 @@ class _HeldOrdersDialog extends ConsumerWidget {
           children: [
             Container(
               padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: _billingOutline(context)),
-                ),
-              ),
+              decoration: BoxDecoration(boxShadow: _billingShadow(context)),
               child: Text(
                 "Held Orders",
                 style: TextStyle(
@@ -2636,7 +2633,7 @@ class _HeldOrdersDialog extends ConsumerWidget {
                         decoration: BoxDecoration(
                           color: _billingSurface(context, darkOpacity: 0.08),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: _billingOutline(context)),
+                          boxShadow: _billingShadow(context),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,

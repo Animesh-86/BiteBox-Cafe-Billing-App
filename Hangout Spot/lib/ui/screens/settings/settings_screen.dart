@@ -98,7 +98,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Theme.of(context).dividerColor),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -197,11 +196,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                       context,
                                     ).primaryColor.withOpacity(0.1),
                                     borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: Theme.of(
-                                        context,
-                                      ).primaryColor.withOpacity(0.3),
-                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.08),
+                                        blurRadius: 12,
+                                        offset: const Offset(0, 6),
+                                      ),
+                                    ],
                                     image: _storeLogoPath != null
                                         ? DecorationImage(
                                             image: FileImage(

@@ -25,8 +25,8 @@ class ItemListTab extends ConsumerWidget {
     final isDark = theme.brightness == Brightness.dark;
     final cream = isDark ? theme.colorScheme.surface : const Color(0xFFFEF9F5);
     final surface = isDark
-        ? theme.colorScheme.surface
-        : const Color(0xFFFFF3E8);
+        ? theme.colorScheme.surfaceVariant.withOpacity(0.35)
+        : const Color(0xFFFFF6ED);
     final coffee = isDark ? theme.colorScheme.primary : const Color(0xFF95674D);
     final coffeeDark = isDark
         ? theme.colorScheme.onSurface
@@ -34,6 +34,9 @@ class ItemListTab extends ConsumerWidget {
     final caramel = isDark
         ? theme.colorScheme.secondary
         : const Color(0xFFEDAD4C);
+    final cardLift = isDark
+        ? theme.colorScheme.surfaceVariant.withOpacity(0.45)
+        : const Color(0xFFF8EBDD);
 
     return allItemsAsync.when(
       data: (items) {
@@ -192,6 +195,9 @@ class _AdminItemCard extends ConsumerWidget {
     final surface = isDark
         ? theme.colorScheme.surface
         : const Color(0xFFFFF3E8);
+    final cardLift = isDark
+        ? theme.colorScheme.surfaceVariant.withOpacity(0.45)
+        : const Color(0xFFF8EBDD);
     final coffee = isDark ? theme.colorScheme.primary : const Color(0xFF95674D);
     final coffeeDark = isDark
         ? theme.colorScheme.onSurface
@@ -203,14 +209,8 @@ class _AdminItemCard extends ConsumerWidget {
       onTap: onEdit,
       child: GlassContainer(
         borderRadius: BorderRadius.circular(14),
-        color: item.isAvailable ? surface : cream,
+        color: item.isAvailable ? cardLift : surface,
         opacity: 1,
-        border: Border.all(
-          color: item.isAvailable
-              ? coffee.withOpacity(0.2)
-              : coffee.withOpacity(0.12),
-          width: 1,
-        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

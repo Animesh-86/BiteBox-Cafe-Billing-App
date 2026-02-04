@@ -21,7 +21,6 @@ class SettingsSection extends StatelessWidget {
             Theme.of(context).cardTheme.color ??
             Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Theme.of(context).dividerColor),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -180,7 +179,13 @@ class SettingsDateBtn extends StatelessWidget {
               Theme.of(context).inputDecorationTheme.fillColor ??
               Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Theme.of(context).dividerColor),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Row(
           children: [
