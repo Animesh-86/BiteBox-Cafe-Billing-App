@@ -91,8 +91,8 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: Colors.black,
+      return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: Center(child: CircularProgressIndicator()),
       );
     }
@@ -105,7 +105,7 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
         centerTitle: true,
       ),
       body: Container(
-        color: Colors.black,
+        color: Theme.of(context).scaffoldBackgroundColor,
         padding: const EdgeInsets.fromLTRB(16, 100, 16, 16),
         child: SingleChildScrollView(
           child: SettingsSection(
@@ -133,7 +133,7 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
                     const Text("Backup Frequency:"),
                     DropdownButton<int>(
                       value: _autoSyncIntervalMinutes,
-                      dropdownColor: const Color(0xFF1E1E1E),
+                      dropdownColor: Theme.of(context).cardTheme.color,
                       underline: Container(),
                       items: const [15, 30, 60].map((m) {
                         return DropdownMenuItem<int>(

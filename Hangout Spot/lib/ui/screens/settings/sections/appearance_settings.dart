@@ -20,7 +20,7 @@ class AppearanceSettingsScreen extends ConsumerWidget {
         centerTitle: true,
       ),
       body: Container(
-        color: Colors.black,
+        // color: Colors.black, // Removed hardcoded color
         padding: const EdgeInsets.fromLTRB(16, 100, 16, 16),
         child: SingleChildScrollView(
           child: SettingsSection(

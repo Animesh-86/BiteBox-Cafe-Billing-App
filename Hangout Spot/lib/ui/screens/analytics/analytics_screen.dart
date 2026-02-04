@@ -501,6 +501,7 @@ class _TrendsTab extends StatelessWidget {
                     (i) => MapEntry(i, byHour[i] ?? 0),
                   );
                   return _buildModernBarChart(
+                    context,
                     hours.map((e) => e.value).toList(),
                     (index) => _formatHour(hours[index].key),
                     theme.colorScheme.primary,
@@ -565,6 +566,7 @@ class _TrendsTab extends StatelessWidget {
                     );
                   }
                   return _buildModernBarChart(
+                    context,
                     items.map((e) => e.value).toList(),
                     (index) => _truncate(items[index].key, 15),
                     const Color(0xFF64B5F6),
@@ -1614,6 +1616,7 @@ class _ModernSectionCard extends StatelessWidget {
 }
 
 Widget _buildModernBarChart(
+  BuildContext context,
   List<double> values,
   String Function(int index) labelBuilder,
   Color color,
@@ -1628,7 +1631,7 @@ Widget _buildModernBarChart(
       barTouchData: BarTouchData(
         enabled: true,
         touchTooltipData: BarTouchTooltipData(
-          getTooltipColor: (_) => Colors.black87,
+          getTooltipColor: (_) => Theme.of(context).colorScheme.inverseSurface,
           tooltipRoundedRadius: 8,
         ),
       ),

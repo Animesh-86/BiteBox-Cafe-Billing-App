@@ -64,7 +64,7 @@ class TableSelectionScreen extends ConsumerWidget {
                       label: const Text('Create First Table'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: theme.colorScheme.primary,
-                        foregroundColor: Colors.black,
+                        foregroundColor: theme.colorScheme.onPrimary,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 24,
                           vertical: 12,
@@ -160,7 +160,7 @@ class _TableCard extends ConsumerWidget {
       onLongPress: onLongPress,
       child: GlassContainer(
         borderRadius: BorderRadius.circular(20),
-        color: Colors.black,
+        color: theme.cardTheme.color ?? theme.colorScheme.surface,
         opacity: 0.5,
         padding: const EdgeInsets.all(24), // Increased from 16
         child: tableWithOrderAsync.when(

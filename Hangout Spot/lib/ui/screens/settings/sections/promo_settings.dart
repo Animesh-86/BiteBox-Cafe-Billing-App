@@ -78,9 +78,9 @@ class _PromoSettingsScreenState extends State<PromoSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: Colors.black,
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -93,7 +93,7 @@ class _PromoSettingsScreenState extends State<PromoSettingsScreen> {
         centerTitle: true,
       ),
       body: Container(
-        color: Colors.black,
+        color: Theme.of(context).scaffoldBackgroundColor,
         padding: const EdgeInsets.fromLTRB(16, 100, 16, 16),
         child: SingleChildScrollView(
           child: SettingsSection(

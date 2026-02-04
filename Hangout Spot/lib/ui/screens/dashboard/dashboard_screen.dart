@@ -24,33 +24,45 @@ class DashboardScreen extends ConsumerWidget {
     final isWide = width > 900;
     final theme = Theme.of(context);
 
+    final isDark = theme.brightness == Brightness.dark;
+    final cream = isDark
+        ? theme.colorScheme.background
+        : const Color(0xFFFEF9F5);
+    final coffee = isDark ? theme.colorScheme.primary : const Color(0xFF95674D);
+    final coffeeDark = isDark
+        ? theme.colorScheme.onSurface
+        : const Color(0xFF98664D);
+    final caramel = isDark
+        ? theme.colorScheme.secondary
+        : const Color(0xFFEDAD4C);
+
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: cream,
       appBar: AppBar(
-        title: const Text("Dashboard"),
+        backgroundColor: cream,
+        title: const Text(
+          "Dashboard",
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
+                color: cream,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: theme.dividerColor),
+                border: Border.all(color: coffee.withOpacity(0.2)),
               ),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.calendar_today,
-                    size: 16,
-                    color: theme.colorScheme.primary,
-                  ),
+                  Icon(Icons.calendar_today, size: 16, color: coffee),
                   const SizedBox(width: 8),
                   Text(
                     DateFormat('EEE, d MMM').format(DateTime.now()),
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.onSurface,
+                      color: coffeeDark,
                     ),
                   ),
                 ],
@@ -64,24 +76,64 @@ class DashboardScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              "Welcome back,",
-              style: TextStyle(
-                fontSize: 16,
-                color: theme.colorScheme.onSurface.withOpacity(0.7),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [caramel.withOpacity(0.18), coffee.withOpacity(0.10)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: coffee.withOpacity(0.18)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Welcome back,",
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: coffeeDark.withOpacity(0.75),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    "Hello, $userName",
+                    style: TextStyle(
+                      fontSize: 30,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: -0.5,
+                      color: coffeeDark,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: caramel.withOpacity(0.18),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          "Session: ${DateFormat('hh:mm a').format(sessionStart)} - ${DateFormat('hh:mm a').format(sessionEnd)}",
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: coffeeDark,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              "Hello, $userName! 👋",
-              style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                letterSpacing: -1,
-                color: theme.colorScheme.primary, // Gold Title
-              ),
-            ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
 
             // Top Stats Grid
             LayoutBuilder(
@@ -107,8 +159,9 @@ class DashboardScreen extends ConsumerWidget {
                               : "...",
                           icon: Icons.currency_rupee,
                           prefix: "₹",
-                          // Gold Palette
-                          iconColor: const Color(0xFFFFD54F),
+                          iconColor: theme.brightness == Brightness.dark
+                              ? theme.colorScheme.secondary
+                              : const Color(0xFFEDAD4C),
                         ),
                       ),
                     ),
@@ -123,8 +176,9 @@ class DashboardScreen extends ConsumerWidget {
                           title: "Orders",
                           value: snapshot.hasData ? "${snapshot.data}" : "...",
                           icon: Icons.receipt_long,
-                          // Blue/Grey Palette for contrast
-                          iconColor: const Color(0xFF64B5F6),
+                          iconColor: theme.brightness == Brightness.dark
+                              ? theme.colorScheme.primary
+                              : const Color(0xFF95674D),
                         ),
                       ),
                     ),
@@ -139,8 +193,9 @@ class DashboardScreen extends ConsumerWidget {
                           title: "Items Sold",
                           value: snapshot.hasData ? "${snapshot.data}" : "...",
                           icon: Icons.inventory_2,
-                          // Orange Palette
-                          iconColor: const Color(0xFFFFB74D),
+                          iconColor: theme.brightness == Brightness.dark
+                              ? theme.colorScheme.onSurface
+                              : const Color(0xFF98664D),
                         ),
                       ),
                     ),
@@ -155,8 +210,9 @@ class DashboardScreen extends ConsumerWidget {
                           title: "Customers",
                           value: snapshot.hasData ? "${snapshot.data}" : "...",
                           icon: Icons.people,
-                          // Green Palette
-                          iconColor: const Color(0xFF81C784),
+                          iconColor: theme.brightness == Brightness.dark
+                              ? theme.colorScheme.secondary
+                              : const Color(0xFFEDAD4C),
                         ),
                       ),
                     ),
@@ -172,9 +228,13 @@ class DashboardScreen extends ConsumerWidget {
               children: [
                 Icon(Icons.history, color: theme.colorScheme.secondary),
                 const SizedBox(width: 8),
-                const Text(
+                Text(
                   "Live Activity",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                    color: coffeeDark,
+                  ),
                 ),
               ],
             ),
@@ -182,9 +242,16 @@ class DashboardScreen extends ConsumerWidget {
 
             Container(
               decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
+                color: cream,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: theme.dividerColor.withOpacity(0.5)),
+                border: Border.all(color: coffee.withOpacity(0.2)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
               ),
               child: StreamBuilder<List<Order>>(
                 stream: sessionManager.watchSessionOrders(),
@@ -285,52 +352,77 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final cream = isDark ? theme.colorScheme.surface : const Color(0xFFFEF9F5);
+    final coffee = isDark ? theme.colorScheme.primary : const Color(0xFF95674D);
+    final coffeeDark = isDark
+        ? theme.colorScheme.onSurface
+        : const Color(0xFF98664D);
 
-    return Card(
-      // Use Theme Card
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: iconColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: cream,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: coffee.withOpacity(0.18)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: iconColor.withOpacity(0.14),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: iconColor, size: 24),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: coffee.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  "Today",
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: coffeeDark,
                   ),
-                  child: Icon(icon, color: iconColor, size: 24),
                 ),
-                Icon(
-                  Icons.show_chart,
-                  color: theme.colorScheme.onSurface.withOpacity(0.2),
-                  size: 20,
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            Text(
-              title,
-              style: TextStyle(
-                color: theme.colorScheme.onSurface.withOpacity(0.6),
-                fontSize: 14,
-                letterSpacing: 0.5,
               ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Text(
+            title,
+            style: TextStyle(
+              color: coffeeDark.withOpacity(0.7),
+              fontSize: 13,
+              letterSpacing: 0.4,
             ),
-            const SizedBox(height: 4),
-            Text(
-              "$prefix$value",
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: theme.colorScheme.onBackground,
-              ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            "$prefix$value",
+            style: TextStyle(
+              fontSize: 30,
+              fontWeight: FontWeight.bold,
+              color: coffeeDark,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

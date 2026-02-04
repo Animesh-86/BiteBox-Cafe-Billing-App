@@ -56,7 +56,9 @@ class BillingItemsGrid extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   filled: true,
-                  fillColor: Colors.white.withOpacity(0.04),
+                  fillColor:
+                      Theme.of(context).inputDecorationTheme.fillColor ??
+                      Colors.white.withOpacity(0.04),
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 12,
                     vertical: 10,
@@ -71,7 +73,12 @@ class BillingItemsGrid extends ConsumerWidget {
                         query.isNotEmpty
                             ? "No items match your search"
                             : "No items",
-                        style: TextStyle(color: Colors.white60, fontSize: 14),
+                        style: TextStyle(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withOpacity(0.6),
+                          fontSize: 14,
+                        ),
                       ),
                     )
                   : GridView.builder(
@@ -127,10 +134,16 @@ class BillingItemCard extends ConsumerWidget {
                   ],
                 )
               : null,
-          color: inCart ? null : Colors.white.withOpacity(0.05),
+          color: inCart
+              ? null
+              : Theme.of(context).cardTheme.color ??
+                    Colors.white.withOpacity(0.05),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: inCart ? colorScheme.primary : Colors.white.withOpacity(0.1),
+            color: inCart
+                ? colorScheme.primary
+                : Theme.of(context).dividerTheme.color ??
+                      Colors.white.withOpacity(0.1),
             width: inCart ? 1.5 : 1,
           ),
         ),
@@ -149,7 +162,11 @@ class BillingItemCard extends ConsumerWidget {
                           ],
                         )
                       : null,
-                  color: inCart ? null : Colors.white.withOpacity(0.03),
+                  color: inCart
+                      ? null
+                      : Theme.of(
+                          context,
+                        ).colorScheme.surfaceVariant.withOpacity(0.3),
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(10),
                   ),
@@ -194,7 +211,9 @@ class BillingItemCard extends ConsumerWidget {
                           fontSize: 12,
                           color: inCart
                               ? colorScheme.primary
-                              : Colors.white.withOpacity(0.9),
+                              : Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withOpacity(0.9),
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -210,7 +229,9 @@ class BillingItemCard extends ConsumerWidget {
                             fontSize: 12,
                             color: inCart
                                 ? colorScheme.primary
-                                : Colors.white70,
+                                : Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface.withOpacity(0.7),
                           ),
                         ),
                         if (item.discountPercent > 0)
@@ -245,7 +266,7 @@ class BillingItemLetterBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Theme.of(context).colorScheme.surfaceVariant,
         shape: BoxShape.circle,
       ),
       child: Text(
@@ -253,7 +274,7 @@ class BillingItemLetterBadge extends StatelessWidget {
         style: TextStyle(
           fontSize: 24,
           fontWeight: FontWeight.w700,
-          color: Colors.white.withOpacity(0.3),
+          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
         ),
       ),
     );

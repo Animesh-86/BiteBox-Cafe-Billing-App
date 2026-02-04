@@ -20,21 +20,35 @@ class ManageMenuScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final selectedCat = ref.watch(adminSelectedCategoryProvider);
+    final isDark = theme.brightness == Brightness.dark;
+    final cream = isDark
+        ? theme.colorScheme.background
+        : const Color(0xFFFEF9F5);
+    final surface = isDark
+        ? theme.colorScheme.surface
+        : const Color(0xFFFFF3E8);
+    final coffee = isDark ? theme.colorScheme.primary : const Color(0xFF95674D);
+    final coffeeDark = isDark
+        ? theme.colorScheme.onSurface
+        : const Color(0xFF98664D);
+    final caramel = isDark
+        ? theme.colorScheme.secondary
+        : const Color(0xFFEDAD4C);
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: cream,
       appBar: AppBar(
         title: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withOpacity(0.2),
+                color: caramel.withOpacity(0.25),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
                 Icons.restaurant_menu_rounded,
-                color: theme.colorScheme.primary,
+                color: coffeeDark,
                 size: 18,
               ),
             ),
@@ -45,22 +59,24 @@ class ManageMenuScreen extends ConsumerWidget {
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.3,
                 fontSize: 18,
-                color: theme.colorScheme.primary,
+                color: coffeeDark,
               ),
             ),
           ],
         ),
-        backgroundColor: Colors.transparent,
+        backgroundColor: cream,
         elevation: 0,
         actions: [
           IconButton(
             tooltip: 'Export CSV',
             icon: const Icon(Icons.file_download_outlined, size: 18),
+            color: coffee,
             onPressed: () => _exportMenuCsv(context, ref),
           ),
           IconButton(
             tooltip: 'Import CSV',
             icon: const Icon(Icons.file_upload_outlined, size: 18),
+            color: coffee,
             onPressed: () => _importMenuCsv(context, ref),
           ),
           const SizedBox(width: 4),
@@ -80,7 +96,7 @@ class ManageMenuScreen extends ConsumerWidget {
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    color: Colors.white.withOpacity(0.9),
+                    color: coffeeDark,
                   ),
                 ),
                 Row(
@@ -90,17 +106,10 @@ class ManageMenuScreen extends ConsumerWidget {
                       onPressed: () {
                         _showEditCategorySelectDialog(context, ref);
                       },
-                      icon: Icon(
-                        Icons.edit_outlined,
-                        size: 16,
-                        color: theme.colorScheme.primary,
-                      ),
+                      icon: Icon(Icons.edit_outlined, size: 16, color: coffee),
                       label: Text(
                         'Edit',
-                        style: TextStyle(
-                          color: theme.colorScheme.primary,
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: coffee, fontSize: 12),
                       ),
                       style: TextButton.styleFrom(
                         padding: const EdgeInsets.symmetric(
@@ -119,14 +128,11 @@ class ManageMenuScreen extends ConsumerWidget {
                       icon: Icon(
                         Icons.add_circle_outline,
                         size: 16,
-                        color: theme.colorScheme.primary,
+                        color: coffee,
                       ),
                       label: Text(
                         'New',
-                        style: TextStyle(
-                          color: theme.colorScheme.primary,
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: coffee, fontSize: 12),
                       ),
                       style: TextButton.styleFrom(
                         padding: const EdgeInsets.symmetric(
@@ -161,7 +167,7 @@ class ManageMenuScreen extends ConsumerWidget {
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    color: Colors.white.withOpacity(0.9),
+                    color: coffeeDark,
                   ),
                 ),
                 Container(
@@ -170,7 +176,7 @@ class ManageMenuScreen extends ConsumerWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withOpacity(0.15),
+                    color: caramel.withOpacity(0.25),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -178,7 +184,7 @@ class ManageMenuScreen extends ConsumerWidget {
                         ? 'All Items'
                         : _getCategoryName(ref, selectedCat),
                     style: TextStyle(
-                      color: theme.colorScheme.primary,
+                      color: coffeeDark,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),
@@ -191,8 +197,8 @@ class ManageMenuScreen extends ConsumerWidget {
             Expanded(
               child: GlassContainer(
                 borderRadius: BorderRadius.circular(20),
-                color: Colors.black,
-                opacity: 0.35,
+                color: surface,
+                opacity: 1,
                 padding: const EdgeInsets.all(12),
                 child: const ItemListTab(),
               ),
@@ -394,24 +400,26 @@ class ManageMenuScreen extends ConsumerWidget {
       text: category.discountPercent.toString(),
     );
     final theme = Theme.of(context);
+    const cream = Color(0xFFFEF9F5);
+    const surface = Color(0xFFFFF3E8);
+    const coffee = Color(0xFF95674D);
+    const coffeeDark = Color(0xFF98664D);
+    const caramel = Color(0xFFEDAD4C);
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: cream,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withOpacity(0.15),
+                color: caramel.withOpacity(0.25),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(
-                Icons.edit_rounded,
-                color: theme.colorScheme.primary,
-                size: 18,
-              ),
+              child: Icon(Icons.edit_rounded, color: coffeeDark, size: 18),
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -420,7 +428,7 @@ class ManageMenuScreen extends ConsumerWidget {
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 16,
-                  color: theme.colorScheme.primary,
+                  color: coffeeDark,
                 ),
               ),
             ),
@@ -439,13 +447,13 @@ class ManageMenuScreen extends ConsumerWidget {
                   ),
                   prefixIcon: const Icon(Icons.label_rounded, size: 20),
                   filled: true,
-                  fillColor: Colors.white.withOpacity(0.05),
+                  fillColor: surface,
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 12,
                     vertical: 12,
                   ),
                 ),
-                style: const TextStyle(color: Colors.white, fontSize: 14),
+                style: TextStyle(color: coffeeDark, fontSize: 14),
               ),
               const SizedBox(height: 12),
               TextField(
@@ -458,14 +466,14 @@ class ManageMenuScreen extends ConsumerWidget {
                   prefixIcon: const Icon(Icons.local_offer_rounded, size: 20),
                   suffixText: '%',
                   filled: true,
-                  fillColor: Colors.white.withOpacity(0.05),
+                  fillColor: surface,
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 12,
                     vertical: 12,
                   ),
                 ),
                 keyboardType: TextInputType.number,
-                style: const TextStyle(color: Colors.white, fontSize: 14),
+                style: TextStyle(color: coffeeDark, fontSize: 14),
               ),
             ],
           ),
@@ -493,7 +501,7 @@ class ManageMenuScreen extends ConsumerWidget {
             onPressed: () => Navigator.pop(context),
             child: Text(
               'Cancel',
-              style: TextStyle(color: Colors.white.withOpacity(0.7)),
+              style: TextStyle(color: coffeeDark.withOpacity(0.8)),
             ),
           ),
           FilledButton(
@@ -522,7 +530,7 @@ class ManageMenuScreen extends ConsumerWidget {
               }
             },
             style: FilledButton.styleFrom(
-              backgroundColor: theme.colorScheme.primary,
+              backgroundColor: coffee,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
@@ -541,6 +549,10 @@ class ManageMenuScreen extends ConsumerWidget {
   void _showEditCategorySelectDialog(BuildContext context, WidgetRef ref) {
     final categoriesAsync = ref.read(categoriesStreamProvider);
     final theme = Theme.of(context);
+    const cream = Color(0xFFFEF9F5);
+    const coffee = Color(0xFF95674D);
+    const coffeeDark = Color(0xFF98664D);
+    const caramel = Color(0xFFEDAD4C);
 
     categoriesAsync.when(
       data: (categories) {
@@ -554,6 +566,7 @@ class ManageMenuScreen extends ConsumerWidget {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
+            backgroundColor: cream,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
@@ -562,14 +575,10 @@ class ManageMenuScreen extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withOpacity(0.15),
+                    color: caramel.withOpacity(0.25),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(
-                    Icons.edit_outlined,
-                    color: theme.colorScheme.primary,
-                    size: 18,
-                  ),
+                  child: Icon(Icons.edit_outlined, color: coffeeDark, size: 18),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -578,7 +587,7 @@ class ManageMenuScreen extends ConsumerWidget {
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 16,
-                      color: theme.colorScheme.primary,
+                      color: coffeeDark,
                     ),
                   ),
                 ),
@@ -594,12 +603,12 @@ class ManageMenuScreen extends ConsumerWidget {
                   return ListTile(
                     leading: Icon(
                       _getCategoryIconForDialog(category.name),
-                      color: theme.colorScheme.primary,
+                      color: coffee,
                       size: 20,
                     ),
                     title: Text(
                       category.name,
-                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      style: TextStyle(color: coffeeDark, fontSize: 14),
                     ),
                     onTap: () {
                       Navigator.pop(context);
@@ -617,7 +626,7 @@ class ManageMenuScreen extends ConsumerWidget {
                 onPressed: () => Navigator.pop(context),
                 child: Text(
                   'Cancel',
-                  style: TextStyle(color: Colors.white.withOpacity(0.7)),
+                  style: TextStyle(color: coffeeDark.withOpacity(0.8)),
                 ),
               ),
             ],
@@ -691,7 +700,13 @@ class ManageMenuScreen extends ConsumerWidget {
           context: context,
           builder: (context) {
             final theme = Theme.of(context);
+            const cream = Color(0xFFFEF9F5);
+            const surface = Color(0xFFFFF3E8);
+            const coffee = Color(0xFF95674D);
+            const coffeeDark = Color(0xFF98664D);
+            const caramel = Color(0xFFEDAD4C);
             return AlertDialog(
+              backgroundColor: cream,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
@@ -700,12 +715,12 @@ class ManageMenuScreen extends ConsumerWidget {
                   Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.primary.withOpacity(0.15),
+                      color: caramel.withOpacity(0.25),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
                       Icons.add_circle_rounded,
-                      color: theme.colorScheme.primary,
+                      color: coffeeDark,
                       size: 18,
                     ),
                   ),
@@ -716,7 +731,7 @@ class ManageMenuScreen extends ConsumerWidget {
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 16,
-                        color: theme.colorScheme.primary,
+                        color: coffeeDark,
                       ),
                     ),
                   ),
@@ -733,13 +748,13 @@ class ManageMenuScreen extends ConsumerWidget {
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            theme.colorScheme.primary.withOpacity(0.2),
-                            theme.colorScheme.primary.withOpacity(0.1),
+                            caramel.withOpacity(0.35),
+                            coffee.withOpacity(0.12),
                           ],
                         ),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: theme.colorScheme.primary.withOpacity(0.3),
+                          color: coffee.withOpacity(0.3),
                           width: 1,
                         ),
                       ),
@@ -751,7 +766,7 @@ class ManageMenuScreen extends ConsumerWidget {
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 13,
-                              color: theme.colorScheme.primary,
+                              color: coffeeDark,
                             ),
                           ),
                         ],
@@ -770,14 +785,14 @@ class ManageMenuScreen extends ConsumerWidget {
                           size: 20,
                         ),
                         filled: true,
-                        fillColor: Colors.white.withOpacity(0.05),
+                        fillColor: surface,
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 12,
                           vertical: 12,
                         ),
                       ),
                       autofocus: true,
-                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      style: TextStyle(color: coffeeDark, fontSize: 14),
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -793,14 +808,17 @@ class ManageMenuScreen extends ConsumerWidget {
                         ),
                         prefixText: '₹ ',
                         filled: true,
-                        fillColor: Colors.white.withOpacity(0.05),
+                        fillColor: surface,
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 12,
                           vertical: 12,
                         ),
                       ),
                       keyboardType: TextInputType.number,
-                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      style: const TextStyle(
+                        color: Color(0xFF98664D),
+                        fontSize: 14,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -816,7 +834,9 @@ class ManageMenuScreen extends ConsumerWidget {
                         ),
                         suffixText: '%',
                         filled: true,
-                        fillColor: Colors.white.withOpacity(0.05),
+                        fillColor:
+                            theme.inputDecorationTheme.fillColor ??
+                            theme.colorScheme.surfaceVariant,
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 12,
                           vertical: 12,
@@ -909,8 +929,14 @@ class ManageMenuScreen extends ConsumerWidget {
       context: context,
       builder: (context) {
         final theme = Theme.of(context);
+        const cream = Color(0xFFFEF9F5);
+        const surface = Color(0xFFFFF3E8);
+        const coffee = Color(0xFF95674D);
+        const coffeeDark = Color(0xFF98664D);
+        const caramel = Color(0xFFEDAD4C);
         return StatefulBuilder(
           builder: (context, setState) => AlertDialog(
+            backgroundColor: cream,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
@@ -919,12 +945,12 @@ class ManageMenuScreen extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withOpacity(0.15),
+                    color: caramel.withOpacity(0.25),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
                     Icons.add_circle_rounded,
-                    color: theme.colorScheme.primary,
+                    color: coffeeDark,
                     size: 18,
                   ),
                 ),
@@ -935,7 +961,7 @@ class ManageMenuScreen extends ConsumerWidget {
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 16,
-                      color: theme.colorScheme.primary,
+                      color: coffeeDark,
                     ),
                   ),
                 ),
@@ -954,7 +980,7 @@ class ManageMenuScreen extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       filled: true,
-                      fillColor: Colors.white.withOpacity(0.05),
+                      fillColor: surface,
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 12,
                         vertical: 12,
@@ -969,8 +995,11 @@ class ManageMenuScreen extends ConsumerWidget {
                         )
                         .toList(),
                     onChanged: (v) => setState(() => selectedCategoryId = v),
-                    dropdownColor: Colors.grey[900],
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    dropdownColor: cream,
+                    style: const TextStyle(
+                      color: Color(0xFF98664D),
+                      fontSize: 14,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   TextField(
@@ -985,13 +1014,16 @@ class ManageMenuScreen extends ConsumerWidget {
                         size: 20,
                       ),
                       filled: true,
-                      fillColor: Colors.white.withOpacity(0.05),
+                      fillColor: surface,
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 12,
                         vertical: 12,
                       ),
                     ),
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    style: const TextStyle(
+                      color: Color(0xFF98664D),
+                      fontSize: 14,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   TextField(
@@ -1007,14 +1039,17 @@ class ManageMenuScreen extends ConsumerWidget {
                       ),
                       prefixText: '₹ ',
                       filled: true,
-                      fillColor: Colors.white.withOpacity(0.05),
+                      fillColor: surface,
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 12,
                         vertical: 12,
                       ),
                     ),
                     keyboardType: TextInputType.number,
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    style: const TextStyle(
+                      color: Color(0xFF98664D),
+                      fontSize: 14,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   TextField(
@@ -1030,7 +1065,9 @@ class ManageMenuScreen extends ConsumerWidget {
                       ),
                       suffixText: '%',
                       filled: true,
-                      fillColor: Colors.white.withOpacity(0.05),
+                      fillColor:
+                          theme.inputDecorationTheme.fillColor ??
+                          theme.colorScheme.surfaceVariant,
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 12,
                         vertical: 12,
@@ -1073,7 +1110,7 @@ class ManageMenuScreen extends ConsumerWidget {
                   }
                 },
                 style: FilledButton.styleFrom(
-                  backgroundColor: theme.colorScheme.primary,
+                  backgroundColor: coffee,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 20,
                     vertical: 10,
@@ -1097,24 +1134,26 @@ class ManageMenuScreen extends ConsumerWidget {
   void _showAddCategoryDialog(BuildContext context, WidgetRef ref) {
     final nameController = TextEditingController();
     final theme = Theme.of(context);
+    const cream = Color(0xFFFEF9F5);
+    const surface = Color(0xFFFFF3E8);
+    const coffee = Color(0xFF95674D);
+    const coffeeDark = Color(0xFF98664D);
+    const caramel = Color(0xFFEDAD4C);
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: cream,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withOpacity(0.15),
+                color: caramel.withOpacity(0.25),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(
-                Icons.category_rounded,
-                color: theme.colorScheme.primary,
-                size: 18,
-              ),
+              child: Icon(Icons.category_rounded, color: coffeeDark, size: 18),
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -1123,7 +1162,7 @@ class ManageMenuScreen extends ConsumerWidget {
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 16,
-                  color: theme.colorScheme.primary,
+                  color: coffeeDark,
                 ),
               ),
             ),
@@ -1136,21 +1175,21 @@ class ManageMenuScreen extends ConsumerWidget {
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
             prefixIcon: const Icon(Icons.label_rounded, size: 20),
             filled: true,
-            fillColor: Colors.white.withOpacity(0.05),
+            fillColor: surface,
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 12,
               vertical: 12,
             ),
           ),
           autofocus: true,
-          style: const TextStyle(color: Colors.white, fontSize: 14),
+          style: const TextStyle(color: Color(0xFF98664D), fontSize: 14),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text(
               'Cancel',
-              style: TextStyle(color: Colors.white.withOpacity(0.7)),
+              style: TextStyle(color: coffeeDark.withOpacity(0.8)),
             ),
           ),
           FilledButton(
@@ -1205,6 +1244,16 @@ class _CategoriesRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final categoriesAsync = ref.watch(categoriesStreamProvider);
     final selectedCat = ref.watch(adminSelectedCategoryProvider);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final cream = isDark ? theme.colorScheme.surface : const Color(0xFFFEF9F5);
+    final coffee = isDark ? theme.colorScheme.primary : const Color(0xFF95674D);
+    final coffeeDark = isDark
+        ? theme.colorScheme.onSurface
+        : const Color(0xFF98664D);
+    final caramel = isDark
+        ? theme.colorScheme.secondary
+        : const Color(0xFFEDAD4C);
 
     return categoriesAsync.when(
       data: (categories) {
@@ -1230,8 +1279,6 @@ class _CategoriesRow extends ConsumerWidget {
             final isSelected =
                 selectedCat == cat.id ||
                 (selectedCat == null && cat.id == 'all');
-            final theme = Theme.of(context);
-
             return GestureDetector(
               onTap: () {
                 ref.read(adminSelectedCategoryProvider.notifier).state = cat.id;
@@ -1252,25 +1299,23 @@ class _CategoriesRow extends ConsumerWidget {
                   gradient: isSelected
                       ? LinearGradient(
                           colors: [
-                            theme.colorScheme.primary.withOpacity(0.25),
-                            theme.colorScheme.primary.withOpacity(0.12),
+                            caramel.withOpacity(0.55),
+                            coffee.withOpacity(0.12),
                           ],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         )
                       : null,
-                  color: isSelected ? null : Colors.white.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(12),
+                  color: isSelected ? null : cream,
+                  borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     width: isSelected ? 1.5 : 1,
-                    color: isSelected
-                        ? theme.colorScheme.primary
-                        : Colors.white.withOpacity(0.15),
+                    color: isSelected ? coffee : coffee.withOpacity(0.25),
                   ),
                   boxShadow: isSelected
                       ? [
                           BoxShadow(
-                            color: theme.colorScheme.primary.withOpacity(0.2),
+                            color: coffee.withOpacity(0.2),
                             blurRadius: 4,
                             offset: const Offset(0, 2),
                           ),
@@ -1288,8 +1333,8 @@ class _CategoriesRow extends ConsumerWidget {
                             ? FontWeight.w600
                             : FontWeight.w500,
                         color: isSelected
-                            ? theme.colorScheme.primary
-                            : Colors.white,
+                            ? coffeeDark
+                            : coffeeDark.withOpacity(0.8),
                         letterSpacing: 0.2,
                       ),
                     ),

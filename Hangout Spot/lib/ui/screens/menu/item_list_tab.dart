@@ -9,7 +9,6 @@ import 'package:hangout_spot/ui/widgets/glass_container.dart';
 // Local state for Admin Menu Selection
 final adminSelectedCategoryProvider = StateProvider<String?>((ref) => null);
 final menuItemSearchProvider = StateProvider<String>((ref) => '');
-final menuAvailabilityFilterProvider = StateProvider<String>((ref) => 'all');
 
 class ItemListTab extends ConsumerWidget {
   const ItemListTab({super.key});
@@ -19,19 +18,25 @@ class ItemListTab extends ConsumerWidget {
     final allItemsAsync = ref.watch(allItemsStreamProvider);
     final selectedCat = ref.watch(adminSelectedCategoryProvider);
     final query = ref.watch(menuItemSearchProvider).trim().toLowerCase();
-    final availability = ref.watch(menuAvailabilityFilterProvider);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final cream = isDark ? theme.colorScheme.surface : const Color(0xFFFEF9F5);
+    final surface = isDark
+        ? theme.colorScheme.surface
+        : const Color(0xFFFFF3E8);
+    final coffee = isDark ? theme.colorScheme.primary : const Color(0xFF95674D);
+    final coffeeDark = isDark
+        ? theme.colorScheme.onSurface
+        : const Color(0xFF98664D);
+    final caramel = isDark
+        ? theme.colorScheme.secondary
+        : const Color(0xFFEDAD4C);
 
     return allItemsAsync.when(
       data: (items) {
         var filtered = (selectedCat == null || selectedCat == 'all')
             ? items
             : items.where((i) => i.categoryId == selectedCat).toList();
-
-        if (availability == 'available') {
-          filtered = filtered.where((i) => i.isAvailable).toList();
-        } else if (availability == 'out') {
-          filtered = filtered.where((i) => !i.isAvailable).toList();
-        }
 
         if (query.isNotEmpty) {
           filtered = filtered
@@ -56,42 +61,24 @@ class ItemListTab extends ConsumerWidget {
                       )
                     : null,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(24),
+                  borderSide: BorderSide(color: coffee.withOpacity(0.2)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  borderSide: BorderSide(color: coffee.withOpacity(0.18)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  borderSide: BorderSide(color: coffee.withOpacity(0.45)),
                 ),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.05),
+                fillColor: cream,
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 12,
                   vertical: 10,
                 ),
               ),
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              children: [
-                ChoiceChip(
-                  label: const Text('All'),
-                  selected: availability == 'all',
-                  onSelected: (_) =>
-                      ref.read(menuAvailabilityFilterProvider.notifier).state =
-                          'all',
-                ),
-                ChoiceChip(
-                  label: const Text('Available'),
-                  selected: availability == 'available',
-                  onSelected: (_) =>
-                      ref.read(menuAvailabilityFilterProvider.notifier).state =
-                          'available',
-                ),
-                ChoiceChip(
-                  label: const Text('Out of stock'),
-                  selected: availability == 'out',
-                  onSelected: (_) =>
-                      ref.read(menuAvailabilityFilterProvider.notifier).state =
-                          'out',
-                ),
-              ],
             ),
             const SizedBox(height: 10),
             Expanded(
@@ -118,22 +105,22 @@ class ItemListTab extends ConsumerWidget {
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            query.isNotEmpty || availability != 'all'
-                                ? "No items match your filters"
+                            query.isNotEmpty
+                                ? "No items match your search"
                                 : "No items in this category",
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.6),
+                              color: coffeeDark.withOpacity(0.7),
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            query.isNotEmpty || availability != 'all'
-                                ? "Try clearing search or filters"
+                            query.isNotEmpty
+                                ? "Try clearing your search"
                                 : "Tap the + button to add items",
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.4),
+                              color: coffeeDark.withOpacity(0.5),
                               fontSize: 11,
                             ),
                           ),
@@ -197,16 +184,28 @@ class _AdminItemCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final cream = isDark ? theme.colorScheme.surface : const Color(0xFFFEF9F5);
+    final surface = isDark
+        ? theme.colorScheme.surface
+        : const Color(0xFFFFF3E8);
+    final coffee = isDark ? theme.colorScheme.primary : const Color(0xFF95674D);
+    final coffeeDark = isDark
+        ? theme.colorScheme.onSurface
+        : const Color(0xFF98664D);
+    final caramel = isDark
+        ? theme.colorScheme.secondary
+        : const Color(0xFFEDAD4C);
     return GestureDetector(
       onTap: onEdit,
       child: GlassContainer(
         borderRadius: BorderRadius.circular(14),
-        color: item.isAvailable ? theme.colorScheme.surface : Colors.grey[900]!,
-        opacity: item.isAvailable ? 0.65 : 0.4,
+        color: item.isAvailable ? surface : cream,
+        opacity: 1,
         border: Border.all(
           color: item.isAvailable
-              ? Colors.white.withOpacity(0.15)
-              : Colors.white.withOpacity(0.08),
+              ? coffee.withOpacity(0.2)
+              : coffee.withOpacity(0.12),
           width: 1,
         ),
         child: Column(
@@ -220,14 +219,8 @@ class _AdminItemCard extends ConsumerWidget {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: item.isAvailable
-                        ? [
-                            theme.colorScheme.primary.withOpacity(0.2),
-                            theme.colorScheme.primary.withOpacity(0.05),
-                          ]
-                        : [
-                            Colors.grey.withOpacity(0.1),
-                            Colors.grey.withOpacity(0.05),
-                          ],
+                        ? [caramel.withOpacity(0.18), coffee.withOpacity(0.08)]
+                        : [coffee.withOpacity(0.08), coffee.withOpacity(0.04)],
                   ),
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(14),
@@ -268,8 +261,8 @@ class _AdminItemCard extends ConsumerWidget {
                           fontWeight: FontWeight.w600,
                           fontSize: 12,
                           color: item.isAvailable
-                              ? Colors.white
-                              : Colors.white.withOpacity(0.5),
+                              ? coffeeDark
+                              : coffeeDark.withOpacity(0.5),
                           letterSpacing: 0.1,
                         ),
                       ),
@@ -286,16 +279,16 @@ class _AdminItemCard extends ConsumerWidget {
                           ),
                           decoration: BoxDecoration(
                             color: item.isAvailable
-                                ? theme.colorScheme.primary.withOpacity(0.2)
-                                : Colors.grey.withOpacity(0.2),
+                                ? caramel.withOpacity(0.25)
+                                : coffee.withOpacity(0.12),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             "₹${item.price.toStringAsFixed(0)}",
                             style: TextStyle(
                               color: item.isAvailable
-                                  ? theme.colorScheme.primary
-                                  : Colors.grey[400],
+                                  ? coffeeDark
+                                  : coffeeDark.withOpacity(0.6),
                               fontWeight: FontWeight.w700,
                               fontSize: 12,
                             ),
@@ -305,7 +298,7 @@ class _AdminItemCard extends ConsumerWidget {
                           scale: 0.75,
                           child: Switch(
                             value: item.isAvailable,
-                            activeColor: theme.colorScheme.primary,
+                            activeColor: coffee,
                             onChanged: (val) {
                               ref
                                   .read(menuRepositoryProvider)
@@ -334,12 +327,16 @@ class _FallbackItemBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final coffeeDark = isDark
+        ? theme.colorScheme.onSurface
+        : const Color(0xFF98664D);
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         color: item.isAvailable
-            ? theme.colorScheme.primary.withOpacity(0.2)
-            : Colors.grey.withOpacity(0.2),
+            ? const Color(0xFFEDAD4C).withOpacity(0.25)
+            : const Color(0xFF95674D).withOpacity(0.12),
         shape: BoxShape.circle,
       ),
       child: Text(
@@ -347,9 +344,7 @@ class _FallbackItemBadge extends StatelessWidget {
         style: TextStyle(
           fontSize: 24,
           fontWeight: FontWeight.w700,
-          color: item.isAvailable
-              ? theme.colorScheme.primary
-              : Colors.grey[400],
+          color: item.isAvailable ? coffeeDark : coffeeDark.withOpacity(0.6),
         ),
       ),
     );
@@ -399,21 +394,34 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final cream = isDark ? theme.colorScheme.surface : const Color(0xFFFEF9F5);
+    final surface = isDark
+        ? theme.colorScheme.surface
+        : const Color(0xFFFFF3E8);
+    final coffee = isDark ? theme.colorScheme.primary : const Color(0xFF95674D);
+    final coffeeDark = isDark
+        ? theme.colorScheme.onSurface
+        : const Color(0xFF98664D);
+    final caramel = isDark
+        ? theme.colorScheme.secondary
+        : const Color(0xFFEDAD4C);
     return AlertDialog(
+      backgroundColor: cream,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withOpacity(0.15),
+              color: caramel.withOpacity(0.25),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
               widget.item == null
                   ? Icons.add_circle_rounded
                   : Icons.edit_rounded,
-              color: theme.colorScheme.primary,
+              color: coffeeDark,
               size: 18,
             ),
           ),
@@ -424,7 +432,7 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
               style: TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 16,
-                color: theme.colorScheme.primary,
+                color: coffeeDark,
               ),
             ),
           ),
@@ -449,14 +457,14 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.05),
+                fillColor: surface,
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 12,
                   vertical: 12,
                 ),
               ),
-              dropdownColor: Colors.grey[900],
-              style: const TextStyle(color: Colors.white, fontSize: 14),
+              dropdownColor: cream,
+              style: const TextStyle(color: Color(0xFF98664D), fontSize: 14),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -468,13 +476,13 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
                 ),
                 prefixIcon: const Icon(Icons.restaurant_menu_rounded, size: 20),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.05),
+                fillColor: surface,
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 12,
                   vertical: 12,
                 ),
               ),
-              style: const TextStyle(color: Colors.white, fontSize: 14),
+              style: const TextStyle(color: Color(0xFF98664D), fontSize: 14),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -487,14 +495,14 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
                 prefixIcon: const Icon(Icons.currency_rupee_rounded, size: 20),
                 prefixText: '₹ ',
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.05),
+                fillColor: surface,
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 12,
                   vertical: 12,
                 ),
               ),
               keyboardType: TextInputType.number,
-              style: const TextStyle(color: Colors.white, fontSize: 14),
+              style: const TextStyle(color: Color(0xFF98664D), fontSize: 14),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -507,14 +515,14 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
                 prefixIcon: const Icon(Icons.local_offer_rounded, size: 20),
                 suffixText: '%',
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.05),
+                fillColor: surface,
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 12,
                   vertical: 12,
                 ),
               ),
               keyboardType: TextInputType.number,
-              style: const TextStyle(color: Colors.white, fontSize: 14),
+              style: const TextStyle(color: Color(0xFF98664D), fontSize: 14),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -526,13 +534,13 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
                 ),
                 prefixIcon: const Icon(Icons.image_outlined, size: 20),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.05),
+                fillColor: surface,
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 12,
                   vertical: 12,
                 ),
               ),
-              style: const TextStyle(color: Colors.white, fontSize: 14),
+              style: const TextStyle(color: Color(0xFF98664D), fontSize: 14),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -544,14 +552,14 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
                 ),
                 prefixIcon: const Icon(Icons.notes_outlined, size: 20),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.05),
+                fillColor: surface,
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 12,
                   vertical: 12,
                 ),
               ),
               maxLines: 2,
-              style: const TextStyle(color: Colors.white, fontSize: 14),
+              style: const TextStyle(color: Color(0xFF98664D), fontSize: 14),
             ),
           ],
         ),
@@ -580,7 +588,7 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
           onPressed: () => Navigator.pop(context),
           child: Text(
             "Cancel",
-            style: TextStyle(color: Colors.white.withOpacity(0.7)),
+            style: TextStyle(color: coffeeDark.withOpacity(0.8)),
           ),
         ),
         FilledButton(

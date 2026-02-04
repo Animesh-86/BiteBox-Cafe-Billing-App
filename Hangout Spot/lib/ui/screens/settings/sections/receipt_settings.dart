@@ -46,8 +46,8 @@ class _ReceiptSettingsScreenState extends State<ReceiptSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: Colors.black,
+      return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: Center(child: CircularProgressIndicator()),
       );
     }
@@ -60,7 +60,7 @@ class _ReceiptSettingsScreenState extends State<ReceiptSettingsScreen> {
         centerTitle: true,
       ),
       body: Container(
-        color: Colors.black,
+        color: Theme.of(context).scaffoldBackgroundColor,
         padding: const EdgeInsets.fromLTRB(16, 100, 16, 16),
         child: SingleChildScrollView(
           child: SettingsSection(

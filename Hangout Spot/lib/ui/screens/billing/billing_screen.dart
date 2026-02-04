@@ -242,9 +242,13 @@ class _MobileLayout extends ConsumerWidget {
           child: Container(
             margin: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.02),
+              color: Theme.of(context).cardTheme.color,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withOpacity(0.1)),
+              border: Border.all(
+                color:
+                    Theme.of(context).dividerTheme.color ??
+                    Colors.white.withOpacity(0.1),
+              ),
             ),
             child: const _CategorySidebar(),
           ),
@@ -290,9 +294,13 @@ class _MobileLayout extends ConsumerWidget {
                 child: Container(
                   margin: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.02),
+                    color: Theme.of(context).cardTheme.color,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withOpacity(0.1)),
+                    border: Border.all(
+                      color:
+                          Theme.of(context).dividerTheme.color ??
+                          Colors.white.withOpacity(0.1),
+                    ),
                   ),
                   child: const BillingItemsGrid(),
                 ),
@@ -394,14 +402,17 @@ class _CategorySidebar extends ConsumerWidget {
                                       ? Theme.of(
                                           context,
                                         ).colorScheme.primary.withOpacity(0.2)
-                                      : Colors.white.withOpacity(0.05),
+                                      : Theme.of(
+                                          context,
+                                        ).colorScheme.surfaceVariant,
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Icon(
                                   _getCategoryIcon(cat.name),
                                   color: isSelected
                                       ? Theme.of(context).colorScheme.primary
-                                      : Colors.white60,
+                                      : Theme.of(context).colorScheme.onSurface
+                                            .withOpacity(0.6),
                                   size: 16,
                                 ),
                               ),
@@ -412,7 +423,8 @@ class _CategorySidebar extends ConsumerWidget {
                                   fontSize: 10,
                                   color: isSelected
                                       ? Theme.of(context).colorScheme.primary
-                                      : Colors.white60,
+                                      : Theme.of(context).colorScheme.onSurface
+                                            .withOpacity(0.6),
                                   fontWeight: isSelected
                                       ? FontWeight.w600
                                       : FontWeight.w500,
@@ -477,10 +489,14 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.05),
+            color: Theme.of(context).cardTheme.color,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
             border: Border(
-              bottom: BorderSide(color: Colors.white.withOpacity(0.1)),
+              bottom: BorderSide(
+                color:
+                    Theme.of(context).dividerTheme.color ??
+                    Colors.white.withOpacity(0.1),
+              ),
             ),
           ),
           child: Column(
@@ -491,18 +507,20 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                 children: [
                   Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.shopping_cart,
-                        color: Colors.white70,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withOpacity(0.7),
                         size: 20,
                       ),
                       const SizedBox(width: 8),
-                      const Text(
+                      Text(
                         'Order',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                     ],
@@ -573,7 +591,13 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                     ),
                     if (cart.customer != null) const SizedBox(width: 8),
                     if (cart.customer != null)
-                      const Icon(Icons.person, size: 12, color: Colors.white60),
+                      Icon(
+                        Icons.person,
+                        size: 12,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withOpacity(0.6),
+                      ),
                     if (cart.customer != null) const SizedBox(width: 4),
                     if (cart.customer != null)
                       Expanded(
@@ -1164,12 +1188,12 @@ class _CartPanelState extends ConsumerState<_CartPanel> {
                               context,
                             ).colorScheme.primary,
                           ),
-                          child: const Text(
+                          child: Text(
                             'Pay',
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
-                              color: Colors.black,
+                              color: Theme.of(context).colorScheme.onPrimary,
                             ),
                           ),
                         ),
@@ -1344,7 +1368,7 @@ class _CartMobileBottomBar extends ConsumerWidget {
             maxChildSize: 0.95,
             builder: (_, controller) => Container(
               decoration: BoxDecoration(
-                color: Colors.black,
+                color: Theme.of(context).scaffoldBackgroundColor,
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(20),
                 ),
@@ -2217,12 +2241,12 @@ class _MobileCartModalState extends ConsumerState<_MobileCartModal> {
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         backgroundColor: Theme.of(context).colorScheme.primary,
                       ),
-                      child: const Text(
+                      child: Text(
                         'Pay Now',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black,
+                          color: Theme.of(context).colorScheme.onPrimary,
                         ),
                       ),
                     ),
@@ -2463,7 +2487,7 @@ class _HeldOrdersDialog extends ConsumerWidget {
     );
 
     return Dialog(
-      backgroundColor: Colors.black,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       child: Container(
         width: 450,
         constraints: const BoxConstraints(maxHeight: 700),
@@ -2624,7 +2648,9 @@ class _HeldOrdersDialog extends ConsumerWidget {
                                             maxChildSize: 0.95,
                                             builder: (_, controller) => Container(
                                               decoration: BoxDecoration(
-                                                color: Colors.black,
+                                                color: Theme.of(
+                                                  context,
+                                                ).scaffoldBackgroundColor,
                                                 borderRadius:
                                                     const BorderRadius.vertical(
                                                       top: Radius.circular(20),

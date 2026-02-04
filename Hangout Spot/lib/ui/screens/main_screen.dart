@@ -59,7 +59,9 @@ class _MainScreenState extends State<MainScreen> {
           ? null
           : NavigationBar(
               selectedIndex: _currentIndex,
-              backgroundColor: const Color(0xFF1E1E1E), // Dark Surface
+              backgroundColor:
+                  Theme.of(context).bottomNavigationBarTheme.backgroundColor ??
+                  Theme.of(context).colorScheme.surface,
               surfaceTintColor: Colors.transparent,
               indicatorColor: Theme.of(context).primaryColor,
               onDestinationSelected: (idx) {

@@ -38,7 +38,7 @@ class _LoyaltySettingsScreenState extends ConsumerState<LoyaltySettingsScreen> {
         centerTitle: true,
       ),
       body: Container(
-        color: Colors.black, // Dark background
+        color: Theme.of(context).scaffoldBackgroundColor, // Dark background
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 100, 16, 16),
           child: SingleChildScrollView(

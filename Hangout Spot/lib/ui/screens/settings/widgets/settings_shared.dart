@@ -17,9 +17,18 @@ class SettingsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E).withOpacity(0.6),
+        color:
+            Theme.of(context).cardTheme.color ??
+            Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        border: Border.all(color: Theme.of(context).dividerColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24),
@@ -84,7 +93,9 @@ class SettingsTextField extends StatelessWidget {
         labelText: label,
         prefixIcon: Icon(icon, size: 18),
         filled: true,
-        fillColor: Colors.black.withOpacity(0.2),
+        fillColor:
+            Theme.of(context).inputDecorationTheme.fillColor ??
+            Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
         contentPadding: const EdgeInsets.symmetric(
           vertical: 12,
           horizontal: 16,
@@ -165,13 +176,19 @@ class SettingsDateBtn extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
         decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.2),
+          color:
+              Theme.of(context).inputDecorationTheme.fillColor ??
+              Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withOpacity(0.1)),
+          border: Border.all(color: Theme.of(context).dividerColor),
         ),
         child: Row(
           children: [
-            Icon(Icons.calendar_today_rounded, size: 16, color: Colors.white70),
+            Icon(
+              Icons.calendar_today_rounded,
+              size: 16,
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+            ),
             const SizedBox(width: 8),
             Expanded(
               child: Text(

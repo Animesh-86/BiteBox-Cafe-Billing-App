@@ -31,7 +31,7 @@ class _LocationsSettingsScreenState
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E1E),
+        backgroundColor: Theme.of(context).colorScheme.surface,
         title: const Text('Add Location'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -82,8 +82,8 @@ class _LocationsSettingsScreenState
       ),
       body: Stack(
         children: [
-          // Background/Structure could be reused or just simple dark bg
-          Container(color: Colors.black),
+          // Background/Structure
+          Container(color: Theme.of(context).scaffoldBackgroundColor),
 
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 100, 16, 16),
