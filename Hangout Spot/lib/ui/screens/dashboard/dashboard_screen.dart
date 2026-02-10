@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/data/repositories/analytics_repository.dart';
@@ -6,20 +8,93 @@ import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/data/repositories/auth_repository.dart';
 import 'package:intl/intl.dart';
 
-class DashboardScreen extends ConsumerWidget {
+class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+  DateTime _selectedDate = DateTime.now();
+  late String _quote;
+
+  final List<String> _quotes = [
+    "Life happens, coffee helps.",
+    "Espresso yourself.",
+    "Better latte than never.",
+    "Procaffeinating: The tendency to not start anything until you've had a cup of coffee.",
+    "Coffee: A hug in a mug.",
+    "Love is in the air, and it smells like coffee.",
+    "Stressed, blessed, and coffee obsessed.",
+    "First I drink the coffee, then I do the things.",
+    "Coffee is always a good idea.",
+    "Behind every successful person is a substantial amount of coffee.",
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _quote = _quotes[Random().nextInt(_quotes.length)];
+  }
+
+  Future<void> _pickDate(BuildContext context) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
+        return Theme(
+          data: theme.copyWith(
+            colorScheme: isDark
+                ? theme.colorScheme.copyWith(
+                    primary: const Color(0xFFEDAD4C), // Caramel for primary
+                    onPrimary: const Color(0xFF2C1A1D), // Dark coffee for text
+                    surface: const Color(0xFF2C1A1D), // Dark background
+                    onSurface: const Color(0xFFEDAD4C), // Caramel text
+                  )
+                : theme.colorScheme,
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null && picked != _selectedDate) {
+      setState(() {
+        _selectedDate = picked;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final analytics = ref.watch(analyticsRepositoryProvider);
     final authFunc = ref.watch(authRepositoryProvider);
     final user = authFunc.currentUser;
     final userName =
         user?.displayName ?? user?.email?.split('@').first ?? 'Admin';
     final sessionManager = ref.watch(sessionManagerProvider);
-    final sessionInfo = sessionManager.getSessionInfo();
-    final sessionStart = sessionInfo['opensAt'] as DateTime;
-    final sessionEnd = sessionInfo['closesAt'] as DateTime;
+    // Calculate start and end of selected day for analytics
+    final startOfDay = DateTime(
+      _selectedDate.year,
+      _selectedDate.month,
+      _selectedDate.day,
+      0,
+      0,
+      0,
+    );
+    final endOfDay = DateTime(
+      _selectedDate.year,
+      _selectedDate.month,
+      _selectedDate.day,
+      23,
+      59,
+      59,
+    );
+
     final width = MediaQuery.of(context).size.width;
     final isWide = width > 900;
     final theme = Theme.of(context);
@@ -44,34 +119,43 @@ class DashboardScreen extends ConsumerWidget {
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         iconTheme: IconThemeData(color: coffeeDark),
-        titleTextStyle: TextStyle(
-          fontWeight: FontWeight.w700,
-          fontSize: 20,
-          color: coffeeDark,
-        ),
-        title: const Text("Dashboard"),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: cream,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: coffee.withOpacity(0.2)),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.calendar_today, size: 16, color: coffee),
-                  const SizedBox(width: 8),
-                  Text(
-                    DateFormat('EEE, d MMM').format(DateTime.now()),
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: coffeeDark,
+            child: GestureDetector(
+              onTap: () => _pickDate(context),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: cream,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: coffee.withOpacity(0.2)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
                     ),
-                  ),
-                ],
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.calendar_today, size: 16, color: coffee),
+                    const SizedBox(width: 8),
+                    Text(
+                      DateFormat('EEE, d MMM').format(_selectedDate),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: coffeeDark,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(Icons.arrow_drop_down, size: 18, color: coffeeDark),
+                  ],
+                ),
               ),
             ),
           ),
@@ -109,44 +193,23 @@ class DashboardScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    "Welcome back,",
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: coffeeDark.withOpacity(0.75),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
                     "Hello, $userName",
                     style: TextStyle(
-                      fontSize: 30,
+                      fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      letterSpacing: -0.5,
-                      color: coffeeDark,
+                      color: coffeeDark.withOpacity(0.8),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: caramel.withOpacity(0.18),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          "Session: ${DateFormat('hh:mm a').format(sessionStart)} - ${DateFormat('hh:mm a').format(sessionEnd)}",
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: coffeeDark,
-                          ),
-                        ),
-                      ),
-                    ],
+                  const SizedBox(height: 8),
+                  Text(
+                    "\"$_quote\"",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontStyle: FontStyle.italic,
+                      height: 1.4,
+                      color: coffeeDark,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ],
               ),
@@ -170,8 +233,8 @@ class DashboardScreen extends ConsumerWidget {
                             width: cardWidth,
                             child: FutureBuilder<double>(
                               future: analytics.getSessionSales(
-                                sessionStart,
-                                sessionEnd,
+                                startOfDay,
+                                endOfDay,
                               ),
                               builder: (context, snapshot) => _StatCard(
                                 title: "Total Sales",
@@ -190,8 +253,8 @@ class DashboardScreen extends ConsumerWidget {
                             width: cardWidth,
                             child: FutureBuilder<int>(
                               future: analytics.getSessionOrdersCount(
-                                sessionStart,
-                                sessionEnd,
+                                startOfDay,
+                                endOfDay,
                               ),
                               builder: (context, snapshot) => _StatCard(
                                 title: "Orders",
@@ -209,8 +272,8 @@ class DashboardScreen extends ConsumerWidget {
                             width: cardWidth,
                             child: FutureBuilder<int>(
                               future: analytics.getSessionItemsSold(
-                                sessionStart,
-                                sessionEnd,
+                                startOfDay,
+                                endOfDay,
                               ),
                               builder: (context, snapshot) => _StatCard(
                                 title: "Items Sold",
@@ -228,8 +291,8 @@ class DashboardScreen extends ConsumerWidget {
                             width: cardWidth,
                             child: FutureBuilder<int>(
                               future: analytics.getSessionUniqueCustomersCount(
-                                sessionStart,
-                                sessionEnd,
+                                startOfDay,
+                                endOfDay,
                               ),
                               builder: (context, snapshot) => _StatCard(
                                 title: "Customers",
@@ -254,7 +317,7 @@ class DashboardScreen extends ConsumerWidget {
                       Icon(Icons.history, color: theme.colorScheme.secondary),
                       const SizedBox(width: 8),
                       Text(
-                        "Live Activity",
+                        "Recent Activity",
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 20,
@@ -293,6 +356,16 @@ class DashboardScreen extends ConsumerWidget {
                             ),
                           );
                         }
+
+                        // Filter orders if needed or just show latest 5
+                        // Note: watchSessionOrders might just show current session orders
+                        // If user wants historical, meaningful 'watch' might need refactor in future.
+                        // For now, let's keep showing session orders but filtered by _selectedDate if possible?
+                        // `watchSessionOrders` likely watches the *current* session ID in pure Drift.
+                        // If we want to support date filtering on the stream, we'd need a different query.
+                        // Use `analytics` or verify if session filtering matches date.
+                        // Assuming current request just wants top stats date-filtered.
+                        // Keeping stream as-is for "Live/Recent Activity" context.
 
                         final orders = snapshot.data!.take(5).toList();
                         return Column(
@@ -384,7 +457,6 @@ class _StatCard extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final cream = isDark ? theme.colorScheme.surface : const Color(0xFFFEF9F5);
-    final coffee = isDark ? theme.colorScheme.primary : const Color(0xFF95674D);
     final coffeeDark = isDark
         ? theme.colorScheme.onSurface
         : const Color(0xFF98664D);
@@ -415,21 +487,6 @@ class _StatCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: iconColor, size: 24),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: coffee.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  "Today",
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: coffeeDark,
-                  ),
-                ),
               ),
             ],
           ),

@@ -93,10 +93,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     String subtitle,
     Widget screen,
   ) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final iconColor = isDark ? theme.colorScheme.onSurface : theme.primaryColor;
+    final iconBgColor = isDark
+        ? theme.colorScheme.onSurface.withOpacity(0.1)
+        : theme.primaryColor.withOpacity(0.1);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -113,10 +120,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           leading: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Theme.of(context).primaryColor.withOpacity(0.1),
+              color: iconBgColor,
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: Theme.of(context).primaryColor, size: 24),
+            child: Icon(icon, color: iconColor, size: 24),
           ),
           title: Text(
             title,
@@ -125,14 +132,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           subtitle: Text(
             subtitle,
             style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+              color: theme.colorScheme.onSurface.withOpacity(0.6),
               fontSize: 13,
             ),
           ),
           trailing: Icon(
             Icons.arrow_forward_ios_rounded,
             size: 16,
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
+            color: theme.colorScheme.onSurface.withOpacity(0.3),
           ),
           onTap: () => _navigateTo(screen),
         ),

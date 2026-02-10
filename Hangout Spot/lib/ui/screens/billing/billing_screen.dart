@@ -22,8 +22,9 @@ import 'package:uuid/uuid.dart';
 
 Color _billingSurface(BuildContext context, {double darkOpacity = 0.08}) {
   final theme = Theme.of(context);
+  // Premium Dark Coffee Surface
   return theme.brightness == Brightness.dark
-      ? theme.colorScheme.surface.withOpacity(darkOpacity)
+      ? const Color(0xFF3E2D2F).withOpacity(darkOpacity + 0.15)
       : theme.colorScheme.surface;
 }
 
@@ -32,15 +33,16 @@ Color _billingSurfaceVariant(
   double darkOpacity = 0.12,
 }) {
   final theme = Theme.of(context);
+  // Premium Lighter Coffee Surface
   return theme.brightness == Brightness.dark
-      ? theme.colorScheme.surfaceVariant.withOpacity(darkOpacity)
+      ? const Color(0xFF4E3D3F).withOpacity(darkOpacity + 0.2)
       : theme.colorScheme.surfaceVariant;
 }
 
 Color _billingOutline(BuildContext context, {double darkOpacity = 0.2}) {
   final theme = Theme.of(context);
   return theme.brightness == Brightness.dark
-      ? theme.colorScheme.outline.withOpacity(darkOpacity)
+      ? Colors.white.withOpacity(0.15) // Crisper white outline
       : theme.colorScheme.outline.withOpacity(0.6);
 }
 
@@ -54,24 +56,29 @@ Widget _billingPricePill(BuildContext context, String text) {
   final theme = Theme.of(context);
   final isDark = theme.brightness == Brightness.dark;
   final caramel = isDark
-      ? theme.colorScheme.secondary
+      ? const Color(0xFFEDAD4C) // Golden Caramel
       : const Color(0xFFEDAD4C);
   final coffeeDark = isDark
-      ? theme.colorScheme.onSurface
+      ? const Color(0xFF2C1A1D) // Contrast text
       : const Color(0xFF98664D);
 
   return Container(
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
     decoration: BoxDecoration(
-      color: caramel.withOpacity(0.25),
+      gradient: LinearGradient(
+        colors: [caramel.withOpacity(0.4), caramel.withOpacity(0.2)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
       borderRadius: BorderRadius.circular(6),
+      border: Border.all(color: caramel.withOpacity(0.3), width: 0.5),
     ),
     child: Text(
       text,
       style: TextStyle(
         fontWeight: FontWeight.w700,
         fontSize: 12,
-        color: coffeeDark,
+        color: isDark ? const Color(0xFFFFE0B2) : coffeeDark,
       ),
     ),
   );
@@ -82,10 +89,10 @@ List<BoxShadow> _billingShadow(BuildContext context) {
   return [
     BoxShadow(
       color: isDark
-          ? Colors.black.withOpacity(0.35)
+          ? Colors.black.withOpacity(0.4)
           : Colors.black.withOpacity(0.08),
-      blurRadius: 18,
-      offset: const Offset(0, 10),
+      blurRadius: isDark ? 24 : 18,
+      offset: const Offset(0, 12),
     ),
   ];
 }
@@ -352,10 +359,26 @@ class _MobileLayout extends ConsumerWidget {
           ),
         ),
         // Items Grid (middle - flexible)
+        // Items Grid (middle - flexible)
         Expanded(
           flex: (100 - constrainedFlex.toInt()).clamp(65, 85).toInt(),
           child: Column(
             children: [
+              // Cart Summary at TOP (above search which is inside BillingItemsGrid)
+              if (itemCount > 0)
+                Container(
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _billingSurface(context, darkOpacity: 0.08),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: _billingShadow(context),
+                  ),
+                  child: const _CartMobileBottomBar(),
+                ),
+
               // Items Grid (expanded)
               Expanded(
                 child: Container(
@@ -368,17 +391,6 @@ class _MobileLayout extends ConsumerWidget {
                   child: const BillingItemsGrid(),
                 ),
               ),
-              // Cart Summary at bottom
-              if (itemCount > 0)
-                Container(
-                  margin: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: _billingSurface(context, darkOpacity: 0.08),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: _billingShadow(context),
-                  ),
-                  child: const _CartMobileBottomBar(),
-                ),
             ],
           ),
         ),
@@ -388,13 +400,41 @@ class _MobileLayout extends ConsumerWidget {
 }
 
 /// Categories Sidebar (Vertical for tablet/desktop)
-class _CategorySidebar extends ConsumerWidget {
+class _CategorySidebar extends ConsumerStatefulWidget {
   const _CategorySidebar();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_CategorySidebar> createState() => _CategorySidebarState();
+}
+
+class _CategorySidebarState extends ConsumerState<_CategorySidebar> {
+  final Map<String, GlobalKey> _categoryKeys = {};
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final categoriesAsync = ref.watch(categoriesStreamProvider);
     final selectedCat = ref.watch(selectedCategoryProvider);
+
+    ref.listen<String?>(selectedCategoryProvider, (previous, next) {
+      if (next != null) {
+        final key = _categoryKeys[next];
+        if (key?.currentContext != null) {
+          Scrollable.ensureVisible(
+            key!.currentContext!,
+            alignment: 0.5,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
+        }
+      }
+    });
 
     return categoriesAsync.when(
       data: (cats) {
@@ -410,6 +450,11 @@ class _CategorySidebar extends ConsumerWidget {
           ...cats,
         ];
 
+        // Ensure keys exist
+        for (final cat in allCats) {
+          _categoryKeys.putIfAbsent(cat.id, () => GlobalKey());
+        }
+
         return Column(
           children: [
             Padding(
@@ -424,85 +469,92 @@ class _CategorySidebar extends ConsumerWidget {
               ),
             ),
             Expanded(
-              child: ListView.builder(
-                itemCount: allCats.length,
-                itemBuilder: (context, index) {
-                  final cat = allCats[index];
-                  final isSelected =
-                      selectedCat == cat.id ||
-                      (selectedCat == null && cat.id == 'all');
+              child: SingleChildScrollView(
+                controller: _scrollController,
+                child: Column(
+                  children: allCats.map((cat) {
+                    final isSelected =
+                        selectedCat == cat.id ||
+                        (selectedCat == null && cat.id == 'all');
 
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 3,
-                    ),
-                    child: Material(
-                      color: isSelected
-                          ? Theme.of(
-                              context,
-                            ).colorScheme.primary.withOpacity(0.2)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(10),
-                      child: InkWell(
-                        onTap: () {
-                          ref.read(selectedCategoryProvider.notifier).state =
-                              cat.id;
-                        },
+                    return Padding(
+                      key: _categoryKeys[cat.id],
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 3,
+                      ),
+                      child: Material(
+                        color: isSelected
+                            ? Theme.of(
+                                context,
+                              ).colorScheme.primary.withOpacity(0.2)
+                            : Colors.transparent,
                         borderRadius: BorderRadius.circular(10),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 8,
-                            horizontal: 6,
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? Theme.of(
-                                          context,
-                                        ).colorScheme.primary.withOpacity(0.2)
-                                      : Theme.of(
-                                          context,
-                                        ).colorScheme.surfaceVariant,
-                                  borderRadius: BorderRadius.circular(8),
+                        child: InkWell(
+                          onTap: () {
+                            ref.read(selectedCategoryProvider.notifier).state =
+                                cat.id;
+                          },
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 8,
+                              horizontal: 6,
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? Theme.of(
+                                            context,
+                                          ).colorScheme.primary.withOpacity(0.2)
+                                        : Theme.of(
+                                            context,
+                                          ).colorScheme.surfaceVariant,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(
+                                    _getCategoryIcon(cat.name),
+                                    color: isSelected
+                                        ? Theme.of(context).colorScheme.primary
+                                        : Theme.of(context)
+                                              .colorScheme
+                                              .onSurface
+                                              .withOpacity(0.6),
+                                    size: 16,
+                                  ),
                                 ),
-                                child: Icon(
-                                  _getCategoryIcon(cat.name),
-                                  color: isSelected
-                                      ? Theme.of(context).colorScheme.primary
-                                      : Theme.of(context).colorScheme.onSurface
-                                            .withOpacity(0.6),
-                                  size: 16,
+                                const SizedBox(height: 4),
+                                Text(
+                                  cat.name,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: isSelected
+                                        ? Theme.of(context).colorScheme.primary
+                                        : Theme.of(context)
+                                              .colorScheme
+                                              .onSurface
+                                              .withOpacity(0.6),
+                                    fontWeight: isSelected
+                                        ? FontWeight.w600
+                                        : FontWeight.w500,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                cat.name,
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: isSelected
-                                      ? Theme.of(context).colorScheme.primary
-                                      : Theme.of(context).colorScheme.onSurface
-                                            .withOpacity(0.6),
-                                  fontWeight: isSelected
-                                      ? FontWeight.w600
-                                      : FontWeight.w500,
-                                ),
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  }).toList(),
+                ),
               ),
             ),
           ],

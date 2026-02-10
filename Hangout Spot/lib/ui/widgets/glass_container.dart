@@ -9,6 +9,7 @@ class GlassContainer extends StatelessWidget {
   final BorderRadius? borderRadius;
   final EdgeInsetsGeometry? padding;
   final EdgeInsetsGeometry? margin;
+  final Gradient? gradient;
   final BoxBorder? border;
   final double? width;
   final double? height;
@@ -19,6 +20,7 @@ class GlassContainer extends StatelessWidget {
     this.blur = 10.0,
     this.opacity = 0.7,
     this.color = Colors.white,
+    this.gradient,
     this.borderRadius,
     this.padding,
     this.margin,
@@ -31,6 +33,19 @@ class GlassContainer extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+
+    // Default glass gradient if none provided but color is transparent/default
+    final effectiveGradient =
+        gradient ??
+        LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            color.withOpacity(opacity),
+            color.withOpacity(opacity * 0.8),
+          ],
+        );
+
     return Container(
       margin: margin,
       width: width,
@@ -42,7 +57,7 @@ class GlassContainer extends StatelessWidget {
           child: Container(
             padding: padding,
             decoration: BoxDecoration(
-              color: color.withOpacity(opacity),
+              gradient: effectiveGradient,
               borderRadius: borderRadius ?? BorderRadius.circular(20),
               border: border,
               boxShadow: [

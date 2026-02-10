@@ -133,31 +133,80 @@ class ItemListTab extends ConsumerWidget {
                         ],
                       ),
                     )
-                  : LayoutBuilder(
-                      builder: (context, constraints) {
-                        final crossAxisCount = (constraints.maxWidth / 140)
-                            .floor()
-                            .clamp(2, 6);
-                        return GridView.builder(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          gridDelegate:
-                              SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: crossAxisCount,
-                                childAspectRatio: 0.7,
-                                crossAxisSpacing: 10,
-                                mainAxisSpacing: 10,
-                              ),
-                          itemCount: filtered.length,
-                          itemBuilder: (context, index) => _AdminItemCard(
-                            item: filtered[index],
-                            onEdit: () => _showAddEditDialog(
-                              context,
-                              ref,
-                              item: filtered[index],
-                            ),
-                          ),
+                  : GestureDetector(
+                      onHorizontalDragEnd: (details) {
+                        final categoriesAsync = ref.read(
+                          categoriesStreamProvider,
                         );
+                        categoriesAsync.whenData((categories) {
+                          final allCats = [
+                            const Category(
+                              id: 'all',
+                              name: 'All',
+                              color: 0,
+                              sortOrder: -1,
+                              isDeleted: false,
+                              discountPercent: 0.0,
+                            ),
+                            ...categories,
+                          ];
+
+                          final currentIndex = allCats.indexWhere(
+                            (c) =>
+                                c.id ==
+                                (selectedCat == null || selectedCat == 'all'
+                                    ? 'all'
+                                    : selectedCat),
+                          );
+
+                          if (currentIndex == -1) return;
+
+                          // Swipe Left -> Next Category
+                          if (details.primaryVelocity! < 0) {
+                            if (currentIndex < allCats.length - 1) {
+                              ref
+                                  .read(adminSelectedCategoryProvider.notifier)
+                                  .state = allCats[currentIndex + 1]
+                                  .id;
+                            }
+                          }
+                          // Swipe Right -> Previous Category
+                          else if (details.primaryVelocity! > 0) {
+                            if (currentIndex > 0) {
+                              ref
+                                  .read(adminSelectedCategoryProvider.notifier)
+                                  .state = allCats[currentIndex - 1]
+                                  .id;
+                            }
+                          }
+                        });
                       },
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final crossAxisCount = (constraints.maxWidth / 140)
+                              .floor()
+                              .clamp(2, 6);
+                          return GridView.builder(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: crossAxisCount,
+                                  childAspectRatio: 0.7,
+                                  crossAxisSpacing: 10,
+                                  mainAxisSpacing: 10,
+                                ),
+                            itemCount: filtered.length,
+                            itemBuilder: (context, index) => _AdminItemCard(
+                              item: filtered[index],
+                              onEdit: () => _showAddEditDialog(
+                                context,
+                                ref,
+                                item: filtered[index],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                     ),
             ),
           ],

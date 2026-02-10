@@ -40,7 +40,13 @@ class SettingsSection extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Icon(icon, color: Theme.of(context).primaryColor, size: 20),
+                    Icon(
+                      icon,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Theme.of(context).colorScheme.onSurface
+                          : Theme.of(context).primaryColor,
+                      size: 20,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       title,
@@ -91,6 +97,9 @@ class SettingsTextField extends StatelessWidget {
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, size: 18),
+        prefixIconColor: Theme.of(context).brightness == Brightness.dark
+            ? Theme.of(context).colorScheme.onSurface.withOpacity(0.7)
+            : Theme.of(context).primaryColor,
         filled: true,
         fillColor:
             Theme.of(context).inputDecorationTheme.fillColor ??
