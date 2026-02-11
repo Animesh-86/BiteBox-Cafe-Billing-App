@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 
 Color billingSurface(BuildContext context, {double darkOpacity = 0.08}) {
   final theme = Theme.of(context);
-  // Premium Dark Coffee Surface
+  // Premium Dark Coffee Surface (Matches AppTheme._surface 0xFF1F1B1A but slightly lighter)
   return theme.brightness == Brightness.dark
-      ? const Color(0xFF3E2D2F).withOpacity(darkOpacity + 0.15)
+      ? const Color(0xFF2A2422).withOpacity(darkOpacity + 0.15)
       : theme.colorScheme.surface;
 }
 
@@ -12,14 +12,14 @@ Color billingSurfaceVariant(BuildContext context, {double darkOpacity = 0.12}) {
   final theme = Theme.of(context);
   // Premium Lighter Coffee Surface
   return theme.brightness == Brightness.dark
-      ? const Color(0xFF4E3D3F).withOpacity(darkOpacity + 0.2)
+      ? const Color(0xFF352D2B).withOpacity(darkOpacity + 0.2)
       : theme.colorScheme.surfaceVariant;
 }
 
 Color billingOutline(BuildContext context, {double darkOpacity = 0.2}) {
   final theme = Theme.of(context);
   return theme.brightness == Brightness.dark
-      ? Colors.white.withOpacity(0.15) // Crisper white outline
+      ? const Color(0xFF5D4037).withOpacity(0.3) // Warm coffee outline
       : theme.colorScheme.outline.withOpacity(0.6);
 }
 

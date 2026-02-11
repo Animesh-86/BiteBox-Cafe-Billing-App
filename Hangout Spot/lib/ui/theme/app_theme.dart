@@ -5,14 +5,16 @@ class AppTheme {
   // Typography - Outfit for a modern, clean look
   static final TextTheme _textTheme = GoogleFonts.outfitTextTheme();
 
-  // Midnight Coffee Palette
-  static const Color _background = Color(0xFF0F0F0F); // Deepest Black
-  static const Color _surface = Color(0xFF1E1E1E); // Dark Grey Card
+  // Midnight Coffee Palette (Premium Warm Dark)
+  static const Color _background = Color(
+    0xFF141110,
+  ); // Deep Roasted Coffee Black
+  static const Color _surface = Color(0xFF1F1B1A); // Warm Dark Espresso Card
   static const Color _primary = Color(0xFFD4A574); // Gold / Latte
   static const Color _secondary = Color(0xFF8D6E63); // Mocha
-  static const Color _onBackground = Color(0xFFEDEDED); // Off-white text
-  static const Color _onSurface = Color(0xFFE0E0E0); // Light grey text
-  static const Color _borderColor = Color(0xFF333333); // Subtle borders
+  static const Color _onBackground = Color(0xFFEAE0D5); // Creamy off-white text
+  static const Color _onSurface = Color(0xFFDCC8B8); // Muted latte text
+  static const Color _borderColor = Color(0xFF3E312B); // Coffee bean border
 
   static ThemeData darkTheme = ThemeData(
     useMaterial3: true,

@@ -252,17 +252,40 @@ class BillingItemCard extends ConsumerWidget {
       child: GlassContainer(
         borderRadius: BorderRadius.circular(14),
         color: inCart
-            ? caramel.withOpacity(0.1) // Subtle caramel glow
-            : (isDark ? cardLift : surface),
-        opacity: 1,
-        border: Border.all(
-          color: inCart
-              ? caramel.withOpacity(0.6) // Clear selection border
-              : (isDark
-                    ? colorScheme.outline.withOpacity(0.15)
-                    : Colors.transparent),
-          width: inCart ? 1.5 : 1,
-        ),
+            ? caramel.withOpacity(0.15) // Richer caramel glow
+            : (isDark ? cardLift.withOpacity(0.3) : surface),
+        opacity: isDark ? 0.6 : 0.8,
+        borderGradient: inCart
+            ? LinearGradient(
+                colors: [
+                  caramel,
+                  caramel.withOpacity(0.1),
+                  caramel.withOpacity(0.1),
+                  caramel,
+                ],
+                stops: const [0.0, 0.3, 0.7, 1.0],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : (isDark
+                  ? LinearGradient(
+                      colors: [
+                        Colors.white.withOpacity(0.15),
+                        Colors.white.withOpacity(0.02),
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    )
+                  : null),
+        border: inCart
+            ? null
+            : Border.all(
+                color: isDark
+                    ? Colors.transparent
+                    : colorScheme.outline.withOpacity(0.15),
+                width: 0,
+              ),
+        borderWidth: inCart ? 1.5 : 1.0,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
