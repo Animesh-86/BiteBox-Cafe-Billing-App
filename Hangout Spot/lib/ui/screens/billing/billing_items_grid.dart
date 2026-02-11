@@ -182,7 +182,11 @@ class BillingItemCard extends ConsumerWidget {
         style: TextStyle(
           fontWeight: FontWeight.w700,
           fontSize: 12,
-          color: inCart ? theme.colorScheme.primary : coffeeDark,
+          color: inCart
+              ? (isDark
+                    ? theme.colorScheme.onSurface
+                    : theme.colorScheme.primary)
+              : coffeeDark,
         ),
       ),
     );
@@ -312,7 +316,11 @@ class BillingItemCard extends ConsumerWidget {
                                 style: TextStyle(
                                   fontWeight: FontWeight.w600,
                                   fontSize: 12,
-                                  color: inCart ? caramel : coffeeDark,
+                                  color: inCart
+                                      ? (isDark
+                                            ? colorScheme.onSurface
+                                            : caramel)
+                                      : coffeeDark,
                                   letterSpacing: 0.1,
                                 ),
                               ),

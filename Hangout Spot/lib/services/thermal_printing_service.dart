@@ -1,0 +1,367 @@
+import 'package:blue_thermal_printer/blue_thermal_printer.dart';
+import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hangout_spot/data/local/db/app_database.dart';
+import 'package:intl/intl.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:image/image.dart' as img;
+
+class ThermalPrintingService {
+  final BlueThermalPrinter _bluetooth = BlueThermalPrinter.instance;
+  final Ref _ref;
+
+  ThermalPrintingService(this._ref);
+
+  Future<bool> get isConnected =>
+      _bluetooth.isConnected.then((v) => v ?? false);
+
+  Future<List<BluetoothDevice>> getBondedDevices() async {
+    try {
+      return await _bluetooth.getBondedDevices();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<void> connect(BluetoothDevice device) async {
+    if (await isConnected) {
+      await _bluetooth.disconnect();
+    }
+    await _bluetooth.connect(device);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('selected_printer_mac', device.address ?? '');
+  }
+
+  Future<void> disconnect() async {
+    await _bluetooth.disconnect();
+  }
+
+  Future<void> printBill(
+    Order order,
+    List<OrderItem> items,
+    Customer? customer, {
+    String? storeName,
+    String? storeAddress,
+    String? footerMessage,
+  }) async {
+    if (!await isConnected) {
+      // Try to auto-connect if saved
+      final prefs = await SharedPreferences.getInstance();
+      final savedMac = prefs.getString('selected_printer_mac');
+      if (savedMac != null) {
+        final devices = await getBondedDevices();
+        final device = devices.firstWhere(
+          (d) => d.address == savedMac,
+          orElse: () => devices.first,
+        );
+        // ignore: unnecessary_null_comparison
+        if (device != null) {
+          try {
+            await _bluetooth.connect(device);
+          } catch (e) {
+            // ignore
+          }
+        }
+      }
+    }
+
+    if (!await isConnected) return;
+
+    final profile = await CapabilityProfile.load();
+    final generator = Generator(PaperSize.mm58, profile);
+    List<int> bytes = [];
+
+    // Header
+    bytes += generator.reset();
+
+    // Logo
+    try {
+      final ByteData data = await rootBundle.load('assets/logo.png');
+      final Uint8List imgBytes = data.buffer.asUint8List();
+      final img.Image? image = img.decodeImage(imgBytes);
+      if (image != null) {
+        // Resize if needed, thermal printers usually 384 dots width
+        final resized = img.copyResize(image, width: 150);
+        bytes += generator.image(resized);
+        bytes += generator.feed(1);
+      }
+    } catch (e) {
+      // Logo failed, skip
+      // print("Logo print error: $e");
+    }
+
+    bytes += generator.text(
+      storeName ?? 'HANGOUT SPOT',
+      styles: const PosStyles(
+        align: PosAlign.center,
+        height: PosTextSize.size2,
+        width: PosTextSize.size2,
+        bold: true,
+      ),
+    );
+    if (storeAddress != null) {
+      bytes += generator.text(
+        storeAddress,
+        styles: const PosStyles(align: PosAlign.center),
+      );
+    }
+    bytes += generator.feed(1);
+
+    // Bill Details
+    bytes += generator.text(
+      'Bill No: ${order.invoiceNumber}',
+      styles: const PosStyles(bold: true),
+    );
+    final date = DateFormat('dd/MM/yy hh:mm a').format(order.createdAt);
+    bytes += generator.text('Date: $date');
+    if (customer != null) {
+      bytes += generator.text('Customer: ${customer.name}');
+    } else {
+      bytes += generator.text('Bill To: Cash Sale');
+    }
+
+    bytes += generator.hr();
+
+    // Items Header
+    bytes += generator.row([
+      PosColumn(text: 'Item', width: 6, styles: const PosStyles(bold: true)),
+      PosColumn(
+        text: 'Qty',
+        width: 2,
+        styles: const PosStyles(bold: true, align: PosAlign.right),
+      ),
+      PosColumn(
+        text: 'Rate',
+        width: 2,
+        styles: const PosStyles(bold: true, align: PosAlign.right),
+      ),
+      PosColumn(
+        text: 'Total',
+        width: 2,
+        styles: const PosStyles(bold: true, align: PosAlign.right),
+      ),
+    ]);
+    bytes += generator.hr();
+
+    // Items
+    for (var item in items) {
+      // If item name is too long, it might wrap naturally or we can split it
+      // esc_pos_utils_plus usually handles wrapping in columns
+      bytes += generator.row([
+        PosColumn(text: item.itemName, width: 6),
+        PosColumn(
+          text: item.quantity.toString(),
+          width: 2,
+          styles: const PosStyles(align: PosAlign.right),
+        ),
+        PosColumn(
+          text: item.price.toStringAsFixed(0),
+          width: 2,
+          styles: const PosStyles(align: PosAlign.right),
+        ),
+        PosColumn(
+          text: (item.price * item.quantity).toStringAsFixed(0),
+          width: 2,
+          styles: const PosStyles(align: PosAlign.right),
+        ),
+      ]);
+
+      // Print discount if any
+      if (item.discountAmount > 0) {
+        bytes += generator.row([
+          PosColumn(
+            text: '  (Disc)',
+            width: 6,
+            styles: const PosStyles(fontType: PosFontType.fontB),
+          ),
+          PosColumn(text: '', width: 2),
+          PosColumn(text: '', width: 2),
+          PosColumn(
+            text: '-${item.discountAmount.toStringAsFixed(0)}',
+            width: 2,
+            styles: const PosStyles(
+              align: PosAlign.right,
+              fontType: PosFontType.fontB,
+            ),
+          ),
+        ]);
+      }
+    }
+
+    bytes += generator.hr();
+
+    // Totals
+    bytes += generator.row([
+      PosColumn(text: 'Total Qty:', width: 6),
+      PosColumn(
+        text: items.fold<int>(0, (sum, item) => sum + item.quantity).toString(),
+        width: 6,
+        styles: const PosStyles(align: PosAlign.right, bold: true),
+      ),
+    ]);
+
+    bytes += generator.row([
+      PosColumn(text: 'Sub Total:', width: 6),
+      PosColumn(
+        text: order.subtotal.toStringAsFixed(0),
+        width: 6,
+        styles: const PosStyles(align: PosAlign.right, bold: true),
+      ),
+    ]);
+
+    if (order.discountAmount > 0) {
+      bytes += generator.row([
+        PosColumn(text: 'Discount:', width: 6),
+        PosColumn(
+          text: '-${order.discountAmount.toStringAsFixed(0)}',
+          width: 6,
+          styles: const PosStyles(align: PosAlign.right),
+        ),
+      ]);
+    }
+
+    if (order.taxAmount > 0) {
+      bytes += generator.row([
+        PosColumn(text: 'Tax:', width: 6),
+        PosColumn(
+          text: order.taxAmount.toStringAsFixed(0),
+          width: 6,
+          styles: const PosStyles(align: PosAlign.right),
+        ),
+      ]);
+    }
+
+    bytes += generator.row([
+      PosColumn(
+        text: 'Grand Total:',
+        width: 6,
+        styles: const PosStyles(
+          height: PosTextSize.size2,
+          width: PosTextSize.size2,
+          bold: true,
+        ),
+      ),
+      PosColumn(
+        text: order.totalAmount.toStringAsFixed(0),
+        width: 6,
+        styles: const PosStyles(
+          height: PosTextSize.size2,
+          width: PosTextSize.size2,
+          bold: true,
+          align: PosAlign.right,
+        ),
+      ),
+    ]);
+
+    bytes += generator.hr();
+
+    // Payment Mode
+    bytes += generator.text(
+      'Mode: ${order.paymentMode}',
+      styles: const PosStyles(align: PosAlign.center),
+    );
+
+    if (footerMessage != null) {
+      bytes += generator.feed(1);
+      bytes += generator.text(
+        footerMessage,
+        styles: const PosStyles(align: PosAlign.center),
+      );
+    }
+
+    bytes += generator.feed(1);
+    bytes += generator.text(
+      'Thank You! Visit Again!',
+      styles: const PosStyles(align: PosAlign.center, bold: true),
+    );
+    bytes += generator.text(
+      'Powered by BiteBox',
+      styles: const PosStyles(
+        align: PosAlign.center,
+        fontType: PosFontType.fontB,
+      ),
+    );
+
+    bytes += generator.feed(2);
+    bytes += generator.cut();
+
+    await _bluetooth.writeBytes(Uint8List.fromList(bytes));
+  }
+
+  Future<void> printKot(Order order, List<OrderItem> items) async {
+    if (!await isConnected) {
+      // Try to auto-connect if saved
+      final prefs = await SharedPreferences.getInstance();
+      final savedMac = prefs.getString('selected_printer_mac');
+      if (savedMac != null) {
+        final devices = await getBondedDevices();
+        try {
+          final device = devices.firstWhere((d) => d.address == savedMac);
+          await _bluetooth.connect(device);
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+    if (!await isConnected) return;
+
+    final profile = await CapabilityProfile.load();
+    final generator = Generator(PaperSize.mm58, profile);
+    List<int> bytes = [];
+
+    // RESET PRINTER START
+    bytes += generator.reset();
+
+    // Header
+    bytes += generator.text(
+      'KOT',
+      styles: const PosStyles(
+        align: PosAlign.center,
+        height: PosTextSize.size2,
+        width: PosTextSize.size2,
+        bold: true,
+      ),
+    );
+    bytes += generator.text(
+      'Order #${order.invoiceNumber}',
+      styles: const PosStyles(align: PosAlign.center, bold: true),
+    );
+    final date = DateFormat('dd/MM/yy hh:mm a').format(order.createdAt);
+    bytes += generator.text(
+      'Date: $date',
+      styles: const PosStyles(align: PosAlign.center),
+    );
+
+    bytes += generator.hr();
+
+    // Items
+    for (var item in items) {
+      bytes += generator.row([
+        PosColumn(
+          text: '${item.itemName} x ${item.quantity}',
+          width: 12,
+          styles: const PosStyles(
+            height: PosTextSize.size2,
+            width: PosTextSize.size2,
+            bold: true,
+          ),
+        ),
+      ]);
+      if (item.note != null && item.note!.isNotEmpty) {
+        bytes += generator.text('Note: ${item.note}');
+      }
+      bytes += generator.hr();
+    }
+
+    bytes += generator.feed(3); // Feed more lines before cut
+    bytes += generator.cut();
+
+    await _bluetooth.writeBytes(Uint8List.fromList(bytes));
+  }
+}
+
+final thermalPrintingServiceProvider = Provider<ThermalPrintingService>((ref) {
+  return ThermalPrintingService(ref);
+});

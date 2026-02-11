@@ -9,9 +9,7 @@ import 'package:hangout_spot/data/repositories/menu_repository.dart';
 import 'package:hangout_spot/ui/widgets/glass_container.dart';
 import 'package:file_picker/file_picker.dart';
 
-// Local state for Admin Menu Selection
-final adminSelectedCategoryProvider = StateProvider<String?>((ref) => null);
-final menuItemSearchProvider = StateProvider<String>((ref) => '');
+import 'package:hangout_spot/ui/screens/menu/menu_providers.dart';
 
 class ItemListTab extends ConsumerWidget {
   const ItemListTab({super.key});

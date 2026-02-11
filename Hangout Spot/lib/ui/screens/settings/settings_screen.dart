@@ -16,6 +16,7 @@ import 'sections/loyalty_settings.dart';
 import 'sections/promo_settings.dart';
 import 'sections/receipt_settings.dart';
 import 'widgets/settings_shared.dart';
+import 'sections/printer_settings_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -360,6 +361,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         Icons.palette_rounded,
                         "Change app theme",
                         const AppearanceSettingsScreen(),
+                      ),
+
+                      _buildNavTile(
+                        "Printer Settings",
+                        Icons.print_rounded,
+                        "Connect thermal printer",
+                        const PrinterSettingsScreen(),
                       ),
 
                       const SizedBox(height: 48),

@@ -51,37 +51,62 @@ class ShareService {
     ], text: 'Invoice ${order.invoiceNumber} from Hangout Spot');
   }
 
+  String _buildWhatsAppMessage(Order order, Customer? customer) {
+    final name = customer?.name ?? 'Customer';
+    return 'Hi $name, thanks for visiting! Your bill is ready.\n'
+        'Invoice: ${order.invoiceNumber}\n'
+        'Total: ₹${order.totalAmount.toStringAsFixed(2)}';
+  }
+
   Future<void> shareInvoiceWhatsApp(
     Order order,
     List<OrderItem> items,
     Customer? customer,
   ) async {
     final message = _buildWhatsAppMessage(order, customer);
-    final uri = Uri.parse(
-      'whatsapp://send?text=${Uri.encodeComponent(message)}',
-    );
+
+    // Use customer phone if available
+    String url = "whatsapp://send?text=${Uri.encodeComponent(message)}";
+
+    if (customer != null && (customer.phone?.isNotEmpty ?? false)) {
+      // Sanitize phone (remove + if needed, app expects 10 digits usually or full with country code)
+      // Assuming country code 91 if internal, but better to keep as is if user enters it
+      String phone = customer.phone!.replaceAll(RegExp(r'[^0-9]'), '');
+      // If length is 10, prepend 91 for India (common assumption) or just use as is
+      if (phone.length == 10) phone = "91$phone";
+
+      url = "whatsapp://send?phone=$phone&text=${Uri.encodeComponent(message)}";
+    }
+
+    final uri = Uri.parse(url);
 
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
       return;
     }
 
-    final fallback = Uri.parse(
-      'https://wa.me/?text=${Uri.encodeComponent(message)}',
-    );
-    if (await canLaunchUrl(fallback)) {
-      await launchUrl(fallback, mode: LaunchMode.externalApplication);
-      return;
+    // Fallback web url
+    if (customer != null && (customer.phone?.isNotEmpty ?? false)) {
+      String phone = customer.phone!.replaceAll(RegExp(r'[^0-9]'), '');
+      if (phone.length == 10) phone = "91$phone";
+      final fallback = Uri.parse(
+        'https://wa.me/$phone?text=${Uri.encodeComponent(message)}',
+      );
+      if (await canLaunchUrl(fallback)) {
+        await launchUrl(fallback, mode: LaunchMode.externalApplication);
+        return;
+      }
+    } else {
+      final fallback = Uri.parse(
+        'https://wa.me/?text=${Uri.encodeComponent(message)}',
+      );
+      if (await canLaunchUrl(fallback)) {
+        await launchUrl(fallback, mode: LaunchMode.externalApplication);
+        return;
+      }
     }
 
     await shareInvoice(order, items, customer);
-  }
-
-  String _buildWhatsAppMessage(Order order, Customer? customer) {
-    final name = customer?.name ?? 'Customer';
-    return 'Hi $name, thanks for visiting! Your bill is ready.\n'
-        'Invoice: ${order.invoiceNumber}\n'
-        'Total: ₹${order.totalAmount.toStringAsFixed(2)}';
   }
 }
 

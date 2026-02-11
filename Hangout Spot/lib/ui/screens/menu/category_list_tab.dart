@@ -4,7 +4,7 @@ import 'package:drift/drift.dart' as drift;
 import 'package:uuid/uuid.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/data/repositories/menu_repository.dart';
-import 'item_list_tab.dart';
+import 'package:hangout_spot/ui/screens/menu/menu_providers.dart';
 
 class CategoryListTab extends ConsumerWidget {
   const CategoryListTab({super.key});
