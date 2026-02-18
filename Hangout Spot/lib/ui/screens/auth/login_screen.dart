@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/data/repositories/auth_repository.dart';
 import 'package:hangout_spot/ui/screens/main_screen.dart';
+import 'package:hangout_spot/data/repositories/sync_repository.dart';
 import 'package:hangout_spot/ui/screens/auth/forgot_password_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -19,20 +20,50 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _login() async {
     setState(() => _isLoading = true);
     try {
-      await ref.read(authRepositoryProvider).signInWithEmailAndPassword(
+      await ref
+          .read(authRepositoryProvider)
+          .signInWithEmailAndPassword(
             _emailController.text.trim(),
             _passwordController.text.trim(),
           );
-      // Navigation will be handled by the auth state listener in Splash or Main
-      // But for better UX, we might want to navigate explicitly or let the stream handle it.
-      // Here we rely on the StreamBuilder in the root or Splash to redirect, 
-      // BUT Splash is usually one-off. 
-      // So effectively, after login, we should probably PushReplacement to Dashboard
-      // OR have a Root generic widget that switches.
+
       if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const MainScreen()),
+        // Show Restoring Dialog
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (c) => const Center(
+            child: Card(
+              child: Padding(
+                padding: EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text("Restoring Cloud Data..."),
+                  ],
+                ),
+              ),
+            ),
+          ),
         );
+
+        // Perform Restore
+        try {
+          await ref.read(syncRepositoryProvider).restoreData();
+        } catch (e) {
+          debugPrint("Restore failed (might be fresh user): $e");
+          // Choose to continue even if restore fails?
+          // Yes, because it might be a new user with no data.
+        }
+
+        if (mounted) {
+          Navigator.pop(context); // Hide Dialog
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const MainScreen()),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -93,7 +124,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
               TextButton(
                 onPressed: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()));
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ForgotPasswordScreen(),
+                    ),
+                  );
                 },
                 child: const Text('Forgot Password?'),
               ),

@@ -7,6 +7,7 @@ import 'package:hangout_spot/logic/billing/session_provider.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/data/repositories/auth_repository.dart';
 import 'package:intl/intl.dart';
+import 'package:hangout_spot/logic/locations/location_provider.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -77,6 +78,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final userName =
         user?.displayName ?? user?.email?.split('@').first ?? 'Admin';
     final sessionManager = ref.watch(sessionManagerProvider);
+
+    // Watch location
+    final currentLocationAsync = ref.watch(currentLocationIdProvider);
+    final currentLocationId = currentLocationAsync.value;
+
     // Calculate start and end of selected day for analytics
     final startOfDay = DateTime(
       _selectedDate.year,
@@ -119,6 +125,89 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         iconTheme: IconThemeData(color: coffeeDark),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: coffee.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.store_mall_directory_rounded,
+                color: coffee,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    "Hangout Spot",
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: coffeeDark,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  Consumer(
+                    builder: (context, ref, child) {
+                      final locationsAsync = ref.watch(locationsStreamProvider);
+                      final currentIdAsync = ref.watch(
+                        currentLocationIdProvider,
+                      );
+
+                      return locationsAsync.when(
+                        data: (locations) {
+                          final currentId = currentIdAsync.valueOrNull;
+                          final location = locations.firstWhere(
+                            (l) => l.id == currentId,
+                            orElse: () => locations.isNotEmpty
+                                ? locations.first
+                                : Location(
+                                    id: '',
+                                    name: '',
+                                    address: '',
+                                    phoneNumber: '',
+                                    isActive: true,
+                                    createdAt: DateTime.now(),
+                                  ),
+                          );
+
+                          // Use address if available, falling back to name
+                          String subtitle = (location.address ?? '').isNotEmpty
+                              ? location.address!
+                              : location.name;
+                          if (subtitle.isEmpty) subtitle = location.name;
+
+                          return Text(
+                            subtitle,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: coffeeDark.withOpacity(0.7),
+                              fontWeight: FontWeight.w500,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          );
+                        },
+                        loading: () => const SizedBox(
+                          height: 10,
+                          width: 50,
+                          child: LinearProgressIndicator(minHeight: 2),
+                        ),
+                        error: (_, __) => const SizedBox.shrink(),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
@@ -235,6 +324,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               future: analytics.getSessionSales(
                                 startOfDay,
                                 endOfDay,
+                                locationId: currentLocationId,
                               ),
                               builder: (context, snapshot) => _StatCard(
                                 title: "Total Sales",
@@ -255,6 +345,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               future: analytics.getSessionOrdersCount(
                                 startOfDay,
                                 endOfDay,
+                                locationId: currentLocationId,
                               ),
                               builder: (context, snapshot) => _StatCard(
                                 title: "Orders",
@@ -274,6 +365,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               future: analytics.getSessionItemsSold(
                                 startOfDay,
                                 endOfDay,
+                                locationId: currentLocationId,
                               ),
                               builder: (context, snapshot) => _StatCard(
                                 title: "Items Sold",
@@ -293,6 +385,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               future: analytics.getSessionUniqueCustomersCount(
                                 startOfDay,
                                 endOfDay,
+                                locationId: currentLocationId,
                               ),
                               builder: (context, snapshot) => _StatCard(
                                 title: "Customers",

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/logic/rewards/reward_provider.dart';
 import '../../../../utils/constants/app_keys.dart';
 import '../widgets/settings_shared.dart';
+import 'package:hangout_spot/ui/widgets/trust_gate.dart';
 
 class LoyaltySettingsScreen extends ConsumerStatefulWidget {
   const LoyaltySettingsScreen({super.key});
@@ -70,18 +71,27 @@ class _LoyaltySettingsScreenState extends ConsumerState<LoyaltySettingsScreen> {
 
                     return Column(
                       children: [
-                        SwitchListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('Enable Reward System'),
-                          subtitle: const Text('Earn points per purchase'),
-                          value: isEnabled,
-                          onChanged: (value) async {
-                            await ref
-                                .read(rewardNotifierProvider.notifier)
-                                .setRewardSystemEnabled(value);
-                            ref.invalidate(rewardSettingsProvider);
-                            ref.invalidate(isRewardSystemEnabledProvider);
-                          },
+                        TrustedDeviceGate(
+                          fallback: SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Enable Reward System'),
+                            subtitle: const Text('Earn points per purchase'),
+                            value: isEnabled,
+                            onChanged: null, // Disabled for untrusted
+                          ),
+                          child: SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Enable Reward System'),
+                            subtitle: const Text('Earn points per purchase'),
+                            value: isEnabled,
+                            onChanged: (value) async {
+                              await ref
+                                  .read(rewardNotifierProvider.notifier)
+                                  .setRewardSystemEnabled(value);
+                              ref.invalidate(rewardSettingsProvider);
+                              ref.invalidate(isRewardSystemEnabledProvider);
+                            },
+                          ),
                         ),
                         if (isEnabled) ...[
                           const SizedBox(height: 12),
@@ -108,66 +118,78 @@ class _LoyaltySettingsScreenState extends ConsumerState<LoyaltySettingsScreen> {
                             ],
                           ),
                           const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: SettingsTextField(
-                                  controller: _earningRateController,
-                                  label: "Earning %",
-                                  icon: Icons.percent,
-                                  inputType:
-                                      const TextInputType.numberWithOptions(
-                                        decimal: true,
+                          TrustedDeviceGate(
+                            child: Column(
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: SettingsTextField(
+                                        controller: _earningRateController,
+                                        label: "Earning %",
+                                        icon: Icons.percent,
+                                        inputType:
+                                            const TextInputType.numberWithOptions(
+                                              decimal: true,
+                                            ),
                                       ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: SettingsTextField(
-                                  controller: _redemptionRateController,
-                                  label: "₹ Value/Pt",
-                                  icon: Icons.currency_rupee,
-                                  inputType:
-                                      const TextInputType.numberWithOptions(
-                                        decimal: true,
-                                      ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: SettingsActionBtn(
-                              label: "Save Rates",
-                              onPressed: () async {
-                                final earningPercent =
-                                    double.tryParse(
-                                      _earningRateController.text,
-                                    ) ??
-                                    (earningRate * 100);
-                                final redemption =
-                                    double.tryParse(
-                                      _redemptionRateController.text,
-                                    ) ??
-                                    redemptionRate;
-
-                                await ref
-                                    .read(rewardNotifierProvider.notifier)
-                                    .setRewardEarningRate(earningPercent / 100);
-                                await ref
-                                    .read(rewardNotifierProvider.notifier)
-                                    .setRedemptionRate(redemption);
-
-                                ref.invalidate(rewardSettingsProvider);
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Reward rates updated'),
                                     ),
-                                  );
-                                }
-                              },
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: SettingsTextField(
+                                        controller: _redemptionRateController,
+                                        label: "₹ Value/Pt",
+                                        icon: Icons.currency_rupee,
+                                        inputType:
+                                            const TextInputType.numberWithOptions(
+                                              decimal: true,
+                                            ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: SettingsActionBtn(
+                                    label: "Save Rates",
+                                    onPressed: () async {
+                                      final earningPercent =
+                                          double.tryParse(
+                                            _earningRateController.text,
+                                          ) ??
+                                          (earningRate * 100);
+                                      final redemption =
+                                          double.tryParse(
+                                            _redemptionRateController.text,
+                                          ) ??
+                                          redemptionRate;
+
+                                      await ref
+                                          .read(rewardNotifierProvider.notifier)
+                                          .setRewardEarningRate(
+                                            earningPercent / 100,
+                                          );
+                                      await ref
+                                          .read(rewardNotifierProvider.notifier)
+                                          .setRedemptionRate(redemption);
+
+                                      ref.invalidate(rewardSettingsProvider);
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Reward rates updated',
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    },
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],

@@ -7,7 +7,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:hangout_spot/data/repositories/auth_repository.dart';
 
-import 'package:hangout_spot/ui/screens/auth/login_screen.dart';
 import 'package:hangout_spot/utils/constants/app_keys.dart';
 import 'sections/appearance_settings.dart';
 import 'sections/backup_settings.dart';
@@ -15,6 +14,7 @@ import 'sections/locations_settings.dart';
 import 'sections/loyalty_settings.dart';
 import 'sections/promo_settings.dart';
 import 'sections/receipt_settings.dart';
+import 'active_sessions_screen.dart';
 import 'widgets/settings_shared.dart';
 import 'sections/printer_settings_screen.dart';
 
@@ -293,43 +293,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                ref.read(authRepositoryProvider).signOut();
-                                Navigator.of(context).pushAndRemoveUntil(
-                                  MaterialPageRoute(
-                                    builder: (_) => const LoginScreen(),
-                                  ),
-                                  (route) => false,
-                                );
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red.withOpacity(0.1),
-                                foregroundColor: Colors.redAccent,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 16,
-                                ),
-                                elevation: 0,
-                                side: BorderSide(
-                                  color: Colors.redAccent.withOpacity(0.5),
-                                ),
-                              ),
-                              icon: const Icon(Icons.logout_rounded, size: 20),
-                              label: const Text("Logout"),
-                            ),
-                          ),
                         ],
                       ),
                       const SizedBox(height: 24),
 
                       // Navigation Items
                       _buildNavTile(
-                        "Locations",
+                        "Outlets",
                         Icons.place_rounded,
-                        "Manage store locations",
+                        "Manage store outlets",
                         const LocationsSettingsScreen(),
                       ),
                       _buildNavTile(
@@ -355,6 +327,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         Icons.cloud_sync_rounded,
                         "Sync data and restore",
                         const BackupSettingsScreen(),
+                      ),
+                      _buildNavTile(
+                        "Active Devices",
+                        Icons.devices,
+                        "Manage logged-in devices",
+                        const ActiveSessionsScreen(),
                       ),
                       _buildNavTile(
                         "Appearance",

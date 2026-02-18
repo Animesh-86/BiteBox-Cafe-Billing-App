@@ -8,7 +8,7 @@ class AnalyticsRepository {
 
   AnalyticsRepository(this._db);
 
-  Future<double> getTodaySales() async {
+  Future<double> getTodaySales({String? locationId}) async {
     final now = DateTime.now();
     final startOfDay = DateTime(now.year, now.month, now.day);
 
@@ -17,22 +17,34 @@ class AnalyticsRepository {
       ..where(_db.orders.createdAt.isBiggerOrEqualValue(startOfDay))
       ..where(_db.orders.status.equals('completed'));
 
+    if (locationId != null) {
+      query.where(_db.orders.locationId.equals(locationId));
+    }
+
     final result = await query.getSingle();
     return result.read(_db.orders.totalAmount.sum()) ?? 0.0;
   }
 
-  Future<double> getSessionSales(DateTime start, DateTime end) async {
+  Future<double> getSessionSales(
+    DateTime start,
+    DateTime end, {
+    String? locationId,
+  }) async {
     final query = _db.selectOnly(_db.orders)
       ..addColumns([_db.orders.totalAmount.sum()])
       ..where(_db.orders.createdAt.isBiggerOrEqualValue(start))
       ..where(_db.orders.createdAt.isSmallerThanValue(end))
       ..where(_db.orders.status.equals('completed'));
 
+    if (locationId != null) {
+      query.where(_db.orders.locationId.equals(locationId));
+    }
+
     final result = await query.getSingle();
     return result.read(_db.orders.totalAmount.sum()) ?? 0.0;
   }
 
-  Future<int> getTodayOrdersCount() async {
+  Future<int> getTodayOrdersCount({String? locationId}) async {
     final now = DateTime.now();
     final startOfDay = DateTime(now.year, now.month, now.day);
 
@@ -41,22 +53,34 @@ class AnalyticsRepository {
       ..where(_db.orders.createdAt.isBiggerOrEqualValue(startOfDay))
       ..where(_db.orders.status.equals('completed'));
 
+    if (locationId != null) {
+      query.where(_db.orders.locationId.equals(locationId));
+    }
+
     final result = await query.getSingle();
     return result.read(_db.orders.id.count()) ?? 0;
   }
 
-  Future<int> getSessionOrdersCount(DateTime start, DateTime end) async {
+  Future<int> getSessionOrdersCount(
+    DateTime start,
+    DateTime end, {
+    String? locationId,
+  }) async {
     final query = _db.selectOnly(_db.orders)
       ..addColumns([_db.orders.id.count()])
       ..where(_db.orders.createdAt.isBiggerOrEqualValue(start))
       ..where(_db.orders.createdAt.isSmallerThanValue(end))
       ..where(_db.orders.status.equals('completed'));
 
+    if (locationId != null) {
+      query.where(_db.orders.locationId.equals(locationId));
+    }
+
     final result = await query.getSingle();
     return result.read(_db.orders.id.count()) ?? 0;
   }
 
-  Future<int> getTotalItemsSold() async {
+  Future<int> getTotalItemsSold({String? locationId}) async {
     final query =
         _db.selectOnly(_db.orderItems).join([
             innerJoin(
@@ -67,11 +91,19 @@ class AnalyticsRepository {
           ..addColumns([_db.orderItems.quantity.sum()])
           ..where(_db.orders.status.equals('completed'));
 
+    if (locationId != null) {
+      query.where(_db.orders.locationId.equals(locationId));
+    }
+
     final result = await query.getSingle();
     return result.read(_db.orderItems.quantity.sum()) ?? 0;
   }
 
-  Future<int> getSessionItemsSold(DateTime start, DateTime end) async {
+  Future<int> getSessionItemsSold(
+    DateTime start,
+    DateTime end, {
+    String? locationId,
+  }) async {
     final query =
         _db.selectOnly(_db.orderItems).join([
             innerJoin(
@@ -84,11 +116,15 @@ class AnalyticsRepository {
           ..where(_db.orders.createdAt.isSmallerThanValue(end))
           ..where(_db.orders.status.equals('completed'));
 
+    if (locationId != null) {
+      query.where(_db.orders.locationId.equals(locationId));
+    }
+
     final result = await query.getSingle();
     return result.read(_db.orderItems.quantity.sum()) ?? 0;
   }
 
-  Future<int> getUniqueCustomersCount() async {
+  Future<int> getUniqueCustomersCount({String? locationId}) async {
     final now = DateTime.now();
     final startOfDay = DateTime(now.year, now.month, now.day);
 
@@ -98,6 +134,10 @@ class AnalyticsRepository {
       ..where(_db.orders.status.equals('completed'))
       ..where(_db.orders.customerId.isNotNull());
 
+    if (locationId != null) {
+      namedQuery.where(_db.orders.locationId.equals(locationId));
+    }
+
     final namedResult = await namedQuery.getSingle();
     final namedCount =
         namedResult.read(_db.orders.customerId.count(distinct: true)) ?? 0;
@@ -108,6 +148,10 @@ class AnalyticsRepository {
       ..where(_db.orders.status.equals('completed'))
       ..where(_db.orders.customerId.isNull());
 
+    if (locationId != null) {
+      walkInQuery.where(_db.orders.locationId.equals(locationId));
+    }
+
     final walkInResult = await walkInQuery.getSingle();
     final walkInCount = walkInResult.read(_db.orders.id.count()) ?? 0;
 
@@ -116,14 +160,19 @@ class AnalyticsRepository {
 
   Future<int> getSessionUniqueCustomersCount(
     DateTime start,
-    DateTime end,
-  ) async {
+    DateTime end, {
+    String? locationId,
+  }) async {
     final namedQuery = _db.selectOnly(_db.orders)
       ..addColumns([_db.orders.customerId.count(distinct: true)])
       ..where(_db.orders.createdAt.isBiggerOrEqualValue(start))
       ..where(_db.orders.createdAt.isSmallerThanValue(end))
       ..where(_db.orders.status.equals('completed'))
       ..where(_db.orders.customerId.isNotNull());
+
+    if (locationId != null) {
+      namedQuery.where(_db.orders.locationId.equals(locationId));
+    }
 
     final namedResult = await namedQuery.getSingle();
     final namedCount =
@@ -136,13 +185,19 @@ class AnalyticsRepository {
       ..where(_db.orders.status.equals('completed'))
       ..where(_db.orders.customerId.isNull());
 
+    if (locationId != null) {
+      walkInQuery.where(_db.orders.locationId.equals(locationId));
+    }
+
     final walkInResult = await walkInQuery.getSingle();
     final walkInCount = walkInResult.read(_db.orders.id.count()) ?? 0;
 
     return namedCount + walkInCount;
   }
 
-  Future<List<MapEntry<String, double>>> getTopSellingItems() async {
+  Future<List<MapEntry<String, double>>> getTopSellingItems({
+    String? locationId,
+  }) async {
     final query = _db.selectOnly(_db.orderItems)
       ..addColumns([_db.orderItems.itemName, _db.orderItems.quantity.sum()])
       ..groupBy([_db.orderItems.itemName])
@@ -153,6 +208,14 @@ class AnalyticsRepository {
         ),
       ])
       ..limit(5);
+
+    if (locationId != null) {
+      // Join with orders to filter by location
+      query.join([
+        innerJoin(_db.orders, _db.orders.id.equalsExp(_db.orderItems.orderId)),
+      ]);
+      query.where(_db.orders.locationId.equals(locationId));
+    }
 
     final result = await query.get();
 
@@ -195,12 +258,20 @@ class AnalyticsRepository {
     return await query.getSingleOrNull();
   }
 
-  Future<double> getAverageOrderValue(DateTime start, DateTime end) async {
+  Future<double> getAverageOrderValue(
+    DateTime start,
+    DateTime end, {
+    String? locationId,
+  }) async {
     final query = _db.selectOnly(_db.orders)
       ..addColumns([_db.orders.totalAmount.sum(), _db.orders.id.count()])
       ..where(_db.orders.createdAt.isBiggerOrEqualValue(start))
       ..where(_db.orders.createdAt.isSmallerThanValue(end))
       ..where(_db.orders.status.equals('completed'));
+
+    if (locationId != null) {
+      query.where(_db.orders.locationId.equals(locationId));
+    }
 
     final result = await query.getSingle();
     final sum = result.read(_db.orders.totalAmount.sum()) ?? 0.0;
@@ -209,12 +280,20 @@ class AnalyticsRepository {
     return sum / count;
   }
 
-  Future<double> getAverageDailySales(DateTime start, DateTime end) async {
+  Future<double> getAverageDailySales(
+    DateTime start,
+    DateTime end, {
+    String? locationId,
+  }) async {
     final query = _db.selectOnly(_db.orders)
       ..addColumns([_db.orders.totalAmount.sum()])
       ..where(_db.orders.createdAt.isBiggerOrEqualValue(start))
       ..where(_db.orders.createdAt.isSmallerThanValue(end))
       ..where(_db.orders.status.equals('completed'));
+
+    if (locationId != null) {
+      query.where(_db.orders.locationId.equals(locationId));
+    }
 
     final result = await query.getSingle();
     final sum = result.read(_db.orders.totalAmount.sum()) ?? 0.0;
@@ -225,18 +304,29 @@ class AnalyticsRepository {
 
   Future<Map<String, int>> getCustomerSegments(
     DateTime start,
-    DateTime end,
-  ) async {
+    DateTime end, {
+    String? locationId,
+  }) async {
+    String sql =
+        "SELECT customer_id as customerId, COUNT(*) as orderCount "
+        "FROM orders "
+        "WHERE status = 'completed' AND customer_id IS NOT NULL "
+        "AND created_at >= ? AND created_at < ? ";
+
+    final variables = <Variable>[
+      Variable.withDateTime(start),
+      Variable.withDateTime(end),
+    ];
+
+    if (locationId != null) {
+      sql += "AND location_id = ? ";
+      variables.add(Variable.withString(locationId));
+    }
+
+    sql += "GROUP BY customer_id";
+
     final rows = await _db
-        .customSelect(
-          "SELECT customer_id as customerId, COUNT(*) as orderCount "
-          "FROM orders "
-          "WHERE status = 'completed' AND customer_id IS NOT NULL "
-          "AND created_at >= ? AND created_at < ? "
-          "GROUP BY customer_id",
-          variables: [Variable.withDateTime(start), Variable.withDateTime(end)],
-          readsFrom: {_db.orders},
-        )
+        .customSelect(sql, variables: variables, readsFrom: {_db.orders})
         .get();
 
     int newCustomers = 0;
@@ -257,8 +347,16 @@ class AnalyticsRepository {
     };
   }
 
-  Future<double> getRepeatCustomerRate(DateTime start, DateTime end) async {
-    final segments = await getCustomerSegments(start, end);
+  Future<double> getRepeatCustomerRate(
+    DateTime start,
+    DateTime end, {
+    String? locationId,
+  }) async {
+    final segments = await getCustomerSegments(
+      start,
+      end,
+      locationId: locationId,
+    );
     final total = segments['total'] ?? 0;
     if (total == 0) return 0.0;
     return (segments['returning'] ?? 0) / total;
@@ -266,8 +364,9 @@ class AnalyticsRepository {
 
   Future<Map<String, double>> getDiscountImpact(
     DateTime start,
-    DateTime end,
-  ) async {
+    DateTime end, {
+    String? locationId,
+  }) async {
     final discountedQuery = _db.selectOnly(_db.orders)
       ..addColumns([_db.orders.totalAmount.sum(), _db.orders.id.count()])
       ..where(_db.orders.createdAt.isBiggerOrEqualValue(start))
@@ -281,6 +380,11 @@ class AnalyticsRepository {
       ..where(_db.orders.createdAt.isSmallerThanValue(end))
       ..where(_db.orders.status.equals('completed'))
       ..where(_db.orders.discountAmount.equals(0));
+
+    if (locationId != null) {
+      discountedQuery.where(_db.orders.locationId.equals(locationId));
+      nonDiscountedQuery.where(_db.orders.locationId.equals(locationId));
+    }
 
     final discounted = await discountedQuery.getSingle();
     final nonDiscounted = await nonDiscountedQuery.getSingle();
@@ -306,13 +410,18 @@ class AnalyticsRepository {
 
   Future<List<MapEntry<int, double>>> getPeakHours(
     DateTime start,
-    DateTime end,
-  ) async {
+    DateTime end, {
+    String? locationId,
+  }) async {
     final query = _db.selectOnly(_db.orders)
       ..addColumns([_db.orders.createdAt])
       ..where(_db.orders.status.equals('completed'))
       ..where(_db.orders.createdAt.isBiggerOrEqualValue(start))
       ..where(_db.orders.createdAt.isSmallerThanValue(end));
+
+    if (locationId != null) {
+      query.where(_db.orders.locationId.equals(locationId));
+    }
 
     final rows = await query.get();
 
@@ -336,17 +445,33 @@ class AnalyticsRepository {
     DateTime start,
     DateTime end, {
     int limit = 5,
+    String? locationId,
   }) async {
+    String sql =
+        "SELECT oi.item_name as name, SUM(oi.quantity) as qty "
+        "FROM order_items oi "
+        "INNER JOIN orders o ON o.id = oi.order_id "
+        "WHERE o.status = 'completed' AND o.created_at >= ? AND o.created_at < ? ";
+
+    final variables = <Variable>[
+      Variable.withDateTime(start),
+      Variable.withDateTime(end),
+    ];
+
+    if (locationId != null) {
+      sql += "AND o.location_id = ? ";
+      variables.add(Variable.withString(locationId));
+    }
+
+    sql +=
+        "GROUP BY oi.item_name "
+        "ORDER BY qty DESC "
+        "LIMIT $limit";
+
     final rows = await _db
         .customSelect(
-          "SELECT oi.item_name as name, SUM(oi.quantity) as qty "
-          "FROM order_items oi "
-          "INNER JOIN orders o ON o.id = oi.order_id "
-          "WHERE o.status = 'completed' AND o.created_at >= ? AND o.created_at < ? "
-          "GROUP BY oi.item_name "
-          "ORDER BY qty DESC "
-          "LIMIT $limit",
-          variables: [Variable.withDateTime(start), Variable.withDateTime(end)],
+          sql,
+          variables: variables,
           readsFrom: {_db.orderItems, _db.orders},
         )
         .get();
@@ -362,17 +487,33 @@ class AnalyticsRepository {
     DateTime start,
     DateTime end, {
     int limit = 5,
+    String? locationId,
   }) async {
+    String sql =
+        "SELECT oi.item_name as name, SUM(oi.quantity) as qty "
+        "FROM order_items oi "
+        "INNER JOIN orders o ON o.id = oi.order_id "
+        "WHERE o.status = 'completed' AND o.created_at >= ? AND o.created_at < ? ";
+
+    final variables = <Variable>[
+      Variable.withDateTime(start),
+      Variable.withDateTime(end),
+    ];
+
+    if (locationId != null) {
+      sql += "AND o.location_id = ? ";
+      variables.add(Variable.withString(locationId));
+    }
+
+    sql +=
+        "GROUP BY oi.item_name "
+        "ORDER BY qty ASC "
+        "LIMIT $limit";
+
     final rows = await _db
         .customSelect(
-          "SELECT oi.item_name as name, SUM(oi.quantity) as qty "
-          "FROM order_items oi "
-          "INNER JOIN orders o ON o.id = oi.order_id "
-          "WHERE o.status = 'completed' AND o.created_at >= ? AND o.created_at < ? "
-          "GROUP BY oi.item_name "
-          "ORDER BY qty ASC "
-          "LIMIT $limit",
-          variables: [Variable.withDateTime(start), Variable.withDateTime(end)],
+          sql,
+          variables: variables,
           readsFrom: {_db.orderItems, _db.orders},
         )
         .get();
@@ -388,12 +529,11 @@ class AnalyticsRepository {
     DateTime start,
     DateTime end, {
     int limit = 10,
+    String? locationId,
   }) async {
-    // Determine the number of days in the range
     final days = end.difference(start).inDays + 1;
     if (days <= 0) return [];
 
-    // Query raw data: Item Name, CreatedAt, Quantity
     final query =
         _db.selectOnly(_db.orderItems).join([
             innerJoin(
@@ -410,15 +550,11 @@ class AnalyticsRepository {
           ..where(_db.orders.createdAt.isBiggerOrEqualValue(start))
           ..where(_db.orders.createdAt.isSmallerThanValue(end));
 
-    final rows = await query.get();
+    if (locationId != null) {
+      query.where(_db.orders.locationId.equals(locationId));
+    }
 
-    // Group by (Item Name) -> Total Quantity
-    // Note: The original logic aggregated by (Item, Date) then created a per-item total?
-    // Original query: GROUP BY oi.item_name, date(o.created_at)
-    // Then iterated rows to sum qty for item name.
-    // Effectively, it summed specific quantites for each day, then summed those totals.
-    // This is mathematically equivalent to SUM(quantity) for the item across the whole period.
-    // So we can just sum by itemName.
+    final rows = await query.get();
 
     final itemTotals = <String, double>{};
     for (final row in rows) {
@@ -427,7 +563,6 @@ class AnalyticsRepository {
       itemTotals[name] = (itemTotals[name] ?? 0) + qty;
     }
 
-    // Calculate daily average
     final forecast = itemTotals.entries
         .map((e) => MapEntry(e.key, e.value / days))
         .toList();
@@ -440,14 +575,28 @@ class AnalyticsRepository {
     DateTime start,
     DateTime end, {
     int limit = 5,
+    String? locationId,
   }) async {
+    String sql =
+        "SELECT oi.order_id as orderId, oi.item_name as name "
+        "FROM order_items oi "
+        "INNER JOIN orders o ON o.id = oi.order_id "
+        "WHERE o.status = 'completed' AND o.created_at >= ? AND o.created_at < ?";
+
+    final variables = <Variable>[
+      Variable.withDateTime(start),
+      Variable.withDateTime(end),
+    ];
+
+    if (locationId != null) {
+      sql += "AND o.location_id = ? ";
+      variables.add(Variable.withString(locationId));
+    }
+
     final rows = await _db
         .customSelect(
-          "SELECT oi.order_id as orderId, oi.item_name as name "
-          "FROM order_items oi "
-          "INNER JOIN orders o ON o.id = oi.order_id "
-          "WHERE o.status = 'completed' AND o.created_at >= ? AND o.created_at < ?",
-          variables: [Variable.withDateTime(start), Variable.withDateTime(end)],
+          sql,
+          variables: variables,
           readsFrom: {_db.orderItems, _db.orders},
         )
         .get();
@@ -478,13 +627,18 @@ class AnalyticsRepository {
 
   Future<List<MapEntry<DateTime, double>>> getDailySales(
     DateTime start,
-    DateTime end,
-  ) async {
+    DateTime end, {
+    String? locationId,
+  }) async {
     final query = _db.selectOnly(_db.orders)
       ..addColumns([_db.orders.createdAt, _db.orders.totalAmount])
       ..where(_db.orders.status.equals('completed'))
       ..where(_db.orders.createdAt.isBiggerOrEqualValue(start))
       ..where(_db.orders.createdAt.isSmallerThanValue(end));
+
+    if (locationId != null) {
+      query.where(_db.orders.locationId.equals(locationId));
+    }
 
     final rows = await query.get();
 
@@ -494,7 +648,6 @@ class AnalyticsRepository {
       final date = row.read(_db.orders.createdAt);
       final total = row.read(_db.orders.totalAmount) ?? 0.0;
       if (date != null) {
-        // Strip time component to group by day
         final day = DateTime(date.year, date.month, date.day);
         salesByDay[day] = (salesByDay[day] ?? 0) + total;
       }
@@ -510,16 +663,32 @@ class AnalyticsRepository {
     DateTime start,
     DateTime end, {
     int limit = 5,
+    String? locationId,
   }) async {
+    String sql =
+        "SELECT oi.item_name as name, SUM(oi.quantity) as qty "
+        "FROM order_items oi "
+        "INNER JOIN orders o ON o.id = oi.order_id "
+        "WHERE o.status = 'completed' AND o.created_at >= ? AND o.created_at < ? ";
+
+    final variables = <Variable>[
+      Variable.withDateTime(start),
+      Variable.withDateTime(end),
+    ];
+
+    if (locationId != null) {
+      sql += "AND o.location_id = ? ";
+      variables.add(Variable.withString(locationId));
+    }
+
+    sql +=
+        "GROUP BY oi.item_name "
+        "ORDER BY qty DESC";
+
     final rows = await _db
         .customSelect(
-          "SELECT oi.item_name as name, SUM(oi.quantity) as qty "
-          "FROM order_items oi "
-          "INNER JOIN orders o ON o.id = oi.order_id "
-          "WHERE o.status = 'completed' AND o.created_at >= ? AND o.created_at < ? "
-          "GROUP BY oi.item_name "
-          "ORDER BY qty DESC",
-          variables: [Variable.withDateTime(start), Variable.withDateTime(end)],
+          sql,
+          variables: variables,
           readsFrom: {_db.orderItems, _db.orders},
         )
         .get();
@@ -538,9 +707,14 @@ class AnalyticsRepository {
     }).toList();
   }
 
-  Future<String?> getSalesAnomalyNote(DateTime start, DateTime end) async {
-    final todaySales = await getTodaySales();
-    final avg = await getAverageDailySales(start, end);
+  Future<String?> getSalesAnomalyNote(
+    DateTime start,
+    DateTime end, {
+    String? locationId,
+  }) async {
+    // These methods already accept locationId, so we just pass it through
+    final todaySales = await getTodaySales(locationId: locationId);
+    final avg = await getAverageDailySales(start, end, locationId: locationId);
     if (avg <= 0) return null;
     if (todaySales < avg * 0.7) {
       return 'Sales are below the recent average.';

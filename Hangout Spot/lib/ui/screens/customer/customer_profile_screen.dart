@@ -13,7 +13,7 @@ class CustomerProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final locationId = ref.watch(currentLocationIdProvider).valueOrNull;
-    final ordersStream = ref
+    final Stream<List<Order>> ordersStream = ref
         .watch(orderRepositoryProvider)
         .watchOrdersByCustomer(customer.id, locationId: locationId);
     final theme = Theme.of(context);

@@ -24,7 +24,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   void initState() {
     super.initState();
     _initializeVideo();
-    _seedData(); // Initialize seeding in background
+    // Defer _seedData() to after first frame to avoid ref.read() in initState
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _seedData();
+    });
     // Safety timeout: 4 seconds max for splash
     _timeoutTimer = Timer(const Duration(seconds: 4), () {
       _navigateAway();
@@ -82,8 +85,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         await authRepo.signInAnonymously();
         user = authRepo.currentUser;
       } catch (e) {
-        debugPrint("Anonymous sign-in failed: $e");
-        // Even if anonymous sign-in fails, still go to MainScreen
+        debugPrint("Anonymous sign-in failed (Provider likely disabled): $e");
+        // GRACEFUL FAIL: Proceed to MainScreen anyway.
+        // The app can function in 'offline' mode or prompt for login later.
       }
     }
 

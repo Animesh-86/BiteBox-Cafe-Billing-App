@@ -16,6 +16,7 @@ import 'package:hangout_spot/ui/screens/menu/menu_providers.dart';
 import 'widgets/menu_categories_row.dart';
 import 'dialogs/category_dialogs.dart';
 import 'dialogs/item_dialogs.dart';
+import 'package:hangout_spot/ui/widgets/trust_gate.dart';
 
 class ManageMenuScreen extends ConsumerWidget {
   const ManageMenuScreen({super.key});
@@ -106,45 +107,53 @@ class ManageMenuScreen extends ConsumerWidget {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    TextButton.icon(
-                      onPressed: () {
-                        showEditCategorySelectDialog(context, ref);
-                      },
-                      icon: Icon(Icons.edit_outlined, size: 16, color: coffee),
-                      label: Text(
-                        'Edit',
-                        style: TextStyle(color: coffee, fontSize: 12),
-                      ),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
+                    TrustedDeviceGate(
+                      child: TextButton.icon(
+                        onPressed: () {
+                          showEditCategorySelectDialog(context, ref);
+                        },
+                        icon: Icon(
+                          Icons.edit_outlined,
+                          size: 16,
+                          color: coffee,
                         ),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        label: Text(
+                          'Edit',
+                          style: TextStyle(color: coffee, fontSize: 12),
+                        ),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 4),
-                    TextButton.icon(
-                      onPressed: () {
-                        showAddCategoryDialog(context, ref);
-                      },
-                      icon: Icon(
-                        Icons.add_circle_outline,
-                        size: 16,
-                        color: coffee,
-                      ),
-                      label: Text(
-                        'New',
-                        style: TextStyle(color: coffee, fontSize: 12),
-                      ),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
+                    TrustedDeviceGate(
+                      child: TextButton.icon(
+                        onPressed: () {
+                          showAddCategoryDialog(context, ref);
+                        },
+                        icon: Icon(
+                          Icons.add_circle_outline,
+                          size: 16,
+                          color: coffee,
                         ),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        label: Text(
+                          'New',
+                          style: TextStyle(color: coffee, fontSize: 12),
+                        ),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
                       ),
                     ),
                   ],
@@ -213,19 +222,21 @@ class ManageMenuScreen extends ConsumerWidget {
       // Floating Action Button at bottom
       floatingActionButton: Container(
         margin: const EdgeInsets.only(bottom: 12),
-        child: FloatingActionButton.extended(
-          onPressed: () {
-            showSmartAddItemDialog(context, ref, selectedCat);
-          },
-          icon: const Icon(Icons.add_rounded, size: 20),
-          label: Text(
-            selectedCat == null || selectedCat == 'all'
-                ? 'Add Item'
-                : 'Add to ${_getCategoryName(ref, selectedCat)}',
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+        child: TrustedDeviceGate(
+          child: FloatingActionButton.extended(
+            onPressed: () {
+              showSmartAddItemDialog(context, ref, selectedCat);
+            },
+            icon: const Icon(Icons.add_rounded, size: 20),
+            label: Text(
+              selectedCat == null || selectedCat == 'all'
+                  ? 'Add Item'
+                  : 'Add to ${_getCategoryName(ref, selectedCat)}',
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+            backgroundColor: theme.colorScheme.primary,
+            elevation: 6,
           ),
-          backgroundColor: theme.colorScheme.primary,
-          elevation: 6,
         ),
       ),
     );

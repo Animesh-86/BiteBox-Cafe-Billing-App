@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,21 +8,29 @@ import 'package:hangout_spot/ui/screens/splash_screen.dart';
 import 'package:hangout_spot/data/providers/theme_provider.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  runZonedGuarded(
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
 
-  // Restrict to portrait mode on mobile
-  SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+      // Restrict to portrait mode on mobile
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
 
-  try {
-    await Firebase.initializeApp();
-  } catch (e) {
-    debugPrint("Firebase init failed: $e");
-  }
+      try {
+        await Firebase.initializeApp();
+      } catch (e) {
+        debugPrint("Firebase init failed: $e");
+      }
 
-  runApp(const ProviderScope(child: HangoutSpotApp()));
+      runApp(const ProviderScope(child: HangoutSpotApp()));
+    },
+    (error, stack) {
+      debugPrint("CRASH ERROR: $error");
+      debugPrint("CRASH STACK: $stack");
+    },
+  );
 }
 
 class HangoutSpotApp extends ConsumerWidget {

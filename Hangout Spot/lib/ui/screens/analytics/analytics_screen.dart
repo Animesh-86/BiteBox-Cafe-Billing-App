@@ -4,12 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:hangout_spot/data/repositories/analytics_repository.dart';
+import 'package:hangout_spot/logic/locations/location_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 final analyticsDateRangeProvider = StateProvider<DateTimeRange?>((ref) => null);
+final analyticsOutletFilterProvider = StateProvider<String?>((ref) => null);
 
 class AnalyticsScreen extends ConsumerWidget {
   const AnalyticsScreen({super.key});
@@ -21,6 +23,8 @@ class AnalyticsScreen extends ConsumerWidget {
     final startOfDay = DateTime(now.year, now.month, now.day);
     final last7Start = startOfDay.subtract(const Duration(days: 6));
     final selectedRange = ref.watch(analyticsDateRangeProvider);
+    final selectedOutletId = ref.watch(analyticsOutletFilterProvider);
+    final outletsAsync = ref.watch(locationsStreamProvider);
     final rangeStart = DateTime(
       (selectedRange?.start ?? last7Start).year,
       (selectedRange?.start ?? last7Start).month,
@@ -39,44 +43,238 @@ class AnalyticsScreen extends ConsumerWidget {
     return DefaultTabController(
       length: 3,
       child: Scaffold(
-        backgroundColor: theme.colorScheme.background,
+        backgroundColor: theme.brightness == Brightness.dark
+            ? const Color(0xFF121212)
+            : const Color(0xFFF5F5F5),
         appBar: AppBar(
-          title: const Text('Analytics & Insights'),
+          elevation: 0,
+          backgroundColor: theme.colorScheme.background,
+          title: Text(
+            'Analytics',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.onBackground,
+            ),
+          ),
           actions: [
-            TextButton.icon(
-              onPressed: () async {
-                final picked = await showDateRangePicker(
-                  context: context,
-                  firstDate: DateTime(2023),
-                  lastDate: DateTime.now(),
-                  initialDateRange:
-                      selectedRange ??
-                      DateTimeRange(start: last7Start, end: now),
+            // Outlet Selector Button
+            outletsAsync.when(
+              data: (outlets) {
+                if (outlets.isEmpty) return const SizedBox.shrink();
+
+                final selectedOutlet = outlets.firstWhere(
+                  (loc) => loc.id == selectedOutletId,
+                  orElse: () => outlets.first,
                 );
-                if (picked != null) {
-                  ref.read(analyticsDateRangeProvider.notifier).state = picked;
-                }
+                final displayText = selectedOutletId == null
+                    ? "All Outlets"
+                    : (selectedOutlet.address ?? selectedOutlet.name);
+
+                return Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  child: Material(
+                    color: theme.brightness == Brightness.dark
+                        ? Colors.brown.shade800.withOpacity(0.3)
+                        : Colors.brown.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    child: InkWell(
+                      onTap: () async {
+                        await showDialog(
+                          context: context,
+                          builder: (context) => _OutletSelectorDialog(
+                            outlets: outlets,
+                            selectedOutletId: selectedOutletId,
+                            onSelect: (id) {
+                              ref
+                                      .read(
+                                        analyticsOutletFilterProvider.notifier,
+                                      )
+                                      .state =
+                                  id;
+                            },
+                          ),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 9,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.store_outlined,
+                              size: 16,
+                              color: theme.brightness == Brightness.dark
+                                  ? Colors.brown.shade300
+                                  : Colors.brown.shade700,
+                            ),
+                            const SizedBox(width: 6),
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 90),
+                              child: Text(
+                                displayText,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: theme.brightness == Brightness.dark
+                                      ? Colors.brown.shade300
+                                      : Colors.brown.shade700,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
               },
-              icon: const Icon(Icons.date_range, size: 18),
-              label: Text(rangeLabel, style: const TextStyle(fontSize: 12)),
+              loading: () => const SizedBox(width: 20),
+              error: (_, __) => const SizedBox.shrink(),
             ),
-            IconButton(
-              tooltip: 'Export Report',
-              icon: const Icon(Icons.file_download_outlined, size: 18),
-              onPressed: () =>
-                  _showExportSheet(context, analytics, rangeStart, rangeEnd),
+
+            // Date Range Button
+            Container(
+              margin: const EdgeInsets.only(right: 12),
+              child: Material(
+                color: theme.colorScheme.primary.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
+                child: InkWell(
+                  onTap: () async {
+                    final picked = await showDateRangePicker(
+                      context: context,
+                      firstDate: DateTime(2023),
+                      lastDate: DateTime.now(),
+                      initialDateRange:
+                          selectedRange ??
+                          DateTimeRange(start: last7Start, end: now),
+                    );
+                    if (picked != null) {
+                      ref.read(analyticsDateRangeProvider.notifier).state =
+                          picked;
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 9,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.calendar_today_outlined,
+                          size: 16,
+                          color: theme.colorScheme.primary,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          rangeLabel,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ),
-            const SizedBox(width: 4),
           ],
-          bottom: TabBar(
-            indicatorColor: theme.colorScheme.primary,
-            labelColor: theme.colorScheme.primary,
-            unselectedLabelColor: theme.colorScheme.onSurface.withOpacity(0.6),
-            tabs: const [
-              Tab(icon: Icon(Icons.dashboard), text: 'Overview'),
-              Tab(icon: Icon(Icons.trending_up), text: 'Trends'),
-              Tab(icon: Icon(Icons.insights), text: 'Forecast'),
-            ],
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(56),
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: theme.brightness == Brightness.dark
+                    ? Colors.white.withOpacity(0.05)
+                    : Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: TabBar(
+                indicator: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      theme.colorScheme.primary,
+                      theme.colorScheme.primary.withOpacity(0.8),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: theme.colorScheme.primary.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                labelColor: Colors.white,
+                unselectedLabelColor: theme.colorScheme.onSurface.withOpacity(
+                  0.6,
+                ),
+                labelStyle: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+                unselectedLabelStyle: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+                dividerColor: Colors.transparent,
+                indicatorSize: TabBarIndicatorSize.tab,
+                tabs: const [
+                  Tab(
+                    height: 44,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.dashboard_outlined, size: 18),
+                        SizedBox(width: 8),
+                        Text('Overview'),
+                      ],
+                    ),
+                  ),
+                  Tab(
+                    height: 44,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.trending_up, size: 18),
+                        SizedBox(width: 8),
+                        Text('Trends'),
+                      ],
+                    ),
+                  ),
+                  Tab(
+                    height: 44,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.insights_outlined, size: 18),
+                        SizedBox(width: 8),
+                        Text('Forecast'),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
         body: TabBarView(
@@ -88,6 +286,7 @@ class AnalyticsScreen extends ConsumerWidget {
               rangeEnd: rangeEnd,
               rangeLabel: rangeLabel,
               isWide: isWide,
+              outletId: selectedOutletId,
             ),
 
             // Trends Tab
@@ -96,6 +295,7 @@ class AnalyticsScreen extends ConsumerWidget {
               rangeStart: rangeStart,
               rangeEnd: rangeEnd,
               rangeLabel: rangeLabel,
+              outletId: selectedOutletId,
             ),
 
             // Forecast Tab
@@ -104,6 +304,7 @@ class AnalyticsScreen extends ConsumerWidget {
               rangeStart: rangeStart,
               rangeEnd: rangeEnd,
               rangeLabel: rangeLabel,
+              outletId: selectedOutletId,
             ),
           ],
         ),
@@ -119,6 +320,7 @@ class _OverviewTab extends StatelessWidget {
   final DateTime rangeEnd;
   final String rangeLabel;
   final bool isWide;
+  final String? outletId;
 
   const _OverviewTab({
     required this.analytics,
@@ -126,6 +328,7 @@ class _OverviewTab extends StatelessWidget {
     required this.rangeEnd,
     required this.rangeLabel,
     required this.isWide,
+    this.outletId,
   });
 
   @override
@@ -156,7 +359,7 @@ class _OverviewTab extends StatelessWidget {
           ),
           const SizedBox(height: 24),
 
-          // Key Metrics Grid
+          // Key Metrics in Single Brown Box
           FutureBuilder(
             future: Future.wait([
               analytics.getSessionSales(rangeStart, rangeEnd),
@@ -174,58 +377,85 @@ class _OverviewTab extends StatelessWidget {
                 );
               }
               final data = snapshot.data as List<num>;
-              return LayoutBuilder(
-                builder: (context, constraints) {
-                  final cardWidth = isWide
-                      ? (constraints.maxWidth - 48) / 4
-                      : (constraints.maxWidth - 16) / 2;
-                  return Wrap(
-                    spacing: 16,
-                    runSpacing: 16,
-                    children: [
-                      SizedBox(
-                        width: cardWidth,
-                        child: _MetricCard(
-                          title: "Sales",
-                          value: "₹${data[0].toStringAsFixed(0)}",
-                          icon: Icons.currency_rupee,
-                          iconColor: const Color(0xFFFFD54F),
-                          subtitle: rangeLabel,
-                        ),
-                      ),
-                      SizedBox(
-                        width: cardWidth,
-                        child: _MetricCard(
-                          title: "Orders",
-                          value: "${data[1]}",
-                          icon: Icons.receipt_long,
-                          iconColor: const Color(0xFF64B5F6),
-                          subtitle: rangeLabel,
-                        ),
-                      ),
-                      SizedBox(
-                        width: cardWidth,
-                        child: _MetricCard(
-                          title: "Avg Order Value",
-                          value: "₹${data[2].toStringAsFixed(0)}",
-                          icon: Icons.shopping_cart,
-                          iconColor: const Color(0xFFFFB74D),
-                          subtitle: rangeLabel,
-                        ),
-                      ),
-                      SizedBox(
-                        width: cardWidth,
-                        child: _MetricCard(
-                          title: "Repeat Rate",
-                          value: "${(data[3] * 100).toStringAsFixed(0)}%",
-                          icon: Icons.loyalty,
-                          iconColor: const Color(0xFFBA68C8),
-                          subtitle: rangeLabel,
-                        ),
-                      ),
+              return Container(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [
+                      Color(0xFF5D4037), // Dark brown
+                      Color(0xFF4E342E), // Deeper brown
                     ],
-                  );
-                },
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF5D4037).withOpacity(0.4),
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  children: [
+                    // First Row
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _MetricItem(
+                            icon: Icons.currency_rupee,
+                            title: "Total Sales",
+                            value: "₹${data[0].toStringAsFixed(0)}",
+                          ),
+                        ),
+                        Container(
+                          width: 1,
+                          height: 60,
+                          color: Colors.white.withOpacity(0.2),
+                          margin: const EdgeInsets.symmetric(horizontal: 16),
+                        ),
+                        Expanded(
+                          child: _MetricItem(
+                            icon: Icons.receipt_long,
+                            title: "Orders",
+                            value: "${data[1]}",
+                          ),
+                        ),
+                      ],
+                    ),
+                    Divider(
+                      color: Colors.white.withOpacity(0.2),
+                      height: 32,
+                      thickness: 1,
+                    ),
+                    // Second Row
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _MetricItem(
+                            icon: Icons.shopping_cart,
+                            title: "Avg Order Value",
+                            value: "₹${data[2].toStringAsFixed(0)}",
+                          ),
+                        ),
+                        Container(
+                          width: 1,
+                          height: 60,
+                          color: Colors.white.withOpacity(0.2),
+                          margin: const EdgeInsets.symmetric(horizontal: 16),
+                        ),
+                        Expanded(
+                          child: _MetricItem(
+                            icon: Icons.repeat,
+                            title: "Repeat Rate",
+                            value: "${(data[3] * 100).toStringAsFixed(0)}%",
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               );
             },
           ),
@@ -374,12 +604,14 @@ class _TrendsTab extends StatelessWidget {
   final DateTime rangeStart;
   final DateTime rangeEnd;
   final String rangeLabel;
+  final String? outletId;
 
   const _TrendsTab({
     required this.analytics,
     required this.rangeStart,
     required this.rangeEnd,
     required this.rangeLabel,
+    this.outletId,
   });
 
   @override
@@ -672,12 +904,14 @@ class _ForecastTab extends StatelessWidget {
   final DateTime rangeStart;
   final DateTime rangeEnd;
   final String rangeLabel;
+  final String? outletId;
 
   const _ForecastTab({
     required this.analytics,
     required this.rangeStart,
     required this.rangeEnd,
     required this.rangeLabel,
+    this.outletId,
   });
 
   @override
@@ -1775,4 +2009,314 @@ String _formatHour(int hour) {
   if (hour == 12) return '12 PM';
   if (hour < 12) return '$hour AM';
   return '${hour - 12} PM';
+}
+
+// Outlet Selector Dialog
+class _OutletSelectorDialog extends StatefulWidget {
+  final List outlets;
+  final String? selectedOutletId;
+  final Function(String?) onSelect;
+
+  const _OutletSelectorDialog({
+    required this.outlets,
+    required this.selectedOutletId,
+    required this.onSelect,
+  });
+
+  @override
+  State<_OutletSelectorDialog> createState() => _OutletSelectorDialogState();
+}
+
+class _OutletSelectorDialogState extends State<_OutletSelectorDialog> {
+  final TextEditingController _searchController = TextEditingController();
+  List _filteredOutlets = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _filteredOutlets = widget.outlets;
+    _searchController.addListener(_filterOutlets);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _filterOutlets() {
+    final query = _searchController.text.toLowerCase();
+    setState(() {
+      if (query.isEmpty) {
+        _filteredOutlets = widget.outlets;
+      } else {
+        _filteredOutlets = widget.outlets.where((outlet) {
+          final name = outlet.name.toLowerCase();
+          final address = (outlet.address ?? '').toLowerCase();
+          return name.contains(query) || address.contains(query);
+        }).toList();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Dialog(
+      backgroundColor: theme.brightness == Brightness.dark
+          ? const Color(0xFF1E1E1E)
+          : Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 400, maxHeight: 600),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              children: [
+                Icon(
+                  Icons.store,
+                  color: theme.brightness == Brightness.dark
+                      ? Colors.brown.shade300
+                      : Colors.brown.shade700,
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Select Outlet',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Search Bar
+            TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search outlets...',
+                prefixIcon: Icon(
+                  Icons.search,
+                  color: theme.brightness == Brightness.dark
+                      ? Colors.brown.shade300
+                      : Colors.brown.shade700,
+                ),
+                filled: true,
+                fillColor: theme.brightness == Brightness.dark
+                    ? Colors.brown.shade900.withOpacity(0.2)
+                    : Colors.brown.shade50,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // All Outlets Option
+            _OutletOption(
+              name: 'All Outlets',
+              address: 'View combined data from all outlets',
+              isSelected: widget.selectedOutletId == null,
+              onTap: () {
+                widget.onSelect(null);
+                Navigator.pop(context);
+              },
+              theme: theme,
+            ),
+
+            const SizedBox(height: 8),
+            const Divider(),
+            const SizedBox(height: 8),
+
+            // Individual Outlets
+            Flexible(
+              child: _filteredOutlets.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32.0),
+                        child: Text(
+                          'No outlets found',
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurface.withOpacity(0.6),
+                          ),
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: _filteredOutlets.length,
+                      itemBuilder: (context, index) {
+                        final outlet = _filteredOutlets[index];
+                        return _OutletOption(
+                          name: outlet.name,
+                          address: outlet.address ?? 'No address',
+                          isSelected: widget.selectedOutletId == outlet.id,
+                          onTap: () {
+                            widget.onSelect(outlet.id);
+                            Navigator.pop(context);
+                          },
+                          theme: theme,
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Outlet Option Widget
+class _OutletOption extends StatelessWidget {
+  final String name;
+  final String address;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final ThemeData theme;
+
+  const _OutletOption({
+    required this.name,
+    required this.address,
+    required this.isSelected,
+    required this.onTap,
+    required this.theme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: isSelected
+          ? (theme.brightness == Brightness.dark
+                ? Colors.brown.shade800.withOpacity(0.4)
+                : Colors.brown.shade50)
+          : Colors.transparent,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Icon(
+                isSelected
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_unchecked,
+                size: 20,
+                color: isSelected
+                    ? (theme.brightness == Brightness.dark
+                          ? Colors.brown.shade300
+                          : Colors.brown.shade700)
+                    : theme.colorScheme.onSurface.withOpacity(0.4),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.w500,
+                        color: isSelected
+                            ? (theme.brightness == Brightness.dark
+                                  ? Colors.brown.shade300
+                                  : Colors.brown.shade700)
+                            : theme.colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      address,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Individual metric item for the unified brown box
+class _MetricItem extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String value;
+
+  const _MetricItem({
+    required this.icon,
+    required this.title,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: Colors.white, size: 24),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 6),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            letterSpacing: -0.5,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
 }

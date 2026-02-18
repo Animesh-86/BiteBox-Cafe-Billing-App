@@ -1,8 +1,11 @@
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
+import 'package:hangout_spot/logic/locations/location_provider.dart';
 
 // --- state ---
 class CartItem {
@@ -29,6 +32,24 @@ class CartItem {
       quantity: quantity ?? this.quantity,
       note: note ?? this.note,
       discountAmount: discountAmount ?? this.discountAmount,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'item': item.toJson(),
+    'quantity': quantity,
+    'note': note,
+    'discountAmount': discountAmount,
+  };
+
+  factory CartItem.fromJson(Map<String, dynamic> json) {
+    return CartItem(
+      id: json['id'],
+      item: Item.fromJson(json['item']),
+      quantity: json['quantity'] ?? 1,
+      note: json['note'],
+      discountAmount: (json['discountAmount'] ?? 0.0).toDouble(),
     );
   }
 }
@@ -111,12 +132,82 @@ class CartState {
       canRedo: canRedo ?? this.canRedo,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'orderId': orderId,
+    'items': items.map((i) => i.toJson()).toList(),
+    'customer': customer?.toJson(),
+    'paymentMode': paymentMode,
+    'paidCash': paidCash,
+    'paidUPI': paidUPI,
+    'manualDiscount': manualDiscount,
+    'promoDiscount': promoDiscount,
+  };
+
+  factory CartState.fromJson(Map<String, dynamic> json) {
+    return CartState(
+      orderId: json['orderId'],
+      items:
+          (json['items'] as List<dynamic>?)
+              ?.map((i) => CartItem.fromJson(i))
+              .toList() ??
+          [],
+      customer: json['customer'] != null
+          ? Customer.fromJson(json['customer'])
+          : null,
+      paymentMode: json['paymentMode'] ?? 'Cash',
+      paidCash: (json['paidCash'] ?? 0.0).toDouble(),
+      paidUPI: (json['paidUPI'] ?? 0.0).toDouble(),
+      manualDiscount: (json['manualDiscount'] ?? 0.0).toDouble(),
+      promoDiscount: (json['promoDiscount'] ?? 0.0).toDouble(),
+    );
+  }
 }
 
 // --- notifier ---
 class CartNotifier extends StateNotifier<CartState> {
-  CartNotifier() : super(CartState()) {
-    _pushState(state);
+  final String? outletId;
+  late final String _storageKey;
+
+  CartNotifier(this.outletId) : super(CartState()) {
+    _storageKey = outletId != null
+        ? 'cart_state_v1_$outletId'
+        : 'cart_state_temp';
+    _loadCart();
+  }
+
+  Future<void> _loadCart() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonStr = prefs.getString(_storageKey);
+      if (jsonStr != null) {
+        try {
+          final Map<String, dynamic> map = json.decode(jsonStr);
+          final loaded = CartState.fromJson(map);
+          _applyState(loaded, push: false, save: false);
+          // Initialize history with loaded state
+          _history.clear();
+          _history.add(loaded.copyWith(canUndo: false, canRedo: false));
+          _historyIndex = 0;
+          return;
+        } catch (e) {
+          // data format changed or error
+        }
+      }
+      _pushState(state); // Default init
+    } catch (e) {
+      _pushState(state); // Default init
+    }
+  }
+
+  Future<void> _saveCart(CartState state) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonStr = json.encode(state.toJson());
+      await prefs.setString(_storageKey, jsonStr);
+    } catch (e) {
+      // ignore
+    }
   }
 
   final List<CartState> _history = [];
@@ -131,14 +222,16 @@ class CartNotifier extends StateNotifier<CartState> {
     _applyState(newState, push: false);
   }
 
-  void _applyState(CartState newState, {bool push = true}) {
+  void _applyState(CartState newState, {bool push = true, bool save = true}) {
     if (push) {
       _pushState(newState);
       return;
     }
     final canUndo = _historyIndex > 0;
     final canRedo = _historyIndex < _history.length - 1;
-    state = newState.copyWith(canUndo: canUndo, canRedo: canRedo);
+    final finalState = newState.copyWith(canUndo: canUndo, canRedo: canRedo);
+    state = finalState;
+    if (save) _saveCart(finalState);
   }
 
   void undo() {
@@ -154,6 +247,8 @@ class CartNotifier extends StateNotifier<CartState> {
   }
 
   void addItem(Item item) {
+    if (outletId == null) return; // Cannot add items if no outlet selected
+    if (!item.isAvailable) return;
     // Check if exists
     final index = state.items.indexWhere(
       (i) => i.item.id == item.id && i.note == null,
@@ -329,5 +424,7 @@ class CartNotifier extends StateNotifier<CartState> {
 }
 
 final cartProvider = StateNotifierProvider<CartNotifier, CartState>((ref) {
-  return CartNotifier();
+  final activeOutletAsync = ref.watch(activeOutletProvider);
+  final outletId = activeOutletAsync.valueOrNull?.id;
+  return CartNotifier(outletId);
 });

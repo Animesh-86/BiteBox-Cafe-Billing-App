@@ -2,15 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hangout_spot/utils/constants/app_keys.dart';
 import '../widgets/settings_shared.dart';
+import 'package:hangout_spot/ui/widgets/trust_gate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class ReceiptSettingsScreen extends StatefulWidget {
+class ReceiptSettingsScreen extends ConsumerStatefulWidget {
   const ReceiptSettingsScreen({super.key});
 
   @override
-  State<ReceiptSettingsScreen> createState() => _ReceiptSettingsScreenState();
+  ConsumerState<ReceiptSettingsScreen> createState() =>
+      _ReceiptSettingsScreenState();
 }
 
-class _ReceiptSettingsScreenState extends State<ReceiptSettingsScreen> {
+class _ReceiptSettingsScreenState extends ConsumerState<ReceiptSettingsScreen> {
   final TextEditingController _receiptFooterController =
       TextEditingController();
   bool _showThankYou = true;
@@ -67,32 +70,48 @@ class _ReceiptSettingsScreenState extends State<ReceiptSettingsScreen> {
             title: "Receipt Configuration",
             icon: Icons.receipt_long_rounded,
             children: [
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Show "Thank You" Line'),
-                value: _showThankYou,
-                onChanged: (val) => setState(() => _showThankYou = val),
+              TrustedDeviceGate(
+                fallback: SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Show "Thank You" Line'),
+                  value: _showThankYou,
+                  onChanged: null,
+                ),
+                child: SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Show "Thank You" Line'),
+                  value: _showThankYou,
+                  onChanged: (val) => setState(() => _showThankYou = val),
+                ),
               ),
               const SizedBox(height: 8),
-              SettingsTextField(
-                controller: _receiptFooterController,
-                label: "Footer Note",
-                icon: Icons.notes,
-                maxLines: 2,
-              ),
-              const SizedBox(height: 16),
-              Align(
-                alignment: Alignment.centerRight,
-                child: SettingsActionBtn(
-                  label: "Update Receipt",
-                  onPressed: () async {
-                    await _saveReceiptSettings();
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Receipt settings saved')),
-                      );
-                    }
-                  },
+              TrustedDeviceGate(
+                child: Column(
+                  children: [
+                    SettingsTextField(
+                      controller: _receiptFooterController,
+                      label: "Footer Note",
+                      icon: Icons.notes,
+                      maxLines: 2,
+                    ),
+                    const SizedBox(height: 16),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: SettingsActionBtn(
+                        label: "Update Receipt",
+                        onPressed: () async {
+                          await _saveReceiptSettings();
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Receipt settings saved'),
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],

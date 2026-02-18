@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/logic/billing/cart_provider.dart';
 import 'package:hangout_spot/logic/offers/promo_provider.dart';
+import 'package:hangout_spot/logic/locations/location_provider.dart';
 import 'package:hangout_spot/ui/screens/billing/billing_items_grid.dart';
 import 'package:hangout_spot/ui/screens/billing/billing_providers.dart';
 import 'package:hangout_spot/ui/screens/billing/widgets/billing_actions.dart';
@@ -41,31 +42,61 @@ class _BillingView extends ConsumerWidget {
         backgroundColor: theme.colorScheme.background,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                Icons.point_of_sale_rounded,
-                color: theme.colorScheme.primary,
-                size: 18,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'POS Terminal',
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.5,
-                fontSize: 18,
-                color: theme.colorScheme.primary,
-              ),
-            ),
-          ],
+        title: Consumer(
+          builder: (context, ref, _) {
+            final activeOutlet = ref.watch(activeOutletProvider).valueOrNull;
+
+            return Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.point_of_sale_rounded,
+                    color: theme.colorScheme.primary,
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'POS Terminal',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
+                        fontSize: 18,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                    if (activeOutlet != null)
+                      Text(
+                        activeOutlet.name,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: theme.colorScheme.onSurface.withOpacity(0.6),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      )
+                    else
+                      Text(
+                        'No Active Outlet',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.red.withOpacity(0.8),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            );
+          },
         ),
         actions: [
           // Customer Select

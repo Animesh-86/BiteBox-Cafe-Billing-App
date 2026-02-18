@@ -61,21 +61,12 @@ class Customers extends Table {
 class Locations extends Table {
   TextColumn get id => text()();
   TextColumn get name => text()();
-  TextColumn get address => text().nullable()();
-  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
-
-  @override
-  Set<Column> get primaryKey => {id};
-}
-
-class RestaurantTables extends Table {
-  TextColumn get id => text()();
-  TextColumn get tableNumber => text().unique()();
-  TextColumn get status => text().withDefault(
-    const Constant('available'),
-  )(); // available, occupied, reserved
+  TextColumn get address =>
+      text().nullable()(); // Relaxed to nullable for robustness
+  TextColumn get phoneNumber => text().nullable()(); // Relaxed to nullable
+  BoolColumn get isActive =>
+      boolean().nullable().withDefault(const Constant(false))(); // Relaxed
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
-  BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -87,8 +78,6 @@ class Orders extends Table {
   TextColumn get customerId =>
       text().nullable()(); // No FK constraint for nullable field
   TextColumn get locationId => text().nullable()();
-  TextColumn get tableId =>
-      text().nullable()(); // No FK constraint for nullable field
   RealColumn get subtotal => real()();
   RealColumn get discountAmount => real().withDefault(const Constant(0.0))();
   RealColumn get taxAmount => real().withDefault(const Constant(0.0))();
@@ -157,7 +146,6 @@ class Settings extends Table {
     Items,
     Customers,
     Locations,
-    RestaurantTables,
     Orders,
     OrderItems,
     SyncLogs,
@@ -169,7 +157,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(openConnection());
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration {
@@ -194,20 +182,7 @@ class AppDatabase extends _$AppDatabase {
           }
         }
         if (from < 3) {
-          // Add RestaurantTables table
-          try {
-            await m.createTable(restaurantTables);
-          } catch (e) {
-            debugPrint(
-              'Migration: RestaurantTables table might already exist: $e',
-            );
-          }
-          // Add tableId column to Orders
-          try {
-            await m.addColumn(orders, orders.tableId);
-          } catch (e) {
-            debugPrint('Migration: tableId column might already exist: $e');
-          }
+          // RestaurantTables removed
         }
         if (from < 4) {
           // Foreign keys disabled at connection level
@@ -269,6 +244,13 @@ class AppDatabase extends _$AppDatabase {
             );
           } catch (e) {
             debugPrint('Migration: location index might already exist: $e');
+          }
+        }
+        if (from < 9) {
+          try {
+            await m.addColumn(orders, orders.isSynced);
+          } catch (e) {
+            debugPrint('Migration: isSynced column might already exist: $e');
           }
         }
       },

@@ -300,7 +300,7 @@ class HeldOrdersDialog extends ConsumerWidget {
                                     if (confirm == true) {
                                       await ref
                                           .read(orderRepositoryProvider)
-                                          .deleteOrder(order.id);
+                                          .voidOrder(order.id);
                                     }
                                   },
                                   child: Container(
@@ -313,7 +313,8 @@ class HeldOrdersDialog extends ConsumerWidget {
                                       ),
                                     ),
                                     child: Icon(
-                                      Icons.delete,
+                                      Icons
+                                          .delete_forever, // Changed icon to indicate void/cancel
                                       size: 18,
                                       color: Colors.red.shade400,
                                     ),

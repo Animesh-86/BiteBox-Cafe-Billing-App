@@ -9,6 +9,8 @@ import 'package:hangout_spot/logic/billing/session_provider.dart';
 import 'package:hangout_spot/logic/rewards/reward_provider.dart';
 import 'package:hangout_spot/services/logging_service.dart';
 import 'package:hangout_spot/logic/locations/location_provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart' hide Order;
+import 'package:firebase_auth/firebase_auth.dart';
 
 class OrderRepository {
   final AppDatabase _db;
@@ -98,10 +100,16 @@ class OrderRepository {
             "INV-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}";
       }
 
-      final locationSetting = await (_db.select(
-        _db.settings,
-      )..where((t) => t.key.equals(CURRENT_LOCATION_ID_KEY))).getSingleOrNull();
-      final locationId = locationSetting?.value;
+      // Get active outlet (required for order creation)
+      final activeOutlet = await (_db.select(
+        _db.locations,
+      )..where((t) => t.isActive.equals(true))).getSingleOrNull();
+
+      if (activeOutlet == null) {
+        throw Exception(
+          'No active outlet found. Please activate an outlet in Settings before creating orders.',
+        );
+      }
 
       await _db
           .into(_db.orders)
@@ -110,7 +118,7 @@ class OrderRepository {
               id: Value(orderId),
               invoiceNumber: Value(invoiceNum),
               customerId: Value(cart.customer?.id),
-              locationId: Value(locationId),
+              locationId: Value(activeOutlet.id), // Use active outlet
               subtotal: Value(cart.subtotal),
               discountAmount: Value(cart.totalDiscount),
               taxAmount: Value(cart.taxAmount),
@@ -140,19 +148,97 @@ class OrderRepository {
               ),
             );
       }
+
+      // IMMEDIATE PUSH: Send to Firestore for Real-Time Sync
+      try {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          final orderData = {
+            'id': orderId,
+            'invoiceNumber': invoiceNum,
+            'customerId': cart.customer?.id,
+            'locationId': activeOutlet.id,
+            'subtotal': cart.subtotal,
+            'discountAmount': cart.totalDiscount,
+            'taxAmount': cart.taxAmount,
+            'totalAmount': cart.grandTotal,
+            'paymentMode': cart.paymentMode,
+            'paidCash': cart.paidCash,
+            'paidUPI': cart.paidUPI,
+            'status': status,
+            'createdAt': DateTime.now().toIso8601String(),
+            'isSynced': true, // Marked as synced since we are pushing now
+          };
+
+          // Push to Firestore order collection
+          // We use 'data/orders' inside the user doc as per SyncRepository structure
+          // Note: Full sync also pushes 'order_items', but for Invoice Numbering speed,
+          // pushing the main Order doc is sufficient for the Listener to pick it up.
+          // To be safe, we should match the SyncRepository structure exactly.
+
+          /* 
+             Ideally, we should reuse SyncRepository logic, but we need speed here.
+             We will push to the specific document path.
+          */
+
+          // Push to Firestore order collection
+          // Utilising FieldValue.arrayUnion to append to the list in `data/orders`
+
+          await FirebaseFirestore.instance
+              .collection('cafes')
+              .doc(user.uid)
+              .collection('data')
+              .doc('orders')
+              .set({
+                'list': FieldValue.arrayUnion([orderData]),
+              }, SetOptions(merge: true));
+        }
+      } catch (e) {
+        debugPrint("⚠️ Immediate Push failed: $e");
+        // Don't fail the local transaction. Just log it. Sync will catch it later.
+      }
+
       return orderId;
     });
   }
 
-  // Delete an order
-  Future<void> deleteOrder(String orderId) async {
-    await _db.transaction(() async {
-      await (_db.delete(
-        _db.orderItems,
-      )..where((t) => t.orderId.equals(orderId))).go();
-      await (_db.delete(_db.orders)..where((t) => t.id.equals(orderId))).go();
-    });
+  // Soft Delete strategy: Cancel instead of Delete
+  Future<void> voidOrder(String orderId) async {
+    await _db
+        .update(_db.orders)
+        .replace(
+          OrdersCompanion(
+            id: Value(orderId),
+            status: const Value('cancelled'),
+            isSynced: const Value(
+              false,
+            ), // Mark unsynced so it pushes to cloud on next sync
+          ),
+        );
+
+    // Attempt immediate push of cancellation
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        // For array removal/update, it is tricky with just arrayUnion.
+        // We might need to rely on the background SyncRepository for robust updates
+        // or read-modify-write here.
+        // For now, let's mark it locally. The RealTimeListener on OTHER devices
+        // won't see the cancellation instantly unless we handle it,
+        // but they definitely won't see a "Missing Number".
+
+        // To notify others INSTANTLY, we would need to push the updated order.
+        // But dealing with `list` updates for a specific item in Firestore is hard.
+        // We will rely on BackupSync for full consistency of edits.
+        // The critical part (Creation Numbering) is handled by `createOrder`.
+      }
+    } catch (e) {
+      print(e);
+    }
   }
+
+  // Deprecated: Hard delete is removed to preserve invoice sequence
+  // Future<void> deleteOrder(String orderId) async { ... }
 
   // Handle reward points for completed orders
   Future<void> processRewardForOrder(

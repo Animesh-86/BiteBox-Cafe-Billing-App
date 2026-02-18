@@ -290,7 +290,12 @@ class ThermalPrintingService {
     await _bluetooth.writeBytes(Uint8List.fromList(bytes));
   }
 
-  Future<void> printKot(Order order, List<OrderItem> items) async {
+  Future<void> printKot(
+    Order order,
+    List<OrderItem> items, {
+    String? storeName,
+    String? storeAddress,
+  }) async {
     if (!await isConnected) {
       // Try to auto-connect if saved
       final prefs = await SharedPreferences.getInstance();

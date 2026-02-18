@@ -5,6 +5,7 @@ import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/data/providers/database_provider.dart';
 import 'package:hangout_spot/logic/billing/cart_provider.dart';
 import 'package:hangout_spot/logic/billing/session_provider.dart';
+import 'package:hangout_spot/logic/locations/location_provider.dart';
 import 'package:hangout_spot/data/repositories/order_repository.dart';
 import 'package:hangout_spot/services/printing_service.dart';
 import 'package:hangout_spot/services/share_service.dart';
@@ -36,7 +37,6 @@ Future<void> printKot(BuildContext context, WidgetRef ref) async {
       id: orderId,
       invoiceNumber: invoiceNumber,
       customerId: cart.customer?.id,
-      tableId: null,
       subtotal: cart.subtotal,
       discountAmount: cart.totalDiscount,
       taxAmount: cart.taxAmount,
@@ -66,9 +66,25 @@ Future<void> printKot(BuildContext context, WidgetRef ref) async {
 
     // 1. Try Thermal Print
     try {
-      await ref.read(thermalPrintingServiceProvider).printKot(order, items);
+      final activeOutlet = await ref.read(activeOutletProvider.future);
+      await ref
+          .read(thermalPrintingServiceProvider)
+          .printKot(
+            order,
+            items,
+            storeName: activeOutlet?.name,
+            storeAddress: activeOutlet?.address,
+          );
     } catch (e) {
       debugPrint("Thermal print failed: $e");
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Printing failed: $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
 
     // 2. Fallback/Parallel PDF Print (Optional, keeping existing behavior)
@@ -108,6 +124,10 @@ Future<void> holdOrder(BuildContext context, WidgetRef ref) async {
           status: 'pending',
           sessionManager: sessionManager,
         );
+
+    // Trigger Sync immediately for this pending order so other devices see it
+    // The createOrderFromCart already does an immediate push, so no extra code needed here!
+
     ref.read(cartProvider.notifier).clearCart();
     if (context.mounted) {
       ScaffoldMessenger.of(
@@ -132,6 +152,25 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
       ).showSnackBar(const SnackBar(content: Text("Cart is empty")));
     }
     return;
+  }
+
+  // Robustness Check: Validate Split Payment Totals
+  if (cart.paymentMode == 'Split') {
+    final totalPaid = cart.paidCash + cart.paidUPI;
+    // Allow small rounding difference (0.5)
+    if ((totalPaid - cart.grandTotal).abs() > 0.5) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              "Payment mismatch! Paid: ₹${totalPaid.toStringAsFixed(2)}, Bill: ₹${cart.grandTotal.toStringAsFixed(2)}",
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return; // Stop checkout
+    }
   }
 
   try {
@@ -184,11 +223,28 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
 
     // AUTO-PRINT THERMAL BILL
     try {
+      final activeOutlet = await ref.read(activeOutletProvider.future);
       await ref
           .read(thermalPrintingServiceProvider)
-          .printBill(order, items, customer);
+          .printBill(
+            order,
+            items,
+            customer,
+            storeName: activeOutlet?.name,
+            storeAddress: activeOutlet != null
+                ? '${activeOutlet.address}\nPhone: ${activeOutlet.phoneNumber}'
+                : null,
+          );
     } catch (e) {
       debugPrint("Thermal print failed: $e");
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Printing failed: $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
 
     ref.read(cartProvider.notifier).clearCart();
