@@ -76,7 +76,9 @@ class _BillingView extends ConsumerWidget {
                     ),
                     if (activeOutlet != null)
                       Text(
-                        activeOutlet.name,
+                        activeOutlet.address?.isNotEmpty == true
+                            ? activeOutlet.address!
+                            : activeOutlet.name,
                         style: TextStyle(
                           fontSize: 11,
                           color: theme.colorScheme.onSurface.withOpacity(0.6),

@@ -6,6 +6,7 @@ import 'package:hangout_spot/data/repositories/auth_repository.dart';
 import 'package:hangout_spot/data/repositories/menu_repository.dart';
 import 'package:hangout_spot/data/local/seed_data.dart';
 import 'package:hangout_spot/ui/screens/main_screen.dart';
+import 'package:hangout_spot/ui/screens/auth/login_screen.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -73,29 +74,28 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     if (!mounted || _navigated) return;
     _navigated = true;
     _timeoutTimer?.cancel();
-    _controller.removeListener(_checkVideoEnd); // Clean listener
+    _controller.removeListener(_checkVideoEnd);
 
-    // Check Auth - if no user exists, use demo account or create anonymous session
     final authRepo = ref.read(authRepositoryProvider);
-    var user = authRepo.currentUser;
+    final user = authRepo.currentUser;
 
-    // If no user, attempt anonymous sign-in for demo/local POS usage
-    if (user == null) {
-      try {
-        await authRepo.signInAnonymously();
-        user = authRepo.currentUser;
-      } catch (e) {
-        debugPrint("Anonymous sign-in failed (Provider likely disabled): $e");
-        // GRACEFUL FAIL: Proceed to MainScreen anyway.
-        // The app can function in 'offline' mode or prompt for login later.
-      }
-    }
+    if (!mounted) return;
 
-    // Always navigate to MainScreen (no login required for POS)
-    if (mounted) {
+    if (user != null) {
+      // Already logged in — go straight to the app
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
           pageBuilder: (_, __, ___) => const MainScreen(),
+          transitionsBuilder: (_, a, __, c) =>
+              FadeTransition(opacity: a, child: c),
+          transitionDuration: const Duration(milliseconds: 500),
+        ),
+      );
+    } else {
+      // Not logged in — go to login screen
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          pageBuilder: (_, __, ___) => const LoginScreen(),
           transitionsBuilder: (_, a, __, c) =>
               FadeTransition(opacity: a, child: c),
           transitionDuration: const Duration(milliseconds: 500),

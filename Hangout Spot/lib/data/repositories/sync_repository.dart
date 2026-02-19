@@ -4,6 +4,7 @@ import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:drift/drift.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../providers/database_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // Using simple Provider for now as we don't have riverpod_generator set up fully in this plan
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -158,7 +159,7 @@ class SyncRepository {
     }
   }
 
-  /// Clears all local data including menu, config, and transactions
+  /// Clears transactional & config data but PRESERVES menu (categories/items)
   Future<void> clearLocalData() async {
     await _db.batch((batch) {
       // Transactional data
@@ -168,16 +169,25 @@ class SyncRepository {
       batch.deleteWhere(_db.rewardTransactions, (t) => const Constant(true));
       batch.deleteWhere(_db.syncLogs, (t) => const Constant(true));
 
-      // Configuration & Menu data
-      batch.deleteWhere(_db.categories, (t) => const Constant(true));
-      batch.deleteWhere(_db.items, (t) => const Constant(true));
+      // Config data (outlets, settings) — menu is intentionally preserved
       batch.deleteWhere(_db.locations, (t) => const Constant(true));
-      // Tables excluded as unused
-      // batch.deleteWhere(_db.restaurantTables, (t) => const Constant(true));
       batch.deleteWhere(_db.settings, (t) => const Constant(true));
+
+      // NOTE: categories and items are NOT deleted (menu is preserved)
     });
+
+    // Also clear promo & outlet SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('promo_enabled');
+    await prefs.remove('promo_title');
+    await prefs.remove('promo_discount');
+    await prefs.remove('promo_bundle_ids');
+    await prefs.remove('promo_start_iso');
+    await prefs.remove('promo_end_iso');
+    await prefs.remove('last_active_outlet_id');
   }
 
+  /// Deletes all cloud data EXCEPT menu (categories/items are preserved)
   Future<void> deleteCloudData() async {
     try {
       final user = _auth.currentUser;
@@ -185,18 +195,25 @@ class SyncRepository {
 
       final baseRef = _firestore.collection('cafes').doc(user.uid);
 
-      // Delete known sub-documents
-      final menuRef = baseRef.collection('menu');
-      await menuRef.doc('categories').delete();
-      await menuRef.doc('items').delete();
-
+      // Delete transactional data
       final dataRef = baseRef.collection('data');
       await dataRef.doc('customers').delete();
       await dataRef.doc('orders').delete();
       await dataRef.doc('order_items').delete();
 
+      // Delete config (outlets, settings) — menu/* is intentionally kept
+      final configRef = baseRef.collection('config');
+      await configRef.doc('locations').delete();
+      await configRef.doc('settings').delete();
+
+      // Delete loyalty data
+      final loyaltyRef = baseRef.collection('loyalty');
+      await loyaltyRef.doc('reward_transactions').delete();
+
       // Delete base document
       await baseRef.delete();
+
+      // NOTE: menu/categories and menu/items are NOT deleted
     } catch (e) {
       // Firestore not set up or already deleted - fail silently
       print('Delete cloud data failed (Firestore may not be configured): $e');

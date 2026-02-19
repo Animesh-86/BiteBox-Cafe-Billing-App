@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:hangout_spot/data/repositories/auth_repository.dart';
+import 'package:hangout_spot/logic/locations/location_provider.dart';
 
 import 'package:hangout_spot/utils/constants/app_keys.dart';
 import 'sections/appearance_settings.dart';
@@ -52,10 +53,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _loadStoreSettings() async {
     final prefs = await SharedPreferences.getInstance();
+    // Get the logged-in user's email from Firebase Auth
+    final userEmail = ref.read(authRepositoryProvider).currentUser?.email ?? '';
+    // Get the active outlet for address and phone
+    final activeOutlet = await ref.read(activeOutletProvider.future);
     setState(() {
       _storeNameController.text = prefs.getString(STORE_NAME_KEY) ?? '';
-      _storeAddressController.text = prefs.getString(STORE_ADDRESS_KEY) ?? '';
-      _storePhoneController.text = prefs.getString(STORE_PHONE_KEY) ?? '';
+      // Address: prefer active outlet address, fallback to saved pref
+      _storeAddressController.text = (activeOutlet?.address?.isNotEmpty == true)
+          ? activeOutlet!.address!
+          : prefs.getString(STORE_ADDRESS_KEY) ?? '';
+      // Phone: prefer active outlet phone, fallback to saved pref
+      _storePhoneController.text =
+          (activeOutlet?.phoneNumber?.isNotEmpty == true)
+          ? activeOutlet!.phoneNumber!
+          : prefs.getString(STORE_PHONE_KEY) ?? '';
+      // Email: from saved prefs, fallback to Firebase Auth email
+      _storeEmailController.text = prefs.getString('store_email') ?? userEmail;
       _storeLogoPath = prefs.getString(STORE_LOGO_KEY);
       _storeSettingsLoaded = true;
     });
@@ -66,6 +80,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await prefs.setString(STORE_NAME_KEY, _storeNameController.text);
     await prefs.setString(STORE_ADDRESS_KEY, _storeAddressController.text);
     await prefs.setString(STORE_PHONE_KEY, _storePhoneController.text);
+    await prefs.setString('store_email', _storeEmailController.text);
     if (_storeLogoPath != null) {
       await prefs.setString(STORE_LOGO_KEY, _storeLogoPath!);
     }
@@ -221,10 +236,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                         : null,
                                   ),
                                   child: _storeLogoPath == null
-                                      ? Icon(
-                                          Icons.add_a_photo_rounded,
-                                          size: 32,
-                                          color: Theme.of(context).primaryColor,
+                                      ? Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.add_a_photo_rounded,
+                                              size: 30,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface
+                                                  .withOpacity(0.7),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              'Logo',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .onSurface
+                                                    .withOpacity(0.5),
+                                              ),
+                                            ),
+                                          ],
                                         )
                                       : null,
                                 ),

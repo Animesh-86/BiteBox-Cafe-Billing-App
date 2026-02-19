@@ -3,8 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../widgets/settings_shared.dart';
-import 'package:hangout_spot/ui/widgets/trust_gate.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class PromoSettingsScreen extends ConsumerStatefulWidget {
   const PromoSettingsScreen({super.key});
@@ -103,90 +101,80 @@ class _PromoSettingsScreenState extends ConsumerState<PromoSettingsScreen> {
             title: "Manage Campaign",
             icon: Icons.local_offer_rounded,
             children: [
-              TrustedDeviceGate(
-                fallback: SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Enable Promo Campaign'),
-                  value: _promoEnabled,
-                  onChanged: null, // Disabled
-                ),
-                child: SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Enable Promo Campaign'),
-                  value: _promoEnabled,
-                  onChanged: (val) => setState(() => _promoEnabled = val),
-                ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Enable Promo Campaign'),
+                value: _promoEnabled,
+                onChanged: (val) => setState(() => _promoEnabled = val),
               ),
               if (_promoEnabled)
-                TrustedDeviceGate(
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 12),
-                      SettingsTextField(
-                        controller: _promoTitleController,
-                        label: "Promo Title",
-                        icon: Icons.title,
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: SettingsTextField(
-                              controller: _promoDiscountController,
-                              label: "Discount %",
-                              icon: Icons.percent,
-                              inputType: TextInputType.number,
-                            ),
+                Column(
+                  children: [
+                    const SizedBox(height: 12),
+                    SettingsTextField(
+                      controller: _promoTitleController,
+                      label: "Promo Title",
+                      icon: Icons.title,
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SettingsTextField(
+                            controller: _promoDiscountController,
+                            label: "Discount %",
+                            icon: Icons.percent,
+                            inputType: TextInputType.number,
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      SettingsTextField(
-                        controller: _promoBundleController,
-                        label: "Bundle IDs (csv)",
-                        icon: Icons.list_alt,
-                        maxLines: 2,
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: SettingsDateBtn(
-                              label: "Start",
-                              date: _promoStart,
-                              onPick: (d) => setState(() => _promoStart = d),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: SettingsDateBtn(
-                              label: "End",
-                              date: _promoEnd,
-                              isEnd: true,
-                              onPick: (d) => setState(() => _promoEnd = d),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: SettingsActionBtn(
-                          label: "Save Campaign",
-                          onPressed: () async {
-                            await _savePromoSettings();
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Offer settings saved'),
-                                ),
-                              );
-                            }
-                          },
                         ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    SettingsTextField(
+                      controller: _promoBundleController,
+                      label: "Bundle IDs (csv)",
+                      icon: Icons.list_alt,
+                      maxLines: 2,
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SettingsDateBtn(
+                            label: "Start",
+                            date: _promoStart,
+                            onPick: (d) => setState(() => _promoStart = d),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: SettingsDateBtn(
+                            label: "End",
+                            date: _promoEnd,
+                            isEnd: true,
+                            onPick: (d) => setState(() => _promoEnd = d),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: SettingsActionBtn(
+                        label: "Save Campaign",
+                        onPressed: () async {
+                          await _savePromoSettings();
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Offer settings saved'),
+                              ),
+                            );
+                          }
+                        },
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
             ],
           ),

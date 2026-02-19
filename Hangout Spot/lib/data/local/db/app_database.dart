@@ -157,7 +157,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(openConnection());
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration {
@@ -253,10 +253,58 @@ class AppDatabase extends _$AppDatabase {
             debugPrint('Migration: isSynced column might already exist: $e');
           }
         }
+        if (from < 10) {
+          // Add missing columns to locations table that existed before these were added
+          try {
+            await m.database.customStatement(
+              'ALTER TABLE locations ADD COLUMN phone_number TEXT',
+            );
+          } catch (e) {
+            debugPrint(
+              'Migration: phone_number column might already exist: $e',
+            );
+          }
+          try {
+            await m.database.customStatement(
+              'ALTER TABLE locations ADD COLUMN is_active INTEGER DEFAULT 0',
+            );
+          } catch (e) {
+            debugPrint('Migration: is_active column might already exist: $e');
+          }
+          try {
+            await m.database.customStatement(
+              "ALTER TABLE locations ADD COLUMN created_at INTEGER DEFAULT (strftime('%s', 'now'))",
+            );
+          } catch (e) {
+            debugPrint('Migration: created_at column might already exist: $e');
+          }
+          try {
+            await m.database.customStatement(
+              'ALTER TABLE locations ADD COLUMN address TEXT',
+            );
+          } catch (e) {
+            debugPrint('Migration: address column might already exist: $e');
+          }
+        }
       },
       beforeOpen: (details) async {
         // Disable foreign keys for this connection
         await customSelect('PRAGMA foreign_keys = OFF').get();
+        // Seed default outlet if none exist yet
+        final existing = await select(locations).get();
+        if (existing.isEmpty) {
+          await into(locations).insert(
+            LocationsCompanion(
+              id: const Value('default-outlet-001'),
+              name: const Value('Hangout Spot'),
+              address: const Value('Kanha Dreamland'),
+              phoneNumber: const Value(''),
+              isActive: const Value(true),
+              createdAt: Value(DateTime.now()),
+            ),
+          );
+          debugPrint('✅ Default outlet seeded: Hangout Spot – Kanha Dreamland');
+        }
       },
     );
   }

@@ -326,6 +326,214 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
                   ),
                 ],
               ),
+              const SizedBox(height: 24),
+              // ── DANGER ZONE ──────────────────────────────────────────────
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: Colors.red.withOpacity(0.5),
+                    width: 1.5,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  color: Colors.red.withOpacity(0.04),
+                ),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.warning_amber_rounded,
+                          color: Colors.red,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Danger Zone',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'This will permanently delete ALL data from the cloud and this device, then log you out. This action cannot be undone.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          // Step 1: First confirmation
+                          final confirm1 = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.surface,
+                              title: Row(
+                                children: const [
+                                  Icon(Icons.delete_forever, color: Colors.red),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Clean All Data?',
+                                    style: TextStyle(color: Colors.red),
+                                  ),
+                                ],
+                              ),
+                              content: const Text(
+                                'This will permanently erase ALL orders, customers, settings, menu, and outlet data from both the cloud and this device.\n\nAre you absolutely sure?',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx, false),
+                                  child: const Text('Cancel'),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () => Navigator.pop(ctx, true),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                  child: const Text('Yes, Delete Everything'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirm1 != true || !mounted) return;
+
+                          // Step 2: Second confirmation (type to confirm)
+                          final confirmController = TextEditingController();
+                          final confirm2 = await showDialog<bool>(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (ctx) => StatefulBuilder(
+                              builder: (ctx, setS) => AlertDialog(
+                                backgroundColor: Theme.of(
+                                  context,
+                                ).colorScheme.surface,
+                                title: const Text('Final Confirmation'),
+                                content: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Type DELETE to confirm:',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    TextField(
+                                      controller: confirmController,
+                                      autofocus: true,
+                                      decoration: const InputDecoration(
+                                        hintText: 'DELETE',
+                                        border: OutlineInputBorder(),
+                                      ),
+                                      onChanged: (_) => setS(() {}),
+                                    ),
+                                  ],
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx, false),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed:
+                                        confirmController.text == 'DELETE'
+                                        ? () => Navigator.pop(ctx, true)
+                                        : null,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.red,
+                                      foregroundColor: Colors.white,
+                                    ),
+                                    child: const Text('Confirm Delete'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                          if (confirm2 != true || !mounted) return;
+
+                          // Step 3: Show progress and execute
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (c) => const Center(
+                              child: Card(
+                                child: Padding(
+                                  padding: EdgeInsets.all(24),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      CircularProgressIndicator(
+                                        color: Colors.red,
+                                      ),
+                                      SizedBox(height: 16),
+                                      Text('Deleting all data...'),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+
+                          try {
+                            final syncRepo = ref.read(syncRepositoryProvider);
+                            // Delete cloud data first
+                            await syncRepo.deleteCloudData();
+                            // Then clear local data
+                            await syncRepo.clearLocalData();
+                            // Sign out
+                            await ref.read(authRepositoryProvider).signOut();
+
+                            if (mounted) {
+                              Navigator.of(context).pushAndRemoveUntil(
+                                MaterialPageRoute(
+                                  builder: (_) => const LoginScreen(),
+                                ),
+                                (route) => false,
+                              );
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              Navigator.pop(context); // close progress dialog
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Failed: $e'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          elevation: 2,
+                        ),
+                        icon: const Icon(
+                          Icons.delete_forever_rounded,
+                          size: 20,
+                        ),
+                        label: const Text(
+                          'Clean All Data & Logout',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),

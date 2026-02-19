@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/data/providers/database_provider.dart';
 import 'package:uuid/uuid.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 const String CURRENT_LOCATION_ID_KEY = 'current_location_id';
 
@@ -36,13 +37,20 @@ final currentLocationIdProvider = StreamProvider<String?>((ref) {
 
 final locationsControllerProvider =
     StateNotifierProvider<LocationsController, AsyncValue<void>>((ref) {
-      return LocationsController(ref.watch(appDatabaseProvider));
+      return LocationsController(ref.watch(appDatabaseProvider), ref);
     });
 
 class LocationsController extends StateNotifier<AsyncValue<void>> {
   final AppDatabase _db;
+  final Ref _ref;
 
-  LocationsController(this._db) : super(const AsyncData(null));
+  LocationsController(this._db, this._ref) : super(const AsyncData(null));
+
+  /// Force a refresh of the locations list
+  void _refresh() {
+    _ref.invalidate(locationsStreamProvider);
+    _ref.invalidate(activeOutletProvider);
+  }
 
   Future<void> addLocation(
     String name,
@@ -57,11 +65,12 @@ class LocationsController extends StateNotifier<AsyncValue<void>> {
         address: Value(address),
         phoneNumber: Value(phoneNumber),
         isActive: const Value(false), // New outlets start inactive
-        createdAt: Value(DateTime.now()), // Add timestamp
+        createdAt: Value(DateTime.now()),
       );
       await _db.into(_db.locations).insert(location);
       debugPrint('✅ Outlet added successfully: $name');
       state = const AsyncData(null);
+      _refresh();
     } catch (e, st) {
       debugPrint('❌ Error adding outlet: $e');
       state = AsyncError(e, st);
@@ -84,6 +93,7 @@ class LocationsController extends StateNotifier<AsyncValue<void>> {
         ),
       );
       state = const AsyncData(null);
+      _refresh();
     } catch (e, st) {
       state = AsyncError(e, st);
     }
@@ -107,6 +117,10 @@ class LocationsController extends StateNotifier<AsyncValue<void>> {
   Future<void> activateOutlet(String id) async {
     state = const AsyncLoading();
     try {
+      // Persist to SharedPreferences for auto-connect
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('last_active_outlet_id', id);
+
       await _db.transaction(() async {
         // First, deactivate all outlets
         await _db
@@ -119,6 +133,7 @@ class LocationsController extends StateNotifier<AsyncValue<void>> {
         );
       });
       state = const AsyncData(null);
+      _refresh();
     } catch (e, st) {
       state = AsyncError(e, st);
     }
@@ -132,6 +147,7 @@ class LocationsController extends StateNotifier<AsyncValue<void>> {
         const LocationsCompanion(isActive: Value(false)),
       );
       state = const AsyncData(null);
+      _refresh();
     } catch (e, st) {
       state = AsyncError(e, st);
     }
