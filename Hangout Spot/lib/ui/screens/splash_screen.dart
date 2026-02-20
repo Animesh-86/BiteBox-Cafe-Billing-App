@@ -7,6 +7,7 @@ import 'package:hangout_spot/data/repositories/menu_repository.dart';
 import 'package:hangout_spot/data/local/seed_data.dart';
 import 'package:hangout_spot/ui/screens/main_screen.dart';
 import 'package:hangout_spot/ui/screens/auth/login_screen.dart';
+import 'package:hangout_spot/data/providers/database_provider.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -35,10 +36,15 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     });
   }
 
+  // ... (existing imports)
+
   Future<void> _seedData() async {
     try {
       final menuRepo = ref.read(menuRepositoryProvider);
       await MenuSeeder.seed(menuRepo);
+
+      final db = ref.read(appDatabaseProvider);
+      await LocationSeeder.seed(db);
     } catch (e) {
       debugPrint("Seeding error: $e");
     }

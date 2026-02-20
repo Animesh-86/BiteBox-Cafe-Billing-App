@@ -155,7 +155,7 @@ class SyncRepository {
       print(
         'Restore failed (Firestore may not be configured or no backup exists): $e',
       );
-      throw Exception('No backup data found or Firestore not configured');
+      throw Exception('Restore failed: $e');
     }
   }
 

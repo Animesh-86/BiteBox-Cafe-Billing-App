@@ -117,7 +117,37 @@ class _ProfileHeader extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(customer.phone ?? 'No phone'),
+                Row(
+                  children: [
+                    Text(customer.phone ?? 'No phone'),
+                    if (customer.phone?.isNotEmpty ?? false) ...[
+                      const SizedBox(width: 8),
+                      // We need a Consumer here to access the provider, since _ProfileHeader is StatelessWidget
+                      Consumer(
+                        builder: (context, ref, _) {
+                          return IconButton(
+                            icon: const Icon(
+                              Icons.chat_bubble_outline,
+                              color: Colors.green,
+                              size: 20,
+                            ),
+                            constraints: const BoxConstraints(),
+                            padding: EdgeInsets.zero,
+                            tooltip: 'Chat on WhatsApp',
+                            onPressed: () {
+                              ref
+                                  .read(shareServiceProvider)
+                                  .openWhatsAppChat(
+                                    customer.phone!,
+                                    text: "Hi ${customer.name}!",
+                                  );
+                            },
+                          );
+                        },
+                      ),
+                    ],
+                  ],
+                ),
               ],
             ),
           ),

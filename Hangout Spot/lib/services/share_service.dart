@@ -108,6 +108,27 @@ class ShareService {
 
     await shareInvoice(order, items, customer);
   }
+
+  Future<void> openWhatsAppChat(String phone, {String? text}) async {
+    if (phone.isEmpty) return;
+
+    String cleanPhone = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    if (cleanPhone.length == 10) cleanPhone = "91$cleanPhone";
+
+    final message = text != null ? "&text=${Uri.encodeComponent(text)}" : "";
+    final url = "whatsapp://send?phone=$cleanPhone$message";
+    final uri = Uri.parse(url);
+
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      return;
+    }
+
+    final fallback = Uri.parse("https://wa.me/$cleanPhone$message");
+    if (await canLaunchUrl(fallback)) {
+      await launchUrl(fallback, mode: LaunchMode.externalApplication);
+    }
+  }
 }
 
 final shareServiceProvider = Provider<ShareService>((ref) {

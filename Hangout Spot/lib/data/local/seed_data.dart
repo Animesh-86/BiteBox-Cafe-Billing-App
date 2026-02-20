@@ -159,3 +159,24 @@ class MenuSeeder {
     }
   }
 }
+
+class LocationSeeder {
+  static Future<void> seed(AppDatabase db) async {
+    final count = await (db.select(db.locations)..limit(1)).get();
+    if (count.isEmpty) {
+      // Seed default location
+      await db
+          .into(db.locations)
+          .insert(
+            LocationsCompanion(
+              id: drift.Value(const Uuid().v4()),
+              name: const drift.Value('Main Outlet'),
+              address: const drift.Value('Main Street'),
+              phoneNumber: const drift.Value(''),
+              isActive: const drift.Value(true),
+              createdAt: drift.Value(DateTime.now()),
+            ),
+          );
+    }
+  }
+}

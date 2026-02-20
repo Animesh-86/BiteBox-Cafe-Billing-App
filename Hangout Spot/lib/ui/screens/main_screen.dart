@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hangout_spot/ui/screens/dashboard/dashboard_screen.dart';
-import 'package:hangout_spot/ui/screens/analytics/analytics_screen.dart';
+import 'package:hangout_spot/ui/screens/analytics/premium_analytics_screen.dart';
 import 'package:hangout_spot/ui/screens/menu/manage_menu_screen.dart';
 import 'package:hangout_spot/ui/screens/billing/billing_screen.dart';
 import 'package:hangout_spot/ui/screens/settings/settings_screen.dart';
@@ -100,7 +100,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       case 2:
         return const ManageMenuScreen();
       case 3:
-        return const AnalyticsScreen();
+        return const PremiumAnalyticsScreen();
       case 4:
         return const SettingsScreen();
       default:
