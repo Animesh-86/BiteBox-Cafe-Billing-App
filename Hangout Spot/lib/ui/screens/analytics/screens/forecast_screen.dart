@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/ui/screens/analytics/theme/analytics_theme.dart';
 import 'package:hangout_spot/ui/screens/analytics/providers/analytics_data_provider.dart';
+import 'package:hangout_spot/ui/screens/analytics/utils/date_filter_utils.dart';
+import 'package:hangout_spot/logic/locations/location_provider.dart';
+import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:intl/intl.dart';
 
 class ForecastScreen extends ConsumerStatefulWidget {
@@ -13,18 +16,188 @@ class ForecastScreen extends ConsumerStatefulWidget {
 }
 
 class _ForecastScreenState extends ConsumerState<ForecastScreen> {
-  DateTime _startDate = DateTime.now().subtract(const Duration(days: 6));
-  DateTime _endDate = DateTime.now();
+  DateFilter _dateFilter = DateFilter.last7Days();
+  DateTime get _startDate => _dateFilter.startDate;
+  DateTime get _endDate => _dateFilter.endDate;
+
+  void _applyDateFilter(DateFilter filter) {
+    setState(() {
+      _dateFilter = filter;
+    });
+  }
+
+  Future<void> _selectDateRange() async {
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      initialDateRange: DateTimeRange(start: _startDate, end: _endDate),
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.dark().copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: AnalyticsTheme.primaryGold,
+              surface: AnalyticsTheme.cardBackground,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        _dateFilter = DateFilter.custom(picked.start, picked.end);
+      });
+    }
+  }
+
+  Future<void> _showOutletSelector(Location? currentOutlet) async {
+    final locations = await ref.read(locationsStreamProvider.future);
+
+    if (!mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AnalyticsTheme.cardBackground,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Select Outlet',
+              style: TextStyle(
+                color: AnalyticsTheme.primaryGold,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Add "All Outlets" option
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: currentOutlet == null
+                      ? AnalyticsTheme.primaryGold.withOpacity(0.2)
+                      : AnalyticsTheme.secondaryBeige.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.store_mall_directory_rounded,
+                  color: currentOutlet == null
+                      ? AnalyticsTheme.primaryGold
+                      : AnalyticsTheme.secondaryText,
+                ),
+              ),
+              title: Text(
+                'All Outlets',
+                style: TextStyle(
+                  color: currentOutlet == null
+                      ? AnalyticsTheme.primaryGold
+                      : AnalyticsTheme.primaryText,
+                  fontWeight: currentOutlet == null
+                      ? FontWeight.w600
+                      : FontWeight.normal,
+                ),
+              ),
+              subtitle: Text(
+                'Combined analytics from all outlets',
+                style: TextStyle(
+                  color: AnalyticsTheme.secondaryText,
+                  fontSize: 12,
+                ),
+              ),
+              trailing: currentOutlet == null
+                  ? const Icon(
+                      Icons.check_circle_rounded,
+                      color: AnalyticsTheme.primaryGold,
+                    )
+                  : null,
+              onTap: () async {
+                // Deactivate all outlets to show "All Outlets"
+                final locations = await ref.read(
+                  locationsStreamProvider.future,
+                );
+                for (final location in locations) {
+                  await ref
+                      .read(locationsControllerProvider.notifier)
+                      .deactivateOutlet(location.id);
+                }
+                if (mounted) Navigator.pop(context);
+              },
+            ),
+            const Divider(),
+            ...locations.map(
+              (location) => ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: location.id == currentOutlet?.id
+                        ? AnalyticsTheme.primaryGold.withOpacity(0.2)
+                        : AnalyticsTheme.secondaryBeige.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.store_rounded,
+                    color: location.id == currentOutlet?.id
+                        ? AnalyticsTheme.primaryGold
+                        : AnalyticsTheme.secondaryText,
+                  ),
+                ),
+                title: Text(
+                  location.name,
+                  style: TextStyle(
+                    color: location.id == currentOutlet?.id
+                        ? AnalyticsTheme.primaryGold
+                        : AnalyticsTheme.primaryText,
+                    fontWeight: location.id == currentOutlet?.id
+                        ? FontWeight.w600
+                        : FontWeight.normal,
+                  ),
+                ),
+                subtitle: Text(
+                  location.address ?? 'No address',
+                  style: TextStyle(
+                    color: AnalyticsTheme.secondaryText,
+                    fontSize: 12,
+                  ),
+                ),
+                trailing: location.id == currentOutlet?.id
+                    ? const Icon(
+                        Icons.check_circle_rounded,
+                        color: AnalyticsTheme.primaryGold,
+                      )
+                    : null,
+                onTap: () {
+                  ref
+                      .read(locationsControllerProvider.notifier)
+                      .activateOutlet(location.id);
+                  Navigator.pop(context);
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final analyticsData = ref.watch(
       analyticsDataProvider((startDate: _startDate, endDate: _endDate)),
     );
+    final activeOutlet = ref.watch(activeOutletProvider).valueOrNull;
 
     return Column(
       children: [
-        _buildTopBar(),
+        _buildTopBar(activeOutlet),
         Expanded(
           child: analyticsData.when(
             data: (data) => _buildContent(data),
@@ -45,34 +218,83 @@ class _ForecastScreenState extends ConsumerState<ForecastScreen> {
     );
   }
 
-  Widget _buildTopBar() {
+  Widget _buildTopBar(Location? activeOutlet) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
       decoration: BoxDecoration(
         color: AnalyticsTheme.cardBackground,
         border: Border(
           bottom: BorderSide(color: AnalyticsTheme.borderColor, width: 1),
         ),
       ),
-      child: Column(
+      child: Row(
         children: [
-          Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.menu_rounded),
-                color: AnalyticsTheme.primaryGold,
-                onPressed: widget.onMenuPressed,
-              ),
-              const Expanded(
-                child: Text(
-                  'Forecast',
-                  style: AnalyticsTheme.headingLarge,
-                  textAlign: TextAlign.center,
+          IconButton(
+            icon: const Icon(Icons.menu_rounded),
+            color: AnalyticsTheme.primaryGold,
+            onPressed: widget.onMenuPressed,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            activeOutlet?.address ?? 'All Outlets',
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AnalyticsTheme.primaryText,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: InkWell(
+              onTap: () => _showOutletSelector(activeOutlet),
+              borderRadius: BorderRadius.circular(6),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AnalyticsTheme.cardBackground,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: AnalyticsTheme.primaryGold.withOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      activeOutlet == null
+                          ? Icons.store_mall_directory_rounded
+                          : Icons.store_rounded,
+                      color: AnalyticsTheme.primaryGold,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        activeOutlet?.name ?? 'All Outlets',
+                        style: const TextStyle(
+                          color: AnalyticsTheme.primaryText,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.arrow_drop_down_rounded,
+                      color: AnalyticsTheme.primaryGold,
+                      size: 18,
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 48),
-            ],
+            ),
           ),
+          const SizedBox(width: 48),
         ],
       ),
     );
@@ -177,67 +399,91 @@ class _ForecastScreenState extends ConsumerState<ForecastScreen> {
       );
     }
 
-    return Column(
-      children: data.itemForecast.map((forecast) {
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 16),
-          child: Row(
+    // Use GridView for better layout instead of long list
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 1.3,
+      ),
+      itemCount: data.itemForecast.length,
+      itemBuilder: (context, index) {
+        final forecast = data.itemForecast[index];
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AnalyticsTheme.cardBackground,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: AnalyticsTheme.primaryGold.withOpacity(0.2),
+              width: 1,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: AnalyticsTheme.iconContainer(),
-                child: const Icon(
-                  Icons.restaurant_rounded,
-                  color: AnalyticsTheme.primaryGold,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      forecast.itemName,
-                      style: const TextStyle(
-                        color: AnalyticsTheme.primaryText,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AnalyticsTheme.primaryGold.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    Text(
-                      'Expected quantity',
-                      style: TextStyle(
-                        color: AnalyticsTheme.secondaryText,
-                        fontSize: 12,
-                      ),
+                    child: const Icon(
+                      Icons.restaurant_rounded,
+                      color: AnalyticsTheme.primaryGold,
+                      size: 20,
                     ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: AnalyticsTheme.primaryGold.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  forecast.expectedQuantity.toStringAsFixed(1),
-                  style: const TextStyle(
-                    color: AnalyticsTheme.primaryGold,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
                   ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AnalyticsTheme.primaryGold.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      forecast.expectedQuantity.toStringAsFixed(0),
+                      style: const TextStyle(
+                        color: AnalyticsTheme.primaryGold,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                forecast.itemName,
+                style: const TextStyle(
+                  color: AnalyticsTheme.primaryText,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              Text(
+                'Expected qty/day',
+                style: TextStyle(
+                  color: AnalyticsTheme.secondaryText,
+                  fontSize: 11,
                 ),
               ),
             ],
           ),
         );
-      }).toList(),
+      },
     );
   }
 
@@ -250,13 +496,28 @@ class _ForecastScreenState extends ConsumerState<ForecastScreen> {
       );
     }
 
-    return Column(
-      children: data.bundleSuggestions.asMap().entries.map((entry) {
-        final index = entry.key;
-        final bundle = entry.value;
-
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 16),
+    // Use GridView for better layout
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 1,
+        mainAxisSpacing: 12,
+        childAspectRatio: 4,
+      ),
+      itemCount: data.bundleSuggestions.length,
+      itemBuilder: (context, index) {
+        final bundle = data.bundleSuggestions[index];
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AnalyticsTheme.cardBackground,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: AnalyticsTheme.chartPurple.withOpacity(0.3),
+              width: 1,
+            ),
+          ),
           child: Row(
             children: [
               Container(
@@ -266,30 +527,38 @@ class _ForecastScreenState extends ConsumerState<ForecastScreen> {
                   color: AnalyticsTheme.chartPurple.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(
-                  Icons.shopping_bag_rounded,
-                  color: AnalyticsTheme.chartPurple,
-                  size: 20,
+                child: Center(
+                  child: Text(
+                    '${index + 1}',
+                    style: const TextStyle(
+                      color: AnalyticsTheme.chartPurple,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
                       '${bundle.item1} + ${bundle.item2}',
                       style: const TextStyle(
                         color: AnalyticsTheme.primaryText,
                         fontSize: 14,
-                        fontWeight: FontWeight.w500,
+                        fontWeight: FontWeight.w600,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     Text(
                       'Frequently ordered together',
                       style: TextStyle(
                         color: AnalyticsTheme.secondaryText,
-                        fontSize: 12,
+                        fontSize: 11,
                       ),
                     ),
                   ],
@@ -297,18 +566,18 @@ class _ForecastScreenState extends ConsumerState<ForecastScreen> {
               ),
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
+                  horizontal: 14,
+                  vertical: 8,
                 ),
                 decoration: BoxDecoration(
                   color: AnalyticsTheme.chartPurple.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  '${bundle.count} orders',
+                  '${bundle.count}x',
                   style: const TextStyle(
                     color: AnalyticsTheme.chartPurple,
-                    fontSize: 12,
+                    fontSize: 13,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -316,7 +585,7 @@ class _ForecastScreenState extends ConsumerState<ForecastScreen> {
             ],
           ),
         );
-      }).toList(),
+      },
     );
   }
 

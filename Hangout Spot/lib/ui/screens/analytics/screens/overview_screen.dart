@@ -5,6 +5,7 @@ import 'package:hangout_spot/ui/screens/analytics/providers/analytics_data_provi
 import 'package:hangout_spot/ui/screens/analytics/utils/date_filter_utils.dart';
 import 'package:hangout_spot/ui/screens/analytics/services/analytics_export_service.dart';
 import 'package:hangout_spot/logic/locations/location_provider.dart';
+import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 
@@ -23,6 +24,149 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
     setState(() {
       _currentFilter = filter;
     });
+  }
+
+  Future<void> _selectDateRange() async {
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      initialDateRange: DateTimeRange(
+        start: _currentFilter.startDate,
+        end: _currentFilter.endDate,
+      ),
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.dark().copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: AnalyticsTheme.primaryGold,
+              surface: AnalyticsTheme.cardBackground,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        _currentFilter = DateFilter.custom(picked.start, picked.end);
+      });
+    }
+  }
+
+  Future<void> _showOutletSelector(Location? currentOutlet) async {
+    final locations = await ref.read(locationsStreamProvider.future);
+
+    if (!mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AnalyticsTheme.cardBackground,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text('Select Outlet', style: AnalyticsTheme.headingMedium),
+            ),
+            const SizedBox(height: 16),
+            // Add "All Outlets" option
+            ListTile(
+              leading: Icon(
+                Icons.store_mall_directory_rounded,
+                color: currentOutlet == null
+                    ? AnalyticsTheme.primaryGold
+                    : AnalyticsTheme.secondaryText,
+              ),
+              title: Text(
+                'All Outlets',
+                style: TextStyle(
+                  color: currentOutlet == null
+                      ? AnalyticsTheme.primaryGold
+                      : AnalyticsTheme.primaryText,
+                  fontWeight: currentOutlet == null
+                      ? FontWeight.w600
+                      : FontWeight.normal,
+                ),
+              ),
+              subtitle: Text(
+                'Combined analytics from all outlets',
+                style: TextStyle(
+                  color: AnalyticsTheme.secondaryText,
+                  fontSize: 12,
+                ),
+              ),
+              trailing: currentOutlet == null
+                  ? const Icon(
+                      Icons.check_circle,
+                      color: AnalyticsTheme.primaryGold,
+                    )
+                  : null,
+              onTap: () async {
+                // Deactivate all outlets to show "All Outlets"
+                final locations = await ref.read(
+                  locationsStreamProvider.future,
+                );
+                for (final location in locations) {
+                  await ref
+                      .read(locationsControllerProvider.notifier)
+                      .deactivateOutlet(location.id);
+                }
+                if (mounted) Navigator.pop(context);
+              },
+            ),
+            const Divider(),
+            ...locations.map((location) {
+              final isSelected = location.id == currentOutlet?.id;
+              return ListTile(
+                leading: Icon(
+                  Icons.store_rounded,
+                  color: isSelected
+                      ? AnalyticsTheme.primaryGold
+                      : AnalyticsTheme.secondaryText,
+                ),
+                title: Text(
+                  location.name,
+                  style: TextStyle(
+                    color: isSelected
+                        ? AnalyticsTheme.primaryGold
+                        : AnalyticsTheme.primaryText,
+                    fontWeight: isSelected
+                        ? FontWeight.w600
+                        : FontWeight.normal,
+                  ),
+                ),
+                subtitle: Text(
+                  location.address ?? 'No address',
+                  style: TextStyle(
+                    color: AnalyticsTheme.secondaryText,
+                    fontSize: 12,
+                  ),
+                ),
+                trailing: isSelected
+                    ? const Icon(
+                        Icons.check_circle,
+                        color: AnalyticsTheme.primaryGold,
+                      )
+                    : null,
+                onTap: () {
+                  ref
+                      .read(locationsControllerProvider.notifier)
+                      .activateOutlet(location.id);
+                  Navigator.pop(context);
+                },
+              );
+            }).toList(),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -83,9 +227,9 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
     );
   }
 
-  Widget _buildTopBar(activeOutlet) {
+  Widget _buildTopBar(Location? activeOutlet) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
       decoration: BoxDecoration(
         color: AnalyticsTheme.cardBackground,
         border: Border(
@@ -98,32 +242,75 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
             icon: const Icon(Icons.menu_rounded),
             color: AnalyticsTheme.primaryGold,
             onPressed: widget.onMenuPressed,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
           ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const Text(
-                  'Overview',
-                  style: AnalyticsTheme.headingLarge,
-                  textAlign: TextAlign.center,
-                ),
-                if (activeOutlet != null)
-                  Text(
-                    activeOutlet.name,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AnalyticsTheme.primaryGold.withOpacity(0.6),
-                    ),
-                  ),
-              ],
+          const SizedBox(width: 8),
+          Text(
+            activeOutlet?.address ?? 'All Outlets',
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AnalyticsTheme.primaryText,
             ),
           ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: InkWell(
+              onTap: () => _showOutletSelector(activeOutlet),
+              borderRadius: BorderRadius.circular(6),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AnalyticsTheme.cardBackground,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: AnalyticsTheme.primaryGold.withOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      activeOutlet == null
+                          ? Icons.store_mall_directory_rounded
+                          : Icons.store_rounded,
+                      color: AnalyticsTheme.primaryGold,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        activeOutlet?.name ?? 'All Outlets',
+                        style: const TextStyle(
+                          color: AnalyticsTheme.primaryText,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.arrow_drop_down_rounded,
+                      color: AnalyticsTheme.primaryGold,
+                      size: 18,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
           IconButton(
             icon: const Icon(Icons.download_rounded),
             color: AnalyticsTheme.primaryGold,
             tooltip: 'Export to Excel',
             onPressed: () => _exportData(),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
           ),
         ],
       ),
@@ -178,6 +365,49 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
               isSelected: _currentFilter.type == DateFilterType.last30Days,
               onSelected: () => _applyFilter(DateFilter.last30Days()),
             ),
+            const SizedBox(width: 8),
+            InkWell(
+              onTap: _selectDateRange,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: _currentFilter.type == DateFilterType.custom
+                      ? AnalyticsTheme.primaryGold
+                      : AnalyticsTheme.cardBackground,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: AnalyticsTheme.primaryGold,
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.calendar_today_rounded,
+                      color: _currentFilter.type == DateFilterType.custom
+                          ? Colors.black
+                          : AnalyticsTheme.primaryGold,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Custom',
+                      style: TextStyle(
+                        color: _currentFilter.type == DateFilterType.custom
+                            ? Colors.black
+                            : AnalyticsTheme.primaryText,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -185,18 +415,137 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
   }
 
   Future<void> _exportData() async {
+    // Show dialog to select export date range
+    final selectedFilter = await showDialog<DateFilter>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AnalyticsTheme.cardBackground,
+        title: const Text(
+          'Export Date Range',
+          style: TextStyle(color: AnalyticsTheme.primaryText),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(
+                Icons.calendar_month,
+                color: AnalyticsTheme.primaryGold,
+              ),
+              title: const Text(
+                'This Year',
+                style: TextStyle(color: AnalyticsTheme.primaryText),
+              ),
+              onTap: () => Navigator.pop(context, DateFilter.thisYear()),
+            ),
+            ListTile(
+              leading: const Icon(
+                Icons.calendar_today,
+                color: AnalyticsTheme.primaryGold,
+              ),
+              title: const Text(
+                'This Month',
+                style: TextStyle(color: AnalyticsTheme.primaryText),
+              ),
+              onTap: () => Navigator.pop(context, DateFilter.thisMonth()),
+            ),
+            ListTile(
+              leading: const Icon(
+                Icons.date_range,
+                color: AnalyticsTheme.primaryGold,
+              ),
+              title: const Text(
+                'This Week',
+                style: TextStyle(color: AnalyticsTheme.primaryText),
+              ),
+              onTap: () => Navigator.pop(context, DateFilter.thisWeek()),
+            ),
+            ListTile(
+              leading: const Icon(
+                Icons.event,
+                color: AnalyticsTheme.primaryGold,
+              ),
+              title: const Text(
+                'Custom Range',
+                style: TextStyle(color: AnalyticsTheme.primaryText),
+              ),
+              onTap: () async {
+                Navigator.pop(context);
+                final picked = await showDateRangePicker(
+                  context: context,
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime.now(),
+                  initialDateRange: DateTimeRange(
+                    start: _currentFilter.startDate,
+                    end: _currentFilter.endDate,
+                  ),
+                  builder: (context, child) {
+                    return Theme(
+                      data: ThemeData.dark().copyWith(
+                        colorScheme: const ColorScheme.dark(
+                          primary: AnalyticsTheme.primaryGold,
+                          surface: AnalyticsTheme.cardBackground,
+                        ),
+                      ),
+                      child: child!,
+                    );
+                  },
+                );
+                if (picked != null) {
+                  _performExport(DateFilter.custom(picked.start, picked.end));
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(
+                Icons.highlight,
+                color: AnalyticsTheme.primaryGold,
+              ),
+              title: const Text(
+                'Current Selection',
+                style: TextStyle(color: AnalyticsTheme.primaryText),
+              ),
+              subtitle: Text(
+                '${DateFormat('dd MMM yyyy').format(_currentFilter.startDate)} - ${DateFormat('dd MMM yyyy').format(_currentFilter.endDate)}',
+                style: TextStyle(
+                  color: AnalyticsTheme.secondaryText,
+                  fontSize: 12,
+                ),
+              ),
+              onTap: () => Navigator.pop(context, _currentFilter),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: AnalyticsTheme.primaryGold),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (selectedFilter != null) {
+      _performExport(selectedFilter);
+    }
+  }
+
+  Future<void> _performExport(DateFilter filter) async {
     final analyticsData = await ref.read(
       analyticsDataProvider((
-        startDate: _currentFilter.startDate,
-        endDate: _currentFilter.endDate,
+        startDate: filter.startDate,
+        endDate: filter.endDate,
       )).future,
     );
 
     try {
       await AnalyticsExportService.exportToExcel(
         analyticsData,
-        startDate: _currentFilter.startDate,
-        endDate: _currentFilter.endDate,
+        startDate: filter.startDate,
+        endDate: filter.endDate,
       );
 
       if (mounted) {
