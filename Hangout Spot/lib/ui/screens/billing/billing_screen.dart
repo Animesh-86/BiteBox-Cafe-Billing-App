@@ -11,7 +11,6 @@ import 'package:hangout_spot/ui/screens/billing/widgets/billing_cart_panel.dart'
 import 'package:hangout_spot/ui/screens/billing/widgets/billing_category_sidebar.dart';
 import 'package:hangout_spot/ui/screens/billing/widgets/billing_held_orders.dart';
 import 'package:hangout_spot/ui/screens/billing/widgets/billing_styles.dart';
-import 'package:hangout_spot/services/share_service.dart';
 
 class BillingScreen extends ConsumerWidget {
   const BillingScreen({super.key});
@@ -117,25 +116,6 @@ class _BillingView extends ConsumerWidget {
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
           ),
-          if (cart.customer?.phone?.isNotEmpty ?? false) ...[
-            const SizedBox(width: 4),
-            IconButton(
-              icon: const Icon(
-                Icons.chat_bubble_outline,
-                size: 16,
-                color: Colors.green,
-              ),
-              tooltip: "Chat with ${cart.customer!.name}",
-              padding: const EdgeInsets.all(8),
-              constraints: const BoxConstraints(),
-              onPressed: () => ref
-                  .read(shareServiceProvider)
-                  .openWhatsAppChat(
-                    cart.customer!.phone!,
-                    text: "Hi ${cart.customer!.name}!",
-                  ),
-            ),
-          ],
           const SizedBox(width: 4),
           // KOT Print
           IconButton(

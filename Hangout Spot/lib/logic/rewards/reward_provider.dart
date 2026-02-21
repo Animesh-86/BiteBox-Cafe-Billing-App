@@ -2,7 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/data/providers/database_provider.dart';
-import 'package:hangout_spot/logic/billing/cart_provider.dart';
 import 'package:uuid/uuid.dart';
 import '../../utils/constants/app_keys.dart';
 

@@ -302,6 +302,7 @@ class AppDatabase extends _$AppDatabase {
               isActive: const Value(true),
               createdAt: Value(DateTime.now()),
             ),
+            mode: InsertMode.insertOrReplace,
           );
           debugPrint('✅ Default outlet seeded: Hangout Spot – Kanha Dreamland');
         }

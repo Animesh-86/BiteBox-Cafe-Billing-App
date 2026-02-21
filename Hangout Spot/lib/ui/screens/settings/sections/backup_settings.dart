@@ -5,6 +5,11 @@ import 'package:hangout_spot/data/repositories/sync_repository.dart';
 import 'package:hangout_spot/data/repositories/auth_repository.dart';
 import 'package:hangout_spot/ui/screens/auth/login_screen.dart';
 import 'package:hangout_spot/utils/constants/app_keys.dart';
+import 'package:hangout_spot/data/providers/database_provider.dart';
+import 'package:hangout_spot/logic/locations/location_provider.dart';
+import 'package:hangout_spot/ui/screens/analytics/providers/analytics_data_provider.dart';
+import 'package:hangout_spot/services/realtime_order_service.dart';
+import 'package:hangout_spot/logic/billing/cart_provider.dart';
 import '../widgets/settings_shared.dart';
 
 class BackupSettingsScreen extends ConsumerStatefulWidget {
@@ -33,8 +38,8 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
       _autoSyncEnabled =
           (prefs.getString(CLOUD_AUTO_SYNC_ENABLED_KEY) == 'true');
       _autoSyncIntervalMinutes =
-          int.tryParse(prefs.getString(CLOUD_AUTO_SYNC_INTERVAL_KEY) ?? '15') ??
-          15;
+          int.tryParse(prefs.getString(CLOUD_AUTO_SYNC_INTERVAL_KEY) ?? '2') ??
+          2;
       _isLoading = false;
     });
   }
@@ -139,7 +144,7 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
                           value: _autoSyncIntervalMinutes,
                           dropdownColor: Theme.of(context).cardTheme.color,
                           underline: Container(),
-                          items: const [15, 30, 60].map((m) {
+                          items: const [1, 2, 5, 10, 15].map((m) {
                             return DropdownMenuItem<int>(
                               value: m,
                               child: Text("$m min"),
@@ -488,12 +493,71 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
 
                           try {
                             final syncRepo = ref.read(syncRepositoryProvider);
+                            final orderService = ref.read(
+                              realTimeOrderServiceProvider,
+                            );
+                            orderService.stopListening();
                             // Delete cloud data first
                             await syncRepo.deleteCloudData();
-                            // Then clear local data
+                            // Then clear local data (this will re-seed default outlet)
                             await syncRepo.clearLocalData();
+
+                            // Reset cart state to default (Walk-in)
+                            ref.read(cartProvider.notifier).clearCart();
+
+                            // IMPORTANT: Invalidate ALL providers to clear cached data
+                            // This ensures analytics and other screens show fresh data after deletion
+                            ref.invalidate(appDatabaseProvider);
+                            ref.invalidate(locationsStreamProvider);
+                            ref.invalidate(activeOutletProvider);
+                            ref.invalidate(locationsControllerProvider);
+                            ref.invalidate(analyticsDataProvider);
+                            ref.invalidate(cartProvider);
+
+                            // Add extra delay to ensure database operations complete
+                            await Future.delayed(
+                              const Duration(milliseconds: 500),
+                            );
+
+                            if (mounted) {
+                              Navigator.pop(context); // close progress dialog
+
+                              // Show success message
+                              await showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (ctx) => AlertDialog(
+                                  title: const Row(
+                                    children: [
+                                      Icon(
+                                        Icons.check_circle,
+                                        color: Colors.green,
+                                        size: 28,
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text('Data Cleared'),
+                                    ],
+                                  ),
+                                  content: const Text(
+                                    'All data has been successfully cleared.\n\n'
+                                    'Default outlet "Hangout Spot - Kanha Dreamland" has been restored.\n\n'
+                                    'IMPORTANT: After logging out, please FULLY RESTART the app (close and reopen) to ensure all cached data is cleared.',
+                                  ),
+                                  actions: [
+                                    ElevatedButton(
+                                      onPressed: () {
+                                        Navigator.pop(ctx);
+                                      },
+                                      child: const Text('OK'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
+
                             // Sign out
                             await ref.read(authRepositoryProvider).signOut();
+                            orderService.stopListening();
 
                             if (mounted) {
                               Navigator.of(context).pushAndRemoveUntil(

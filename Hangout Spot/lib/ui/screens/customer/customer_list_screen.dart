@@ -48,13 +48,35 @@ class _CustomerListScreenState extends ConsumerState<CustomerListScreen> {
       ),
       body: customersAsync.when(
         data: (customers) {
-          if (customers.isEmpty) {
+          if (customers.isEmpty && !widget.isSelectionMode) {
             return const Center(child: Text("No customers found."));
           }
           return ListView.builder(
-            itemCount: customers.length,
+            itemCount: widget.isSelectionMode
+                ? customers.length + 1
+                : customers.length,
             itemBuilder: (context, index) {
-              final customer = customers[index];
+              // Add Walk-in option at the top in selection mode
+              if (widget.isSelectionMode && index == 0) {
+                return ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.primary.withOpacity(0.2),
+                    child: Icon(
+                      Icons.person_outline,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                  title: const Text('Walk-in Customer'),
+                  subtitle: const Text('Continue without customer selection'),
+                  onTap: () {
+                    Navigator.pop(context, null);
+                  },
+                );
+              }
+              final customerIndex = widget.isSelectionMode ? index - 1 : index;
+              final customer = customers[customerIndex];
               return ListTile(
                 leading: CircleAvatar(child: Text(customer.name[0])),
                 title: Text(customer.name),

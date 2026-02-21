@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart' hide Order;
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' hide Category;
 import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:drift/drift.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -106,6 +107,21 @@ class SyncRepository {
         'reward_transactions',
       );
 
+      // CRITICAL: Clear old transactional data to prevent orphaned records
+      // This ensures fresh install gets clean data, not mixed with old local data
+      debugPrint('🧹 Clearing old transactional data before restore...');
+      await _db.batch((batch) {
+        batch.deleteWhere(_db.customers, (t) => const Constant(true));
+        batch.deleteWhere(_db.orders, (t) => const Constant(true));
+        batch.deleteWhere(_db.orderItems, (t) => const Constant(true));
+        batch.deleteWhere(_db.rewardTransactions, (t) => const Constant(true));
+        batch.deleteWhere(_db.locations, (t) => const Constant(true));
+        batch.deleteWhere(_db.settings, (t) => const Constant(true));
+      });
+
+      // Now insert clean data from cloud
+      debugPrint('📥 Inserting fresh data from cloud...');
+
       await _db.batch((batch) {
         batch.insertAll(
           _db.categories,
@@ -150,6 +166,10 @@ class SyncRepository {
           mode: InsertMode.insertOrReplace,
         );
       });
+
+      // Force refresh all Drift streams after restore
+      await Future.delayed(const Duration(milliseconds: 100));
+      debugPrint('✅ Data restored successfully and streams refreshed');
     } catch (e) {
       // Firestore not set up or no data to restore - fail silently
       print(
@@ -161,6 +181,8 @@ class SyncRepository {
 
   /// Clears transactional & config data but PRESERVES menu (categories/items)
   Future<void> clearLocalData() async {
+    debugPrint('🗑️ Starting data deletion...');
+
     await _db.batch((batch) {
       // Transactional data
       batch.deleteWhere(_db.customers, (t) => const Constant(true));
@@ -176,6 +198,44 @@ class SyncRepository {
       // NOTE: categories and items are NOT deleted (menu is preserved)
     });
 
+    debugPrint('✅ Batch deletion completed');
+
+    // Verify deletion
+    final remainingOrders = await (_db.select(_db.orders).get());
+    final remainingCustomers = await (_db.select(_db.customers).get());
+    debugPrint('📊 Remaining orders: ${remainingOrders.length}');
+    debugPrint('📊 Remaining customers: ${remainingCustomers.length}');
+
+    // Re-seed default outlet after deletion using INSERT OR REPLACE (replaces if exists)
+    await _db.into(_db.locations).insert(
+      LocationsCompanion(
+        id: const Value('default-outlet-001'),
+        name: const Value('Hangout Spot'),
+        address: const Value('Kanha Dreamland'),
+        phoneNumber: const Value(''),
+        isActive: const Value(true),
+        createdAt: Value(DateTime.now()),
+      ),
+      mode: InsertMode.insertOrReplace,
+    );
+    debugPrint('✅ Default outlet re-seeded: Hangout Spot – Kanha Dreamland');
+
+    // Re-seed the default location setting in the Settings table
+    await _db.into(_db.settings).insert(
+      SettingsCompanion(
+        key: const Value('current_location_id'),
+        value: const Value('default-outlet-001'),
+        description: const Value('ID of the currently active outlet'),
+      ),
+      mode: InsertMode.insertOrReplace,
+    );
+    debugPrint('✅ Default location setting re-seeded');
+
+    // Force refresh all Drift streams by invalidating cache
+    // This ensures watchSessionOrders() and other streams see the changes
+    await Future.delayed(const Duration(milliseconds: 200));
+    debugPrint('✅ Local data cleared and streams refreshed');
+
     // Also clear promo & outlet SharedPreferences
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('promo_enabled');
@@ -185,6 +245,17 @@ class SyncRepository {
     await prefs.remove('promo_start_iso');
     await prefs.remove('promo_end_iso');
     await prefs.remove('last_active_outlet_id');
+
+    // Clear any persisted cart state to avoid restoring old customer selection
+    for (final key in prefs.getKeys()) {
+      if (key.startsWith('cart_state_v1_') || key == 'cart_state_temp') {
+        await prefs.remove(key);
+      }
+    }
+
+    // Set the default outlet as last active
+    await prefs.setString('last_active_outlet_id', 'default-outlet-001');
+    debugPrint('✅ Set default outlet as active in preferences');
   }
 
   /// Deletes all cloud data EXCEPT menu (categories/items are preserved)
@@ -195,11 +266,21 @@ class SyncRepository {
 
       final baseRef = _firestore.collection('cafes').doc(user.uid);
 
+      Future<void> deleteCollectionDocs(CollectionReference<Map<String, dynamic>> col) async {
+        final snapshot = await col.get();
+        for (final doc in snapshot.docs) {
+          await doc.reference.delete();
+        }
+      }
+
       // Delete transactional data
       final dataRef = baseRef.collection('data');
       await dataRef.doc('customers').delete();
       await dataRef.doc('orders').delete();
       await dataRef.doc('order_items').delete();
+
+      // Delete individual order documents (real-time sync collection)
+      await deleteCollectionDocs(baseRef.collection('orders'));
 
       // Delete config (outlets, settings) — menu/* is intentionally kept
       final configRef = baseRef.collection('config');

@@ -5,17 +5,20 @@ import 'package:flutter/foundation.dart';
 import 'package:hangout_spot/data/models/user_session.dart';
 import 'package:hangout_spot/data/models/user_metadata.dart' as app_models;
 import 'package:hangout_spot/services/device_info_service.dart';
+import 'package:hangout_spot/data/local/db/app_database.dart';
+import 'package:hangout_spot/data/repositories/order_repository.dart';
 
 /// Service for managing user sessions across devices
 class SessionManagerService {
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
+  final AppDatabase? _db; // Optional for retry sync
 
   String? _currentSessionId;
   Timer? _heartbeatTimer;
   StreamSubscription? _sessionListener;
 
-  SessionManagerService(this._firestore, this._auth);
+  SessionManagerService(this._firestore, this._auth, [this._db]);
 
   /// Get current session ID
   String? get currentSessionId => _currentSessionId;
@@ -128,11 +131,12 @@ class SessionManagerService {
     }
   }
 
-  /// Send heartbeat every 30 seconds to update last activity
+  /// Send heartbeat every 30 seconds to update last activity and retry failed syncs
   void _startHeartbeat() {
     _heartbeatTimer?.cancel();
     _heartbeatTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       _updateLastActivity();
+      _retryFailedSyncs();
     });
   }
 
@@ -150,6 +154,18 @@ class SessionManagerService {
           .update({'lastActivity': FieldValue.serverTimestamp()});
     } catch (e) {
       debugPrint('⚠️ Error updating heartbeat: $e');
+    }
+  }
+
+  /// Retry syncing orders that failed to push to Firestore
+  Future<void> _retryFailedSyncs() async {
+    if (_db == null) return;
+
+    try {
+      final orderRepo = OrderRepository(_db);
+      await orderRepo.syncUnsyncedOrders();
+    } catch (e) {
+      debugPrint('⚠️ Error in retry sync: $e');
     }
   }
 

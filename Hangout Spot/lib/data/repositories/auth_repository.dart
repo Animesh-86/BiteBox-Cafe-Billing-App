@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/services/session_manager_service.dart';
+import 'package:hangout_spot/data/providers/database_provider.dart';
 
 class AuthRepository {
   final FirebaseAuth _firebaseAuth;
@@ -44,9 +45,11 @@ class AuthRepository {
 }
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
+  final db = ref.watch(appDatabaseProvider);
   final sessionManager = SessionManagerService(
     FirebaseFirestore.instance,
     FirebaseAuth.instance,
+    db,
   );
   return AuthRepository(FirebaseAuth.instance, sessionManager);
 });

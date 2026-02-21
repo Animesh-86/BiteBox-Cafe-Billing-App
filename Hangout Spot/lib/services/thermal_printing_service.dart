@@ -4,15 +4,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:intl/intl.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image/image.dart' as img;
 
 class ThermalPrintingService {
   final BlueThermalPrinter _bluetooth = BlueThermalPrinter.instance;
-  final Ref _ref;
 
-  ThermalPrintingService(this._ref);
+  ThermalPrintingService();
 
   Future<bool> get isConnected =>
       _bluetooth.isConnected.then((v) => v ?? false);
@@ -368,5 +366,5 @@ class ThermalPrintingService {
 }
 
 final thermalPrintingServiceProvider = Provider<ThermalPrintingService>((ref) {
-  return ThermalPrintingService(ref);
+  return ThermalPrintingService();
 });

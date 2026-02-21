@@ -83,12 +83,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final currentLocationAsync = ref.watch(currentLocationIdProvider);
     final currentLocationId = currentLocationAsync.value;
 
-    // Calculate start and end of selected day for analytics
+    // Calculate start and end based on SESSION WINDOW (3 PM to 3 AM)
+    // instead of calendar day
     final startOfDay = DateTime(
       _selectedDate.year,
       _selectedDate.month,
       _selectedDate.day,
-      0,
+      SessionManager.OPENING_HOUR, // 3 PM
       0,
       0,
     );
@@ -96,10 +97,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       _selectedDate.year,
       _selectedDate.month,
       _selectedDate.day,
-      23,
-      59,
-      59,
-    );
+      SessionManager.CLOSING_HOUR, // 3 AM
+      0,
+      0,
+    ).add(const Duration(days: 1)); // Next day at 3 AM
 
     final width = MediaQuery.of(context).size.width;
     final isWide = width > 900;

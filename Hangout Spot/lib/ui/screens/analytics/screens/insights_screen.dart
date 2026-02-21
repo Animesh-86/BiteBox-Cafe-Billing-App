@@ -609,14 +609,13 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
             const SizedBox(height: 24),
 
           // Discount Effectiveness
-          if (data.discountEffectiveness != null)
-            _buildSectionCard(
-              icon: Icons.trending_up_rounded,
-              title: 'Discount Effectiveness',
-              subtitle: 'ROI analysis of discount campaigns',
-              child: _buildDiscountEffectiveness(data),
-            ),
-          if (data.discountEffectiveness != null) const SizedBox(height: 24),
+          _buildSectionCard(
+            icon: Icons.trending_up_rounded,
+            title: 'Discount Effectiveness',
+            subtitle: 'ROI analysis of discount campaigns',
+            child: _buildDiscountEffectiveness(data),
+          ),
+          const SizedBox(height: 24),
 
           // Combo Intelligence
           _buildSectionCard(
@@ -681,7 +680,6 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: data.paymentMethodDistribution!.map((method) {
-              final percentage = (method['amount'] / total * 100);
               final color = _getPaymentMethodColor(method['method']);
               return Padding(
                 padding: const EdgeInsets.only(bottom: 16),
@@ -745,7 +743,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
   }
 
   Widget _buildDiscountEffectiveness(AnalyticsData data) {
-    final discount = data.discountEffectiveness!;
+    final discount = data.discountEffectiveness;
     final roi = discount.totalDiscountAmount > 0
         ? ((discount.revenueWithDiscount - discount.totalDiscountAmount) /
               discount.totalDiscountAmount *

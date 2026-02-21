@@ -348,7 +348,10 @@ void showCustomerSelect(BuildContext context, WidgetRef ref) {
       ),
     ),
   ).then((selected) {
-    if (selected is Customer) {
+    if (selected == null) {
+      // User selected Walk-in
+      ref.read(cartProvider.notifier).setCustomer(null);
+    } else if (selected is Customer) {
       ref.read(cartProvider.notifier).setCustomer(selected);
     }
   });

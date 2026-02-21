@@ -8,21 +8,96 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 const String CURRENT_LOCATION_ID_KEY = 'current_location_id';
 
+Future<Location> _ensureDefaultOutlet(AppDatabase db) async {
+  final defaultLocation = LocationsCompanion(
+    id: const Value('default-outlet-001'),
+    name: const Value('Hangout Spot'),
+    address: const Value('Kanha Dreamland'),
+    phoneNumber: const Value(''),
+    isActive: const Value(true),
+    createdAt: Value(DateTime.now()),
+  );
+
+  await db.into(db.locations).insert(
+    defaultLocation,
+    mode: InsertMode.insertOrReplace,
+  );
+
+  // Persist as last active outlet so other providers pick it up
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString('last_active_outlet_id', 'default-outlet-001');
+
+  return await (db.select(
+    db.locations,
+  )..where((t) => t.id.equals('default-outlet-001'))).getSingle();
+}
+
 final locationsStreamProvider = StreamProvider<List<Location>>((ref) {
   final db = ref.watch(appDatabaseProvider);
   return (db.select(db.locations)..orderBy([
         (t) => OrderingTerm(expression: t.name, mode: OrderingMode.asc),
       ]))
-      .watch();
+      .watch()
+      .asyncMap((locations) async {
+        if (locations.isEmpty) {
+          final seeded = await _ensureDefaultOutlet(db);
+          return [seeded];
+        }
+        return locations;
+      });
 });
 
-// Provider for the single active outlet
+// Provider for the single active outlet - with fallback to default outlet
 final activeOutletProvider = StreamProvider<Location?>((ref) {
   final db = ref.watch(appDatabaseProvider);
   return (db.select(
     db.locations,
-  )..where((t) => t.isActive.equals(true))).watchSingleOrNull();
+  )..where((t) => t.isActive.equals(true))).watchSingleOrNull().asyncMap((
+    activeOutlet,
+  ) async {
+    // If no active outlet found, ensure default outlet exists and is active
+    if (activeOutlet == null) {
+      debugPrint(
+        '⚠️ No active outlet found, ensuring default outlet is set as active...',
+      );
+      try {
+        // Ensure default outlet exists and is marked as active
+        await _ensureActiveDefaultOutlet(db);
+
+        // Now fetch and return the default outlet
+        return await (db.select(
+          db.locations,
+        )..where((t) => t.id.equals('default-outlet-001'))).getSingleOrNull();
+      } catch (e) {
+        debugPrint('❌ Error ensuring default outlet: $e');
+        return null;
+      }
+    }
+    return activeOutlet;
+  });
 });
+
+Future<void> _ensureActiveDefaultOutlet(AppDatabase db) async {
+  // First, deactivate all outlets
+  await db
+      .update(db.locations)
+      .write(const LocationsCompanion(isActive: Value(false)));
+
+  // Then, ensure default outlet exists and is active
+  await db.into(db.locations).insert(
+    LocationsCompanion(
+      id: const Value('default-outlet-001'),
+      name: const Value('Hangout Spot'),
+      address: const Value('Kanha Dreamland'),
+      phoneNumber: const Value(''),
+      isActive: const Value(true),
+      createdAt: Value(DateTime.now()),
+    ),
+    mode: InsertMode.insertOrReplace,
+  );
+
+  debugPrint('✅ Default outlet ensured and activated');
+}
 
 final currentLocationIdProvider = StreamProvider<String?>((ref) {
   final db = ref.watch(appDatabaseProvider);

@@ -28,8 +28,19 @@ class CustomerRepository {
     )..where((t) => t.id.equals(id))).getSingleOrNull();
   }
 
-  Future<void> addCustomer(CustomersCompanion customer) {
-    return _db.into(_db.customers).insert(customer);
+  Future<void> addCustomer(CustomersCompanion customer) async {
+    // Check for duplicate phone number before inserting
+    if (customer.phone.present && customer.phone.value != null) {
+      final phoneValue = customer.phone.value!;
+      final existing = await (_db.select(
+        _db.customers,
+      )..where((t) => t.phone.equals(phoneValue))).getSingleOrNull();
+
+      if (existing != null) {
+        throw Exception('Customer with phone $phoneValue already exists');
+      }
+    }
+    await _db.into(_db.customers).insert(customer);
   }
 
   Future<void> updateCustomer(Customer customer) {

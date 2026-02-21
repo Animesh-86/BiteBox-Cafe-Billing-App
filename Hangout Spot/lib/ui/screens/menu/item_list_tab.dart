@@ -22,19 +22,10 @@ class ItemListTab extends ConsumerWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final cream = isDark ? theme.colorScheme.surface : const Color(0xFFFEF9F5);
-    final surface = isDark
-        ? theme.colorScheme.surfaceVariant.withOpacity(0.35)
-        : const Color(0xFFFFF6ED);
     final coffee = isDark ? theme.colorScheme.primary : const Color(0xFF95674D);
     final coffeeDark = isDark
         ? theme.colorScheme.onSurface
         : const Color(0xFF98664D);
-    final caramel = isDark
-        ? theme.colorScheme.secondary
-        : const Color(0xFFEDAD4C);
-    final cardLift = isDark
-        ? theme.colorScheme.surfaceVariant.withOpacity(0.45)
-        : const Color(0xFFF8EBDD);
 
     return allItemsAsync.when(
       data: (items) {
@@ -238,7 +229,6 @@ class _AdminItemCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final cream = isDark ? theme.colorScheme.surface : const Color(0xFFFEF9F5);
     final surface = isDark
         ? theme.colorScheme.surface
         : const Color(0xFFFFF3E8);

@@ -35,10 +35,10 @@ class PdfService {
                   ),
                 ),
               ),
-              if (storeAddress != null && storeAddress!.trim().isNotEmpty)
+              if (storeAddress != null && storeAddress.trim().isNotEmpty)
                 pw.Center(
                   child: pw.Text(
-                    storeAddress!,
+                    storeAddress,
                     style: const pw.TextStyle(fontSize: 9),
                     textAlign: pw.TextAlign.center,
                   ),
@@ -82,10 +82,10 @@ class PdfService {
                 pw.SizedBox(height: 10),
                 if (showThankYou)
                   pw.Center(child: pw.Text("Thank You! Visit Again!")),
-                if (footerNote != null && footerNote!.trim().isNotEmpty)
+                if (footerNote != null && footerNote.trim().isNotEmpty)
                   pw.Center(
                     child: pw.Text(
-                      footerNote!,
+                      footerNote,
                       style: const pw.TextStyle(fontSize: 8),
                       textAlign: pw.TextAlign.center,
                     ),

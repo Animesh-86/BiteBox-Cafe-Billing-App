@@ -4,10 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
 import 'package:hangout_spot/data/repositories/auth_repository.dart';
 import 'package:hangout_spot/data/repositories/menu_repository.dart';
+import 'package:hangout_spot/data/repositories/sync_repository.dart';
 import 'package:hangout_spot/data/local/seed_data.dart';
 import 'package:hangout_spot/ui/screens/main_screen.dart';
 import 'package:hangout_spot/ui/screens/auth/login_screen.dart';
 import 'package:hangout_spot/data/providers/database_provider.dart';
+import 'package:hangout_spot/services/realtime_order_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -50,6 +53,45 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     }
   }
 
+  /// Check if fresh install and force cloud sync
+  Future<void> _checkAndSyncData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lastSyncVersion = prefs.getString('last_sync_app_version');
+      const currentVersion = '1.0.0'; // TODO: Get from package_info
+
+      // Force sync if:
+      // 1. Never synced before (fresh install)
+      // 2. App version changed (new APK installed)
+      if (lastSyncVersion != currentVersion) {
+        debugPrint('🔄 Fresh install detected - forcing cloud sync...');
+
+        try {
+          final syncRepo = ref.read(syncRepositoryProvider);
+          await syncRepo.restoreData();
+
+          // Start real-time listener for order sync
+          final orderService = ref.read(realTimeOrderServiceProvider);
+          orderService.startListening();
+
+          // Save current version
+          await prefs.setString('last_sync_app_version', currentVersion);
+          debugPrint('✅ Cloud sync completed');
+        } catch (e) {
+          debugPrint('⚠️ Cloud sync failed (might be new user): $e');
+          // Continue anyway - might be a new account with no data
+        }
+      } else {
+        // Not a fresh install, but still start real-time listener
+        final orderService = ref.read(realTimeOrderServiceProvider);
+        orderService.startListening();
+        debugPrint('✅ Real-time order sync started');
+      }
+    } catch (e) {
+      debugPrint('⚠️ Sync check failed: $e');
+    }
+  }
+
   Future<void> _initializeVideo() async {
     try {
       _controller = VideoPlayerController.asset('assets/videos/splash.mp4');
@@ -88,7 +130,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     if (!mounted) return;
 
     if (user != null) {
-      // Already logged in — go straight to the app
+      // Already logged in - check if we need to force sync
+      await _checkAndSyncData();
+
+      if (!mounted) return;
+
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
           pageBuilder: (_, __, ___) => const MainScreen(),

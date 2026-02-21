@@ -4,6 +4,8 @@ import 'package:hangout_spot/data/repositories/auth_repository.dart';
 import 'package:hangout_spot/ui/screens/main_screen.dart';
 import 'package:hangout_spot/data/repositories/sync_repository.dart';
 import 'package:hangout_spot/ui/screens/auth/forgot_password_screen.dart';
+import 'package:hangout_spot/services/realtime_order_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -52,6 +54,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         // Perform Restore
         try {
           await ref.read(syncRepositoryProvider).restoreData();
+
+          // Start real-time order sync
+          final orderService = ref.read(realTimeOrderServiceProvider);
+          orderService.startListening();
+
+          // Mark as synced for this app version
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('last_sync_app_version', '1.0.0');
+
+          debugPrint('✅ Login sync completed, real-time listener started');
         } catch (e) {
           debugPrint("Restore failed (might be fresh user): $e");
           // Choose to continue even if restore fails?

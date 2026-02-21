@@ -1,33 +1,36 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/foundation.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/data/providers/database_provider.dart';
 import 'package:drift/drift.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart' hide Order;
 
 /// Session Provider - manages cafe opening/closing hours and order numbering
-/// Cafe operates 3 PM to 3 AM next day
-/// After 3 AM, a new session starts and order numbers reset to 1001
+/// Cafe operates 2 PM to 2 AM next day
+/// After 2 AM, a new session starts and order numbers reset to 1001
 
 class SessionManager {
   final AppDatabase _db;
 
-  // Cafe opens at 3 PM (15:00) and closes at 3 AM (03:00)
-  static const int OPENING_HOUR = 15; // 3 PM
-  static const int CLOSING_HOUR = 3; // 3 AM
+  // Cafe opens at 2 PM (14:00) and closes at 2 AM (02:00)
+  static const int OPENING_HOUR = 14; // 2 PM
+  static const int CLOSING_HOUR = 2; // 2 AM
 
   SessionManager(this._db);
 
   /// Get current session date
-  /// Session starts at 3 PM and ends at 3 AM next day
-  /// So a session is identified by the date it started (3 PM date)
+  /// Session starts at 2 PM and ends at 2 AM next day
+  /// So a session is identified by the date it started (2 PM date)
   DateTime getCurrentSessionDate() {
     final now = DateTime.now();
-    // If current time is before 3 PM, session belongs to yesterday
+    // If current time is before 2 PM, session belongs to yesterday
     if (now.hour < CLOSING_HOUR || (now.hour >= OPENING_HOUR)) {
       // Current session
       if (now.hour >= OPENING_HOUR) {
         return DateTime(now.year, now.month, now.day);
       } else {
-        // Before 3 AM, still in yesterday's session
+        // Before 2 AM, still in yesterday's session
         return DateTime(
           now.year,
           now.month,
@@ -45,8 +48,54 @@ class SessionManager {
   }
 
   /// Get next invoice number for current session
+  /// Uses Firestore transaction to prevent duplicate invoice numbers across devices
   Future<String> getNextInvoiceNumber() async {
     final sessionDate = getCurrentSessionDate();
+    final sessionId = getCurrentSessionId();
+
+    try {
+      // Use Firestore transaction for atomic counter increment
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final counterRef = FirebaseFirestore.instance
+            .collection('cafes')
+            .doc(user.uid)
+            .collection('counters')
+            .doc(sessionId);
+
+        final result = await FirebaseFirestore.instance.runTransaction((
+          transaction,
+        ) async {
+          final snapshot = await transaction.get(counterRef);
+
+          int nextNumber;
+          if (!snapshot.exists) {
+            // First order of the session
+            nextNumber = 1001;
+            transaction.set(counterRef, {
+              'count': nextNumber,
+              'sessionDate': sessionDate.toIso8601String(),
+              'lastUpdated': FieldValue.serverTimestamp(),
+            });
+          } else {
+            final currentCount = snapshot.data()?['count'] ?? 1000;
+            nextNumber = currentCount + 1;
+            transaction.update(counterRef, {
+              'count': nextNumber,
+              'lastUpdated': FieldValue.serverTimestamp(),
+            });
+          }
+
+          return nextNumber;
+        });
+
+        return '#$result';
+      }
+    } catch (e) {
+      debugPrint('⚠️ Firestore counter failed, falling back to local: $e');
+    }
+
+    // Fallback to local counting (legacy behavior for offline mode)
     final sessionStart = DateTime(
       sessionDate.year,
       sessionDate.month,
@@ -60,7 +109,6 @@ class SessionManager {
       CLOSING_HOUR,
     ).add(const Duration(days: 1));
 
-    // Get count of orders for this session
     final query = _db.select(_db.orders)
       ..where((tbl) => tbl.createdAt.isBiggerOrEqualValue(sessionStart))
       ..where((tbl) => tbl.createdAt.isSmallerThanValue(sessionEnd));

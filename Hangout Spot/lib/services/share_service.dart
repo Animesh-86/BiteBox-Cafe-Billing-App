@@ -120,8 +120,7 @@ class ShareService {
 
     // 5. Payment Mode
     if (showPayment) {
-      final paymentMode = order.paymentMode ?? 'Cash';
-      buffer.writeln('💳 *Payment:* $paymentMode');
+      buffer.writeln('💳 *Payment:* ${order.paymentMode}');
       buffer.writeln();
     }
 
