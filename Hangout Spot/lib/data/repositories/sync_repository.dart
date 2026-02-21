@@ -207,28 +207,32 @@ class SyncRepository {
     debugPrint('📊 Remaining customers: ${remainingCustomers.length}');
 
     // Re-seed default outlet after deletion using INSERT OR REPLACE (replaces if exists)
-    await _db.into(_db.locations).insert(
-      LocationsCompanion(
-        id: const Value('default-outlet-001'),
-        name: const Value('Hangout Spot'),
-        address: const Value('Kanha Dreamland'),
-        phoneNumber: const Value(''),
-        isActive: const Value(true),
-        createdAt: Value(DateTime.now()),
-      ),
-      mode: InsertMode.insertOrReplace,
-    );
+    await _db
+        .into(_db.locations)
+        .insert(
+          LocationsCompanion(
+            id: const Value('default-outlet-001'),
+            name: const Value('Hangout Spot'),
+            address: const Value('Kanha Dreamland'),
+            phoneNumber: const Value(''),
+            isActive: const Value(true),
+            createdAt: Value(DateTime.now()),
+          ),
+          mode: InsertMode.insertOrReplace,
+        );
     debugPrint('✅ Default outlet re-seeded: Hangout Spot – Kanha Dreamland');
 
     // Re-seed the default location setting in the Settings table
-    await _db.into(_db.settings).insert(
-      SettingsCompanion(
-        key: const Value('current_location_id'),
-        value: const Value('default-outlet-001'),
-        description: const Value('ID of the currently active outlet'),
-      ),
-      mode: InsertMode.insertOrReplace,
-    );
+    await _db
+        .into(_db.settings)
+        .insert(
+          SettingsCompanion(
+            key: const Value('current_location_id'),
+            value: const Value('default-outlet-001'),
+            description: const Value('ID of the currently active outlet'),
+          ),
+          mode: InsertMode.insertOrReplace,
+        );
     debugPrint('✅ Default location setting re-seeded');
 
     // Force refresh all Drift streams by invalidating cache
@@ -266,7 +270,9 @@ class SyncRepository {
 
       final baseRef = _firestore.collection('cafes').doc(user.uid);
 
-      Future<void> deleteCollectionDocs(CollectionReference<Map<String, dynamic>> col) async {
+      Future<void> deleteCollectionDocs(
+        CollectionReference<Map<String, dynamic>> col,
+      ) async {
         final snapshot = await col.get();
         for (final doc in snapshot.docs) {
           await doc.reference.delete();

@@ -284,6 +284,9 @@ class ManageMenuScreen extends ConsumerWidget {
       for (final c in categories) c.name.toLowerCase(): c,
     };
 
+    const namespace = Uuid.NAMESPACE_URL;
+    final uuid = const Uuid();
+
     int imported = 0;
     for (int i = 1; i < lines.length; i++) {
       final line = lines[i].trim();
@@ -307,7 +310,10 @@ class ManageMenuScreen extends ConsumerWidget {
 
       Category? category = categoryByName[categoryName.toLowerCase().trim()];
       if (category == null) {
-        final id = const Uuid().v4();
+        final id = uuid.v5(
+          namespace,
+          'category_${categoryName.isEmpty ? 'Uncategorized' : categoryName}',
+        );
         category = Category(
           id: id,
           name: categoryName.isEmpty ? 'Uncategorized' : categoryName,
@@ -330,7 +336,7 @@ class ManageMenuScreen extends ConsumerWidget {
 
       await repo.addItem(
         ItemsCompanion(
-          id: drift.Value(const Uuid().v4()),
+          id: drift.Value(uuid.v5(namespace, 'item_${category.id}_$name')),
           categoryId: drift.Value(category.id),
           name: drift.Value(name),
           price: drift.Value(price),

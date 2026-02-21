@@ -9,7 +9,7 @@ class MenuSeeder {
       "Cheese Chilly Toast — 80",
       "Corn chilly Toast — 90",
       "Paneer Toast — 99",
-      "Olive Jalapeno oast — 110",
+      "Olive Jalapeno Toast — 110",
     ],
     "SANDWICH": [
       "Bread Butter with cheese — 59",
@@ -21,10 +21,10 @@ class MenuSeeder {
       "Cheese Chutney — 89",
       "Veg. Cheese — 99",
       "Pari Peri Cheese — 110",
-      "Chilli Mayo Cheese — 120",
-      "Cheese Chilli Corn — 130",
+      "Chilli Mayo Cheese — 110",
+      "Cheese Chilli Corn — 120",
       "Tandoori Paneer — 130",
-      "Makhani Paneer — 140",
+      "Makhani Paneer — 130",
       "Maxican — 140",
     ],
     "PIZZA": [
@@ -58,8 +58,8 @@ class MenuSeeder {
     "FRANKIE": [
       "Veg.Cheese — 89",
       "Peri Peri Frankie — 100",
-      "Veg.Schezwan — 120",
-      "Paneer Tandoori — 130",
+      "Veg.Schezwan — 100",
+      "Paneer Tandoori — 120",
       "Cheese Chilli — 130",
     ],
     "TEA/COFFEE": [
@@ -67,20 +67,17 @@ class MenuSeeder {
       "Masala Tea (Full) — 25",
       "Adrak Tea (Half) — 15",
       "Adrak Tea (Full) — 25",
-      "Elaichi Tea (Half) — 15",
-      "Elaichi Tea (Full) — 25",
+      "Elaichi Tea (Half) — 20",
+      "Elaichi Tea (Full) — 30",
       "Pudina Tea (Half) — 20",
       "Pudina Tea (Full) — 30",
-      "Hot Coffee (Half) — 20",
-      "Hot Coffee (Full) — 30",
-      "Hot Bornvita (Half) — 40",
-      "Hot Bornvita (Full) — 50",
+      "Hot Coffee — 40",
+      "Hot Bornvita — 50",
     ],
     "COLD BEVERAGES": [
-      "Cold Coffee (350ml) — 99",
+      "Cold Coffee — 99",
       "Chocolate cold coffee — 110",
-      "Cold Bornvita — 110",
-      "Cold Coffee with Ice-crem — 120",
+      "Cold Bornvita — 120",
       "Cold Coffee with Ice-crem — 140",
     ],
     "FRENCH FRIES": [
@@ -118,7 +115,7 @@ class MenuSeeder {
       "Olive Oil Pasta — 150",
     ],
     "GARLIC BREAD": [
-      "Cheese Garlic (4 PCS) — 99",
+      "Cheese Garlic — 99",
       "Veg.Garlic — 110",
       "Corn Chilli Garlic — 120",
       "Olives & Jalapeno — 129",
@@ -130,8 +127,11 @@ class MenuSeeder {
     if (hasData) return;
 
     int sortOrder = 0;
+    const namespace = Uuid.NAMESPACE_URL;
+    final uuid = const Uuid();
+
     for (var entry in menuData.entries) {
-      final catId = const Uuid().v4();
+      final catId = uuid.v5(namespace, 'category_${entry.key}');
       await repo.addCategory(
         CategoriesCompanion(
           id: drift.Value(catId),
@@ -148,7 +148,7 @@ class MenuSeeder {
 
         await repo.addItem(
           ItemsCompanion(
-            id: drift.Value(const Uuid().v4()),
+            id: drift.Value(uuid.v5(namespace, 'item_${catId}_$name')),
             categoryId: drift.Value(catId),
             name: drift.Value(name),
             price: drift.Value(price),

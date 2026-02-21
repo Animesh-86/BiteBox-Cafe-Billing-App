@@ -17,33 +17,38 @@ class MenuRepository {
   }
 
   Future<void> addCategory(CategoriesCompanion category) {
-    return _db.into(_db.categories).insert(category);
+    return _db
+        .into(_db.categories)
+        .insert(category, mode: InsertMode.insertOrReplace);
   }
 
   Future<void> updateCategory(Category category) {
     return _db.update(_db.categories).replace(category);
   }
-  
+
   Future<void> deleteCategory(String id) {
-    return (_db.update(_db.categories)..where((t) => t.id.equals(id)))
-        .write(const CategoriesCompanion(isDeleted: Value(true)));
+    return (_db.update(_db.categories)..where((t) => t.id.equals(id))).write(
+      const CategoriesCompanion(isDeleted: Value(true)),
+    );
   }
 
   // Items
   Stream<List<Item>> watchItems(String categoryId) {
-    return (_db.select(_db.items)
-          ..where((tbl) => tbl.categoryId.equals(categoryId) & tbl.isDeleted.equals(false)))
-        .watch();
-  }
-  
-  Stream<List<Item>> watchAllItems() {
-    return (_db.select(_db.items)
-          ..where((tbl) => tbl.isDeleted.equals(false)))
+    return (_db.select(_db.items)..where(
+          (tbl) =>
+              tbl.categoryId.equals(categoryId) & tbl.isDeleted.equals(false),
+        ))
         .watch();
   }
 
+  Stream<List<Item>> watchAllItems() {
+    return (_db.select(
+      _db.items,
+    )..where((tbl) => tbl.isDeleted.equals(false))).watch();
+  }
+
   Future<void> addItem(ItemsCompanion item) {
-    return _db.into(_db.items).insert(item);
+    return _db.into(_db.items).insert(item, mode: InsertMode.insertOrReplace);
   }
 
   Future<void> updateItem(Item item) {
@@ -51,9 +56,11 @@ class MenuRepository {
   }
 
   Future<void> deleteItem(String id) {
-    return (_db.update(_db.items)..where((t) => t.id.equals(id)))
-        .write(const ItemsCompanion(isDeleted: Value(true)));
+    return (_db.update(_db.items)..where((t) => t.id.equals(id))).write(
+      const ItemsCompanion(isDeleted: Value(true)),
+    );
   }
+
   Future<bool> hasCategories() async {
     final count = await (_db.select(_db.categories)..limit(1)).get();
     return count.isNotEmpty;
