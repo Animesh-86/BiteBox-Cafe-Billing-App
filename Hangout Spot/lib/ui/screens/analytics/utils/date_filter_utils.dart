@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 enum DateFilterType {
+  today,
   yesterday,
   thisWeek,
   thisMonth,
@@ -22,6 +23,17 @@ class DateFilter {
     required this.endDate,
     required this.label,
   });
+
+  factory DateFilter.today([DateTime? referenceDate]) {
+    final now = referenceDate ?? DateTime.now();
+    final start = DateTime(now.year, now.month, now.day);
+    return DateFilter(
+      type: DateFilterType.today,
+      startDate: start,
+      endDate: now,
+      label: 'Today',
+    );
+  }
 
   factory DateFilter.yesterday([DateTime? referenceDate]) {
     final now = referenceDate ?? DateTime.now();

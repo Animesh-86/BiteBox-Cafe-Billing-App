@@ -5,9 +5,8 @@ import 'package:hangout_spot/ui/screens/analytics/theme/analytics_theme.dart';
 import 'package:hangout_spot/ui/screens/analytics/providers/analytics_data_provider.dart';
 import 'package:hangout_spot/ui/screens/analytics/utils/date_filter_utils.dart';
 import 'package:hangout_spot/ui/screens/analytics/services/analytics_export_service.dart';
-import 'package:hangout_spot/logic/locations/location_provider.dart';
-import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:intl/intl.dart';
+import '../widgets/analytics_header.dart';
 
 class InsightsScreen extends ConsumerStatefulWidget {
   final VoidCallback onMenuPressed;
@@ -29,7 +28,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
     });
   }
 
-  Future<void> _exportData(AnalyticsData data) async {
+  Future<void> _exportData() async {
     // Show dialog to select export date range
     final selectedFilter = await showDialog<DateFilter>(
       context: context,
@@ -185,178 +184,21 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
     }
   }
 
-  Future<void> _selectDateRange() async {
-    final picked = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-      initialDateRange: DateTimeRange(start: _startDate, end: _endDate),
-      builder: (context, child) {
-        return Theme(
-          data: ThemeData.dark().copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: AnalyticsTheme.primaryGold,
-              surface: AnalyticsTheme.cardBackground,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-
-    if (picked != null) {
-      setState(() {
-        _dateFilter = DateFilter.custom(picked.start, picked.end);
-      });
-    }
-  }
-
-  Future<void> _showOutletSelector(Location? currentOutlet) async {
-    final locations = await ref.read(locationsStreamProvider.future);
-
-    if (!mounted) return;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AnalyticsTheme.cardBackground,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Select Outlet',
-              style: TextStyle(
-                color: AnalyticsTheme.primaryGold,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Add "All Outlets" option
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: currentOutlet == null
-                      ? AnalyticsTheme.primaryGold.withOpacity(0.2)
-                      : AnalyticsTheme.secondaryBeige.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.store_mall_directory_rounded,
-                  color: currentOutlet == null
-                      ? AnalyticsTheme.primaryGold
-                      : AnalyticsTheme.secondaryText,
-                ),
-              ),
-              title: Text(
-                'All Outlets',
-                style: TextStyle(
-                  color: currentOutlet == null
-                      ? AnalyticsTheme.primaryGold
-                      : AnalyticsTheme.primaryText,
-                  fontWeight: currentOutlet == null
-                      ? FontWeight.w600
-                      : FontWeight.normal,
-                ),
-              ),
-              subtitle: Text(
-                'Combined analytics from all outlets',
-                style: TextStyle(
-                  color: AnalyticsTheme.secondaryText,
-                  fontSize: 12,
-                ),
-              ),
-              trailing: currentOutlet == null
-                  ? const Icon(
-                      Icons.check_circle_rounded,
-                      color: AnalyticsTheme.primaryGold,
-                    )
-                  : null,
-              onTap: () async {
-                // Deactivate all outlets to show "All Outlets"
-                final locations = await ref.read(
-                  locationsStreamProvider.future,
-                );
-                for (final location in locations) {
-                  await ref
-                      .read(locationsControllerProvider.notifier)
-                      .deactivateOutlet(location.id);
-                }
-                if (mounted) Navigator.pop(context);
-              },
-            ),
-            const Divider(),
-            ...locations.map(
-              (location) => ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: location.id == currentOutlet?.id
-                        ? AnalyticsTheme.primaryGold.withOpacity(0.2)
-                        : AnalyticsTheme.secondaryBeige.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    Icons.store_rounded,
-                    color: location.id == currentOutlet?.id
-                        ? AnalyticsTheme.primaryGold
-                        : AnalyticsTheme.secondaryText,
-                  ),
-                ),
-                title: Text(
-                  location.name,
-                  style: TextStyle(
-                    color: location.id == currentOutlet?.id
-                        ? AnalyticsTheme.primaryGold
-                        : AnalyticsTheme.primaryText,
-                    fontWeight: location.id == currentOutlet?.id
-                        ? FontWeight.w600
-                        : FontWeight.normal,
-                  ),
-                ),
-                subtitle: Text(
-                  location.address ?? 'No address',
-                  style: TextStyle(
-                    color: AnalyticsTheme.secondaryText,
-                    fontSize: 12,
-                  ),
-                ),
-                trailing: location.id == currentOutlet?.id
-                    ? const Icon(
-                        Icons.check_circle_rounded,
-                        color: AnalyticsTheme.primaryGold,
-                      )
-                    : null,
-                onTap: () {
-                  ref
-                      .read(locationsControllerProvider.notifier)
-                      .activateOutlet(location.id);
-                  Navigator.pop(context);
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final analyticsData = ref.watch(
       analyticsDataProvider((startDate: _startDate, endDate: _endDate)),
     );
-    final activeOutlet = ref.watch(activeOutletProvider).valueOrNull;
-
     return Column(
       children: [
-        _buildTopBar(activeOutlet),
+        AnalyticsHeader(
+          title: 'Insights',
+          onMenuPressed: widget.onMenuPressed,
+          currentFilter: _dateFilter,
+          onFilterChanged: _applyDateFilter,
+          onExportPressed: _exportData,
+          isExporting: _isExporting,
+        ),
         Expanded(
           child: analyticsData.when(
             data: (data) => _buildContent(data),
@@ -377,224 +219,12 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
     );
   }
 
-  Widget _buildTopBar(Location? activeOutlet) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-      decoration: BoxDecoration(
-        color: AnalyticsTheme.cardBackground,
-        border: Border(
-          bottom: BorderSide(color: AnalyticsTheme.borderColor, width: 1),
-        ),
-      ),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.menu_rounded),
-            color: AnalyticsTheme.primaryGold,
-            onPressed: widget.onMenuPressed,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            activeOutlet?.address ?? 'All Outlets',
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AnalyticsTheme.primaryText,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: InkWell(
-              onTap: () => _showOutletSelector(activeOutlet),
-              borderRadius: BorderRadius.circular(6),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AnalyticsTheme.cardBackground,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                    color: AnalyticsTheme.primaryGold.withOpacity(0.3),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      activeOutlet == null
-                          ? Icons.store_mall_directory_rounded
-                          : Icons.store_rounded,
-                      color: AnalyticsTheme.primaryGold,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        activeOutlet?.name ?? 'All Outlets',
-                        style: const TextStyle(
-                          color: AnalyticsTheme.primaryText,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Icon(
-                      Icons.arrow_drop_down_rounded,
-                      color: AnalyticsTheme.primaryGold,
-                      size: 18,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          _isExporting
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      AnalyticsTheme.primaryGold,
-                    ),
-                  ),
-                )
-              : IconButton(
-                  icon: const Icon(Icons.download_rounded),
-                  color: AnalyticsTheme.primaryGold,
-                  tooltip: 'Export to Excel',
-                  onPressed: () {
-                    ref
-                        .read(
-                          analyticsDataProvider((
-                            startDate: _startDate,
-                            endDate: _endDate,
-                          )).future,
-                        )
-                        .then(_exportData);
-                  },
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDateFiltersRow() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            DateFilterChip(
-              label: 'Yesterday',
-              isSelected: _dateFilter.type == DateFilterType.yesterday,
-              onSelected: () => _applyDateFilter(DateFilter.yesterday()),
-            ),
-            const SizedBox(width: 8),
-            DateFilterChip(
-              label: 'This Week',
-              isSelected: _dateFilter.type == DateFilterType.thisWeek,
-              onSelected: () => _applyDateFilter(DateFilter.thisWeek()),
-            ),
-            const SizedBox(width: 8),
-            DateFilterChip(
-              label: 'This Month',
-              isSelected: _dateFilter.type == DateFilterType.thisMonth,
-              onSelected: () => _applyDateFilter(DateFilter.thisMonth()),
-            ),
-            const SizedBox(width: 8),
-            DateFilterChip(
-              label: 'This Year',
-              isSelected: _dateFilter.type == DateFilterType.thisYear,
-              onSelected: () => _applyDateFilter(DateFilter.thisYear()),
-            ),
-            const SizedBox(width: 8),
-            DateFilterChip(
-              label: 'Last 7 Days',
-              isSelected: _dateFilter.type == DateFilterType.last7Days,
-              onSelected: () => _applyDateFilter(DateFilter.last7Days()),
-            ),
-            const SizedBox(width: 8),
-            DateFilterChip(
-              label: 'Last 30 Days',
-              isSelected: _dateFilter.type == DateFilterType.last30Days,
-              onSelected: () => _applyDateFilter(DateFilter.last30Days()),
-            ),
-            const SizedBox(width: 8),
-            InkWell(
-              onTap: _selectDateRange,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: _dateFilter.type == DateFilterType.custom
-                      ? AnalyticsTheme.primaryGold
-                      : AnalyticsTheme.cardBackground,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: AnalyticsTheme.primaryGold,
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.calendar_today_rounded,
-                      color: _dateFilter.type == DateFilterType.custom
-                          ? Colors.black
-                          : AnalyticsTheme.primaryGold,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Custom',
-                      style: TextStyle(
-                        color: _dateFilter.type == DateFilterType.custom
-                            ? Colors.black
-                            : AnalyticsTheme.primaryText,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildContent(AnalyticsData data) {
-    final dateFormat = DateFormat('dd MMM');
-
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Page Title
-          Text('Menu Insights', style: AnalyticsTheme.headingMedium),
-          const SizedBox(height: 4),
-          Text(
-            'Actionable intelligence for ${dateFormat.format(_startDate)} - ${dateFormat.format(_endDate)}',
-            style: AnalyticsTheme.subtitle,
-          ),
-          const SizedBox(height: 24),
-
           // Payment Method Distribution
           if (data.paymentMethodDistribution != null &&
               data.paymentMethodDistribution!.isNotEmpty)
