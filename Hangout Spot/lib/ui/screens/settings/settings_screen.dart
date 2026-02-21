@@ -104,7 +104,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     Navigator.of(context).push(MaterialPageRoute(builder: (context) => screen));
   }
 
-  Widget _buildNavTile(
+  Widget _buildNavGridItem(
     String title,
     IconData icon,
     String subtitle,
@@ -118,51 +118,139 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         : theme.primaryColor.withOpacity(0.1);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: ListTile(
-          contentPadding: const EdgeInsets.all(16),
-          leading: Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: iconBgColor,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: iconColor, size: 24),
-          ),
-          title: Text(
-            title,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          subtitle: Text(
-            subtitle,
-            style: TextStyle(
-              color: theme.colorScheme.onSurface.withOpacity(0.6),
-              fontSize: 13,
-            ),
-          ),
-          trailing: Icon(
-            Icons.arrow_forward_ios_rounded,
-            size: 16,
-            color: theme.colorScheme.onSurface.withOpacity(0.3),
-          ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
           onTap: () => _navigateTo(screen),
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Top Row: Icon Container and Trailing Arrow
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: iconBgColor,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(icon, color: iconColor, size: 20),
+                    ),
+                    Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 12,
+                      color: theme.colorScheme.onSurface.withOpacity(0.3),
+                    ),
+                  ],
+                ),
+
+                // Bottom Row: Text Content
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        height: 1.1,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: theme.colorScheme.onSurface.withOpacity(0.6),
+                        fontSize: 10,
+                        height: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
+
+  // Define the grid items config
+  final List<Map<String, dynamic>> _navigationItems = [
+    {
+      "title": "Outlets",
+      "icon": Icons.place_rounded,
+      "subtitle": "Manage store outlets",
+      "screen": const LocationsSettingsScreen(),
+    },
+    {
+      "title": "Loyalty Program",
+      "icon": Icons.stars_rounded,
+      "subtitle": "Configure rewards and points",
+      "screen": const LoyaltySettingsScreen(),
+    },
+    {
+      "title": "Operating Hours",
+      "icon": Icons.access_time_rounded,
+      "subtitle": "Configure shift cutoffs",
+      "screen": const OperatingHoursSettingsScreen(),
+    },
+    {
+      "title": "Active Promotion",
+      "icon": Icons.local_offer_rounded,
+      "subtitle": "Set up campaigns and discounts",
+      "screen": const PromoSettingsScreen(),
+    },
+    {
+      "title": "Receipt Config",
+      "icon": Icons.receipt_long_rounded,
+      "subtitle": "Customize printed receipts",
+      "screen": const ReceiptSettingsScreen(),
+    },
+    {
+      "title": "Cloud Backup",
+      "icon": Icons.cloud_sync_rounded,
+      "subtitle": "Sync data and restore",
+      "screen": const BackupSettingsScreen(),
+    },
+    {
+      "title": "Active Devices",
+      "icon": Icons.devices,
+      "subtitle": "Manage logged-in devices",
+      "screen": const ActiveSessionsScreen(),
+    },
+    {
+      "title": "Appearance",
+      "icon": Icons.palette_rounded,
+      "subtitle": "Change app theme",
+      "screen": const AppearanceSettingsScreen(),
+    },
+    {
+      "title": "Printer Settings",
+      "icon": Icons.print_rounded,
+      "subtitle": "Connect thermal printer",
+      "screen": const PrinterSettingsScreen(),
+    },
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -333,61 +421,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                       const SizedBox(height: 24),
 
-                      // Navigation Items
-                      _buildNavTile(
-                        "Outlets",
-                        Icons.place_rounded,
-                        "Manage store outlets",
-                        const LocationsSettingsScreen(),
-                      ),
-                      _buildNavTile(
-                        "Loyalty Program",
-                        Icons.stars_rounded,
-                        "Configure rewards and points",
-                        const LoyaltySettingsScreen(),
-                      ),
-                      _buildNavTile(
-                        "Operating Hours",
-                        Icons.access_time_rounded,
-                        "Configure shift cutoffs",
-                        const OperatingHoursSettingsScreen(),
-                      ),
-                      _buildNavTile(
-                        "Active Promotion",
-                        Icons.local_offer_rounded,
-                        "Set up campaigns and discounts",
-                        const PromoSettingsScreen(),
-                      ),
-                      _buildNavTile(
-                        "Receipt Config",
-                        Icons.receipt_long_rounded,
-                        "Customize printed receipts",
-                        const ReceiptSettingsScreen(),
-                      ),
-                      _buildNavTile(
-                        "Cloud Backup",
-                        Icons.cloud_sync_rounded,
-                        "Sync data and restore",
-                        const BackupSettingsScreen(),
-                      ),
-                      _buildNavTile(
-                        "Active Devices",
-                        Icons.devices,
-                        "Manage logged-in devices",
-                        const ActiveSessionsScreen(),
-                      ),
-                      _buildNavTile(
-                        "Appearance",
-                        Icons.palette_rounded,
-                        "Change app theme",
-                        const AppearanceSettingsScreen(),
-                      ),
-
-                      _buildNavTile(
-                        "Printer Settings",
-                        Icons.print_rounded,
-                        "Connect thermal printer",
-                        const PrinterSettingsScreen(),
+                      // Navigation Items Grid
+                      GridView.builder(
+                        physics: const NeverScrollableScrollPhysics(),
+                        shrinkWrap: true,
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              crossAxisSpacing: 12,
+                              mainAxisSpacing: 12,
+                              childAspectRatio: 1.25,
+                            ),
+                        itemCount: _navigationItems.length,
+                        itemBuilder: (context, index) {
+                          final item = _navigationItems[index];
+                          return _buildNavGridItem(
+                            item['title'] as String,
+                            item['icon'] as IconData,
+                            item['subtitle'] as String,
+                            item['screen'] as Widget,
+                          );
+                        },
                       ),
 
                       const SizedBox(height: 48),
