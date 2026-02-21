@@ -100,19 +100,28 @@ class _MobileCartModalState extends ConsumerState<MobileCartModal> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  FutureBuilder<String>(
-                    future: ref
-                        .watch(sessionManagerProvider)
-                        .peekNextInvoiceNumber(),
-                    builder: (context, snapshot) => Text(
-                      'Order - ${snapshot.data ?? '...'}',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: billingText(context),
-                      ),
-                    ),
-                  ),
+                  cart.invoiceNumber != null
+                      ? Text(
+                          'Order - ${cart.invoiceNumber}',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: billingText(context),
+                          ),
+                        )
+                      : FutureBuilder<String>(
+                          future: ref
+                              .watch(sessionManagerProvider)
+                              .peekNextInvoiceNumber(),
+                          builder: (context, snapshot) => Text(
+                            'Order - ${snapshot.data ?? '...'}',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: billingText(context),
+                            ),
+                          ),
+                        ),
                   Row(
                     children: [
                       IconButton(

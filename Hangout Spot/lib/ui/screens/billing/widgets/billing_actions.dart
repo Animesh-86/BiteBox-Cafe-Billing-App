@@ -94,6 +94,12 @@ Future<void> printKot(BuildContext context, WidgetRef ref) async {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text("KOT sent to printer")));
+
+      // Close the Cart modal if on a mobile view
+      if (MediaQuery.of(context).size.width <= 900 &&
+          Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
     }
   } catch (e) {
     if (context.mounted) {
@@ -258,6 +264,12 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text("Order completed!")));
+
+      // Close the Cart modal if on a mobile view
+      if (MediaQuery.of(context).size.width <= 900 &&
+          Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
     }
 
     // Auto-Send to WhatsApp if customer has phone

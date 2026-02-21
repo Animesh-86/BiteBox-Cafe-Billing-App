@@ -56,6 +56,7 @@ class CartItem {
 
 class CartState {
   final String? orderId; // If editing a pending/held order
+  final String? invoiceNumber; // Retained from held orders
   final List<CartItem> items;
   final Customer? customer;
   final String paymentMode; // 'Cash', 'UPI', 'Card', 'Split'
@@ -68,6 +69,7 @@ class CartState {
 
   CartState({
     this.orderId,
+    this.invoiceNumber,
     this.items = const [],
     this.customer,
     this.paymentMode = 'Cash',
@@ -109,6 +111,7 @@ class CartState {
 
   CartState copyWith({
     String? orderId,
+    String? invoiceNumber,
     List<CartItem>? items,
     Customer? customer,
     String? paymentMode,
@@ -121,6 +124,7 @@ class CartState {
   }) {
     return CartState(
       orderId: orderId ?? this.orderId,
+      invoiceNumber: invoiceNumber ?? this.invoiceNumber,
       items: items ?? this.items,
       customer: customer ?? this.customer,
       paymentMode: paymentMode ?? this.paymentMode,
@@ -135,6 +139,7 @@ class CartState {
 
   Map<String, dynamic> toJson() => {
     'orderId': orderId,
+    'invoiceNumber': invoiceNumber,
     'items': items.map((i) => i.toJson()).toList(),
     'customer': customer?.toJson(),
     'paymentMode': paymentMode,
@@ -147,6 +152,7 @@ class CartState {
   factory CartState.fromJson(Map<String, dynamic> json) {
     return CartState(
       orderId: json['orderId'],
+      invoiceNumber: json['invoiceNumber'],
       items:
           (json['items'] as List<dynamic>?)
               ?.map((i) => CartItem.fromJson(i))
@@ -349,6 +355,7 @@ class CartNotifier extends StateNotifier<CartState> {
     _applyState(
       CartState(
         orderId: state.orderId,
+        invoiceNumber: state.invoiceNumber,
         items: state.items,
         customer: null,
         paymentMode: state.paymentMode,
@@ -429,6 +436,7 @@ class CartNotifier extends StateNotifier<CartState> {
     _applyState(
       CartState(
         orderId: order.id,
+        invoiceNumber: order.invoiceNumber,
         customer: customer,
         items: details
             .map(

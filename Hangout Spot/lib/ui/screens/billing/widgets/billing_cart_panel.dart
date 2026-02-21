@@ -139,19 +139,28 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                         ).colorScheme.primary.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: FutureBuilder<String>(
-                        future: ref
-                            .watch(sessionManagerProvider)
-                            .peekNextInvoiceNumber(),
-                        builder: (context, snapshot) => Text(
-                          snapshot.data ?? '... ',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                        ),
-                      ),
+                      child: cart.invoiceNumber != null
+                          ? Text(
+                              cart.invoiceNumber!,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            )
+                          : FutureBuilder<String>(
+                              future: ref
+                                  .watch(sessionManagerProvider)
+                                  .peekNextInvoiceNumber(),
+                              builder: (context, snapshot) => Text(
+                                snapshot.data ?? '... ',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                              ),
+                            ),
                     ),
                     if (cart.customer != null) const SizedBox(width: 8),
                     if (cart.customer != null)
