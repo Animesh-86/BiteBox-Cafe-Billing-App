@@ -76,21 +76,20 @@ class OrderRepository {
     String status = 'completed',
     SessionManager? sessionManager,
   }) async {
-    return _db.transaction(() async {
-      // If updating an existing Pending order, delete it first (simplest way to update items)
-      // Ideally we would diff, but replacing is safer for ensuring totals match exact cart state.
-      if (cart.orderId != null) {
-        // Only delete items, as we will replace the order row
-        await (_db.delete(
-          _db.orderItems,
-        )..where((t) => t.orderId.equals(cart.orderId!))).go();
-      }
+    // Determine the order ID first (reuse if editing)
+    final orderId = cart.orderId ?? const Uuid().v4();
 
-      // Reuse ID if editing, else new
-      final orderId = cart.orderId ?? const Uuid().v4();
+    // Preserve existing invoice number if order is already saved
+    String? invoiceNum;
+    if (cart.orderId != null) {
+      final existingOrder = await (_db.select(
+        _db.orders,
+      )..where((t) => t.id.equals(cart.orderId!))).getSingleOrNull();
+      invoiceNum = existingOrder?.invoiceNumber;
+    }
 
-      // Generate session-based invoice number
-      String invoiceNum;
+    // Generate session-based invoice number ONLY IF it doesn't already exist
+    if (invoiceNum == null) {
       if (sessionManager != null) {
         invoiceNum = await sessionManager.getNextInvoiceNumber();
       } else {
@@ -98,16 +97,26 @@ class OrderRepository {
         invoiceNum =
             "INV-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}";
       }
+    }
 
-      // Get active outlet (required for order creation)
-      final activeOutlet = await (_db.select(
-        _db.locations,
-      )..where((t) => t.isActive.equals(true))).getSingleOrNull();
+    // Get active outlet (required for order creation)
+    final activeOutlet = await (_db.select(
+      _db.locations,
+    )..where((t) => t.isActive.equals(true))).getSingleOrNull();
 
-      if (activeOutlet == null) {
-        throw Exception(
-          'No active outlet found. Please activate an outlet in Settings before creating orders.',
-        );
+    if (activeOutlet == null) {
+      throw Exception(
+        'No active outlet found. Please activate an outlet in Settings before creating orders.',
+      );
+    }
+
+    await _db.transaction(() async {
+      // If updating an existing Pending order, delete it first (simplest way to update items)
+      if (cart.orderId != null) {
+        // Only delete items, as we will replace the order row
+        await (_db.delete(
+          _db.orderItems,
+        )..where((t) => t.orderId.equals(cart.orderId!))).go();
       }
 
       await _db
@@ -115,7 +124,7 @@ class OrderRepository {
           .insert(
             OrdersCompanion(
               id: Value(orderId),
-              invoiceNumber: Value(invoiceNum),
+              invoiceNumber: Value(invoiceNum!),
               customerId: Value(cart.customer?.id),
               locationId: Value(activeOutlet.id), // Use active outlet
               subtotal: Value(cart.subtotal),
@@ -127,6 +136,7 @@ class OrderRepository {
               paidUPI: Value(cart.paidUPI),
               status: Value(status), // 'pending' or 'completed'
               createdAt: Value(DateTime.now()),
+              isSynced: const Value(false), // Always start as unsynced
             ),
             mode: InsertMode.replace, // Replace if exists
           );
@@ -147,78 +157,91 @@ class OrderRepository {
               ),
             );
       }
-
-      // IMMEDIATE PUSH: Send to Firestore for Real-Time Sync
-      // Using individual documents instead of arrays to prevent data loss
-      try {
-        final user = FirebaseAuth.instance.currentUser;
-        if (user != null) {
-          final orderData = {
-            'id': orderId,
-            'invoiceNumber': invoiceNum,
-            'customerId': cart.customer?.id,
-            'locationId': activeOutlet.id,
-            'subtotal': cart.subtotal,
-            'discountAmount': cart.totalDiscount,
-            'taxAmount': cart.taxAmount,
-            'totalAmount': cart.grandTotal,
-            'paymentMode': cart.paymentMode,
-            'paidCash': cart.paidCash,
-            'paidUPI': cart.paidUPI,
-            'status': status,
-            'createdAt': DateTime.now().toIso8601String(),
-            'isSynced': true,
-            'lastModified': FieldValue.serverTimestamp(),
-          };
-
-          // Push as individual order document (better for multi-device sync)
-          await FirebaseFirestore.instance
-              .collection('cafes')
-              .doc(user.uid)
-              .collection('orders')
-              .doc(orderId)
-              .set(orderData, SetOptions(merge: true));
-
-          // Also update the legacy array-based structure for backward compatibility
-          await FirebaseFirestore.instance
-              .collection('cafes')
-              .doc(user.uid)
-              .collection('data')
-              .doc('orders')
-              .set({
-                'list': FieldValue.arrayUnion([orderData]),
-                'lastUpdated': FieldValue.serverTimestamp(),
-              }, SetOptions(merge: true));
-
-          debugPrint('✅ Order pushed to Firestore: $invoiceNum');
-        }
-      } catch (e) {
-        debugPrint("⚠️ Immediate Push failed: $e");
-        // Mark as unsynced so background sync catches it
-        await _db
-            .update(_db.orders)
-            .replace(
-              OrdersCompanion(id: Value(orderId), isSynced: const Value(false)),
-            );
-      }
-
-      return orderId;
     });
+
+    // Fire and forget Firestore sync in the background so UI doesn't lag
+    _tryImmediatePush(
+      orderId,
+      invoiceNum,
+      cart,
+      activeOutlet.id,
+      status,
+    ).ignore();
+
+    return orderId;
+  }
+
+  Future<void> _tryImmediatePush(
+    String orderId,
+    String invoiceNum,
+    CartState cart,
+    String locationId,
+    String status,
+  ) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final orderData = {
+          'id': orderId,
+          'invoiceNumber': invoiceNum,
+          'customerId': cart.customer?.id,
+          'locationId': locationId,
+          'subtotal': cart.subtotal,
+          'discountAmount': cart.totalDiscount,
+          'taxAmount': cart.taxAmount,
+          'totalAmount': cart.grandTotal,
+          'paymentMode': cart.paymentMode,
+          'paidCash': cart.paidCash,
+          'paidUPI': cart.paidUPI,
+          'status': status,
+          'createdAt': DateTime.now().toIso8601String(),
+          'isSynced': true,
+          'lastModified': FieldValue.serverTimestamp(),
+        };
+
+        // Push as individual order document (better for multi-device sync)
+        await FirebaseFirestore.instance
+            .collection('cafes')
+            .doc(user.uid)
+            .collection('orders')
+            .doc(orderId)
+            .set(orderData, SetOptions(merge: true));
+
+        final orderDataArray = Map<String, dynamic>.from(orderData);
+        orderDataArray['lastModified'] = DateTime.now().toIso8601String();
+
+        // Also update the legacy array-based structure for backward compatibility
+        await FirebaseFirestore.instance
+            .collection('cafes')
+            .doc(user.uid)
+            .collection('data')
+            .doc('orders')
+            .set({
+              'list': FieldValue.arrayUnion([orderDataArray]),
+              'lastUpdated': FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true));
+
+        // Mark as synced locally
+        await (_db.update(_db.orders)..where((t) => t.id.equals(orderId)))
+            .write(const OrdersCompanion(isSynced: Value(true)));
+
+        debugPrint('✅ Order pushed to Firestore: $invoiceNum');
+      }
+    } catch (e) {
+      debugPrint("⚠️ Immediate Push failed (will be retried later): $e");
+    }
   }
 
   // Soft Delete strategy: Cancel instead of Delete
   Future<void> voidOrder(String orderId) async {
-    await _db
-        .update(_db.orders)
-        .replace(
-          OrdersCompanion(
-            id: Value(orderId),
-            status: const Value('cancelled'),
-            isSynced: const Value(
-              false,
-            ), // Mark unsynced so it pushes to cloud on next sync
-          ),
-        );
+    await (_db.update(_db.orders)..where((t) => t.id.equals(orderId))).write(
+      const OrdersCompanion(
+        status: Value('cancelled'),
+        isSynced: Value(
+          false,
+        ), // Mark unsynced so it pushes to cloud on next sync
+      ),
+    );
 
     // Attempt immediate push of cancellation
     try {
@@ -301,19 +324,15 @@ class OrderRepository {
       final customer = await _db.customers.select().get();
       final cust = customer.firstWhere((c) => c.id == customerId);
 
-      await _db
-          .update(_db.customers)
-          .replace(
-            CustomersCompanion(
-              id: Value(customerId),
-              name: Value(cust.name),
-              phone: Value(cust.phone),
-              discountPercent: Value(cust.discountPercent),
-              totalVisits: Value(cust.totalVisits + 1),
-              totalSpent: Value(cust.totalSpent + orderAmount),
-              lastVisit: Value(DateTime.now()),
-            ),
-          );
+      await (_db.update(
+        _db.customers,
+      )..where((t) => t.id.equals(customerId))).write(
+        CustomersCompanion(
+          totalVisits: Value(cust.totalVisits + 1),
+          totalSpent: Value(cust.totalSpent + orderAmount),
+          lastVisit: Value(DateTime.now()),
+        ),
+      );
     } catch (e) {
       // Customer not found, skip update
       LoggingService.logError('Error updating customer stats', e);
@@ -373,6 +392,9 @@ class OrderRepository {
               .doc(order.id)
               .set(orderData, SetOptions(merge: true));
 
+          final orderDataArray = Map<String, dynamic>.from(orderData);
+          orderDataArray['lastModified'] = DateTime.now().toIso8601String();
+
           // Also update legacy array structure
           await FirebaseFirestore.instance
               .collection('cafes')
@@ -380,19 +402,13 @@ class OrderRepository {
               .collection('data')
               .doc('orders')
               .set({
-                'list': FieldValue.arrayUnion([orderData]),
+                'list': FieldValue.arrayUnion([orderDataArray]),
                 'lastUpdated': FieldValue.serverTimestamp(),
               }, SetOptions(merge: true));
 
           // Mark as synced in local DB
-          await _db
-              .update(_db.orders)
-              .replace(
-                OrdersCompanion(
-                  id: Value(order.id),
-                  isSynced: const Value(true),
-                ),
-              );
+          await (_db.update(_db.orders)..where((t) => t.id.equals(order.id)))
+              .write(const OrdersCompanion(isSynced: Value(true)));
 
           successCount++;
           debugPrint('✅ Synced order: ${order.invoiceNumber}');

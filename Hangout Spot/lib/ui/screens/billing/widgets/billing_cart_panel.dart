@@ -142,7 +142,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                       child: FutureBuilder<String>(
                         future: ref
                             .watch(sessionManagerProvider)
-                            .getNextInvoiceNumber(),
+                            .peekNextInvoiceNumber(),
                         builder: (context, snapshot) => Text(
                           snapshot.data ?? '... ',
                           style: TextStyle(

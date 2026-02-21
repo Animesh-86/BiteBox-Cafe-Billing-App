@@ -103,7 +103,7 @@ class _MobileCartModalState extends ConsumerState<MobileCartModal> {
                   FutureBuilder<String>(
                     future: ref
                         .watch(sessionManagerProvider)
-                        .getNextInvoiceNumber(),
+                        .peekNextInvoiceNumber(),
                     builder: (context, snapshot) => Text(
                       'Order - ${snapshot.data ?? '...'}',
                       style: TextStyle(

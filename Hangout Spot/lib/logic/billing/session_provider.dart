@@ -63,14 +63,38 @@ class SessionManager {
             .collection('counters')
             .doc(sessionId);
 
+        // Get actual actual order count for the session (self-healing for the bug)
+        final sessionStart = DateTime(
+          sessionDate.year,
+          sessionDate.month,
+          sessionDate.day,
+          OPENING_HOUR,
+        );
+        final sessionEnd = DateTime(
+          sessionDate.year,
+          sessionDate.month,
+          sessionDate.day,
+          CLOSING_HOUR,
+        ).add(const Duration(days: 1));
+        final localCount =
+            await (_db.select(_db.orders)
+                  ..where(
+                    (tbl) => tbl.createdAt.isBiggerOrEqualValue(sessionStart),
+                  )
+                  ..where(
+                    (tbl) => tbl.createdAt.isSmallerThanValue(sessionEnd),
+                  ))
+                .get()
+                .then((list) => list.length);
+
         final result = await FirebaseFirestore.instance.runTransaction((
           transaction,
         ) async {
           final snapshot = await transaction.get(counterRef);
 
           int nextNumber;
-          if (!snapshot.exists) {
-            // First order of the session
+          if (!snapshot.exists || localCount == 0) {
+            // First order of the session (or self-heal if local count is 0)
             nextNumber = 1001;
             transaction.set(counterRef, {
               'count': nextNumber,
@@ -78,6 +102,7 @@ class SessionManager {
               'lastUpdated': FieldValue.serverTimestamp(),
             });
           } else {
+            // Self-heal: Ensure count is not lower than actual orders + 1000
             final currentCount = snapshot.data()?['count'] ?? 1000;
             nextNumber = currentCount + 1;
             transaction.update(counterRef, {
@@ -96,6 +121,78 @@ class SessionManager {
     }
 
     // Fallback to local counting (legacy behavior for offline mode)
+    final sessionStart = DateTime(
+      sessionDate.year,
+      sessionDate.month,
+      sessionDate.day,
+      OPENING_HOUR,
+    );
+    final sessionEnd = DateTime(
+      sessionDate.year,
+      sessionDate.month,
+      sessionDate.day,
+      CLOSING_HOUR,
+    ).add(const Duration(days: 1));
+
+    final query = _db.select(_db.orders)
+      ..where((tbl) => tbl.createdAt.isBiggerOrEqualValue(sessionStart))
+      ..where((tbl) => tbl.createdAt.isSmallerThanValue(sessionEnd));
+
+    final count = await query.get();
+    final nextNumber = 1001 + count.length;
+    return '#$nextNumber';
+  }
+
+  /// Peek at the next invoice number for current session without incrementing it
+  /// Used for UI display purposes to prevent burning sequence numbers on rebuilds
+  Future<String> peekNextInvoiceNumber() async {
+    final sessionDate = getCurrentSessionDate();
+    final sessionId = getCurrentSessionId();
+
+    try {
+      final sessionStart = DateTime(
+        sessionDate.year,
+        sessionDate.month,
+        sessionDate.day,
+        OPENING_HOUR,
+      );
+      final sessionEnd = DateTime(
+        sessionDate.year,
+        sessionDate.month,
+        sessionDate.day,
+        CLOSING_HOUR,
+      ).add(const Duration(days: 1));
+      final localCount =
+          await (_db.select(_db.orders)
+                ..where(
+                  (tbl) => tbl.createdAt.isBiggerOrEqualValue(sessionStart),
+                )
+                ..where((tbl) => tbl.createdAt.isSmallerThanValue(sessionEnd)))
+              .get()
+              .then((list) => list.length);
+
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final counterRef = FirebaseFirestore.instance
+            .collection('cafes')
+            .doc(user.uid)
+            .collection('counters')
+            .doc(sessionId);
+
+        final snapshot = await counterRef.get();
+        if (!snapshot.exists || localCount == 0) {
+          return '#1001';
+        } else {
+          final currentCount = snapshot.data()?['count'] ?? 1000;
+          final nextNumber = currentCount + 1;
+          return '#$nextNumber';
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ Firestore peek failed, falling back to local: $e');
+    }
+
+    // Fallback to local counting
     final sessionStart = DateTime(
       sessionDate.year,
       sessionDate.month,

@@ -30,7 +30,7 @@ Future<void> printKot(BuildContext context, WidgetRef ref) async {
 
   try {
     final sessionManager = ref.read(sessionManagerProvider);
-    final invoiceNumber = await sessionManager.getNextInvoiceNumber();
+    final invoiceNumber = await sessionManager.peekNextInvoiceNumber();
     final orderId = cart.orderId ?? const Uuid().v4();
 
     final order = Order(
