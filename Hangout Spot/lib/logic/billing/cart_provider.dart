@@ -168,6 +168,7 @@ class CartState {
 class CartNotifier extends StateNotifier<CartState> {
   final String? outletId;
   late final String _storageKey;
+  bool _userModified = false;
 
   CartNotifier(this.outletId) : super(CartState()) {
     _storageKey = outletId != null
@@ -184,7 +185,8 @@ class CartNotifier extends StateNotifier<CartState> {
         try {
           final Map<String, dynamic> map = json.decode(jsonStr);
           final loaded = CartState.fromJson(map);
-          _applyState(loaded, push: false, save: false);
+          if (_userModified) return;
+          _applyState(loaded, push: false, save: false, markUser: false);
           // Initialize history with loaded state
           _history.clear();
           _history.add(loaded.copyWith(canUndo: false, canRedo: false));
@@ -222,10 +224,18 @@ class CartNotifier extends StateNotifier<CartState> {
     _applyState(newState, push: false);
   }
 
-  void _applyState(CartState newState, {bool push = true, bool save = true}) {
+  void _applyState(
+    CartState newState, {
+    bool push = true,
+    bool save = true,
+    bool markUser = true,
+  }) {
     if (push) {
       _pushState(newState);
       return;
+    }
+    if (markUser) {
+      _userModified = true;
     }
     final canUndo = _historyIndex > 0;
     final canRedo = _historyIndex < _history.length - 1;
@@ -333,6 +343,46 @@ class CartNotifier extends StateNotifier<CartState> {
 
   void setCustomer(Customer? customer) {
     _applyState(state.copyWith(customer: customer));
+  }
+
+  void clearCustomerSelection() {
+    _applyState(
+      CartState(
+        orderId: state.orderId,
+        items: state.items,
+        customer: null,
+        paymentMode: state.paymentMode,
+        paidCash: state.paidCash,
+        paidUPI: state.paidUPI,
+        manualDiscount: state.manualDiscount,
+        promoDiscount: state.promoDiscount,
+        canUndo: state.canUndo,
+        canRedo: state.canRedo,
+      ),
+    );
+    _clearCustomerInSavedCarts();
+  }
+
+  Future<void> _clearCustomerInSavedCarts() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final keys = prefs.getKeys();
+      for (final key in keys) {
+        if (key.startsWith('cart_state_v1_') || key == 'cart_state_temp') {
+          final jsonStr = prefs.getString(key);
+          if (jsonStr == null) continue;
+          try {
+            final Map<String, dynamic> map = json.decode(jsonStr);
+            map['customer'] = null;
+            await prefs.setString(key, json.encode(map));
+          } catch (_) {
+            // Ignore malformed cache entries
+          }
+        }
+      }
+    } catch (_) {
+      // Ignore storage errors
+    }
   }
 
   void setOrderId(String? orderId) {

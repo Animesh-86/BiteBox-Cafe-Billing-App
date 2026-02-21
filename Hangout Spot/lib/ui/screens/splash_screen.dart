@@ -57,6 +57,18 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   Future<void> _checkAndSyncData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      final resetCompleted = prefs.getBool('factory_reset_completed') ?? false;
+      if (resetCompleted) {
+        await prefs.setBool('factory_reset_completed', false);
+        await prefs.remove('last_sync_app_version');
+        debugPrint('🧹 Factory reset detected - skipping cloud restore');
+        return;
+      }
+      final skipAutoRestore = prefs.getBool('skip_auto_restore') ?? false;
+      if (skipAutoRestore) {
+        debugPrint('⏭️ Auto-restore disabled until manual restore');
+        return;
+      }
       final lastSyncVersion = prefs.getString('last_sync_app_version');
       const currentVersion = '1.0.0'; // TODO: Get from package_info
 

@@ -72,6 +72,8 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
   Future<void> _restore() async {
     setState(() => _isSyncing = true);
     try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('skip_auto_restore', false);
       await ref.read(syncRepositoryProvider).restoreData();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -501,6 +503,12 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
                             await syncRepo.deleteCloudData();
                             // Then clear local data (this will re-seed default outlet)
                             await syncRepo.clearLocalData();
+
+                            // Mark factory reset to skip any immediate restore
+                            final prefs = await SharedPreferences.getInstance();
+                            await prefs.setBool('factory_reset_completed', true);
+                            await prefs.setBool('skip_auto_restore', true);
+                            await prefs.remove('last_sync_app_version');
 
                             // Reset cart state to default (Walk-in)
                             ref.read(cartProvider.notifier).clearCart();

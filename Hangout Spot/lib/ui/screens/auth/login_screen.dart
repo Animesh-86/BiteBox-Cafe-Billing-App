@@ -53,6 +53,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
         // Perform Restore
         try {
+          final prefs = await SharedPreferences.getInstance();
+          final resetCompleted =
+              prefs.getBool('factory_reset_completed') ?? false;
+          if (resetCompleted) {
+            await prefs.setBool('factory_reset_completed', false);
+            await prefs.remove('last_sync_app_version');
+            debugPrint('🧹 Factory reset detected - skipping restore on login');
+            throw Exception('Factory reset - skip restore');
+          }
+          final skipAutoRestore = prefs.getBool('skip_auto_restore') ?? false;
+          if (skipAutoRestore) {
+            debugPrint('⏭️ Auto-restore disabled until manual restore');
+            throw Exception('Auto-restore disabled');
+          }
           await ref.read(syncRepositoryProvider).restoreData();
 
           // Start real-time order sync
@@ -60,7 +74,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           orderService.startListening();
 
           // Mark as synced for this app version
-          final prefs = await SharedPreferences.getInstance();
           await prefs.setString('last_sync_app_version', '1.0.0');
 
           debugPrint('✅ Login sync completed, real-time listener started');

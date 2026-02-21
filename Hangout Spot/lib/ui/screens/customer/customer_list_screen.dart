@@ -71,7 +71,7 @@ class _CustomerListScreenState extends ConsumerState<CustomerListScreen> {
                   title: const Text('Walk-in Customer'),
                   subtitle: const Text('Continue without customer selection'),
                   onTap: () {
-                    Navigator.pop(context, null);
+                    Navigator.pop(context, "walk_in");
                   },
                 );
               }
