@@ -5,6 +5,8 @@ import 'package:hangout_spot/data/providers/database_provider.dart';
 import 'package:drift/drift.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' hide Order;
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../main.dart'; // To access sharedPreferencesProvider
 
 /// Session Provider - manages cafe opening/closing hours and order numbering
 /// Cafe operates 2 PM to 2 AM next day
@@ -12,32 +14,52 @@ import 'package:cloud_firestore/cloud_firestore.dart' hide Order;
 
 class SessionManager {
   final AppDatabase _db;
+  final SharedPreferences _prefs;
 
-  // Cafe opens at 2 PM (14:00) and closes at 2 AM (02:00)
-  static const int OPENING_HOUR = 14; // 2 PM
-  static const int CLOSING_HOUR = 2; // 2 AM
+  // Cafe default hours (if not set in preferences)
+  int get openingHour => _prefs.getInt('opening_hour') ?? 14; // Default 2 PM
+  int get closingHour => _prefs.getInt('closing_hour') ?? 5; // Default 5 AM
 
-  SessionManager(this._db);
+  SessionManager(this._db, this._prefs);
 
   /// Get current session date
-  /// Session starts at 2 PM and ends at 2 AM next day
+  /// Session starts at 2 PM and ends at 5 AM next day
   /// So a session is identified by the date it started (2 PM date)
   DateTime getCurrentSessionDate() {
     final now = DateTime.now();
-    // If current time is before 2 PM, session belongs to yesterday
-    if (now.hour < CLOSING_HOUR || (now.hour >= OPENING_HOUR)) {
-      // Current session
-      if (now.hour >= OPENING_HOUR) {
+    final bool crossesMidnight = closingHour <= openingHour;
+
+    if (crossesMidnight) {
+      // e.g. 2 PM to 5 AM next day
+      if (now.hour < closingHour || now.hour >= openingHour) {
+        if (now.hour >= openingHour) {
+          return DateTime(now.year, now.month, now.day);
+        } else {
+          // It's after midnight but before closing (e.g. 2 AM), so session belongs to yesterday
+          return DateTime(
+            now.year,
+            now.month,
+            now.day,
+          ).subtract(const Duration(days: 1));
+        }
+      }
+    } else {
+      // Standard day shift, e.g. 8 AM to 8 PM
+      if (now.hour >= openingHour && now.hour < closingHour) {
         return DateTime(now.year, now.month, now.day);
       } else {
-        // Before 2 AM, still in yesterday's session
-        return DateTime(
-          now.year,
-          now.month,
-          now.day,
-        ).subtract(const Duration(days: 1));
+        // We are currently outside the operating hours.
+        // We can snap to the most recent logical session
+        if (now.hour < openingHour) {
+          return DateTime(
+            now.year,
+            now.month,
+            now.day,
+          ).subtract(const Duration(days: 1));
+        }
       }
     }
+
     return DateTime(now.year, now.month, now.day);
   }
 
@@ -68,14 +90,25 @@ class SessionManager {
           sessionDate.year,
           sessionDate.month,
           sessionDate.day,
-          OPENING_HOUR,
+          openingHour,
         );
-        final sessionEnd = DateTime(
-          sessionDate.year,
-          sessionDate.month,
-          sessionDate.day,
-          CLOSING_HOUR,
-        ).add(const Duration(days: 1));
+
+        DateTime sessionEnd;
+        if (closingHour <= openingHour) {
+          sessionEnd = DateTime(
+            sessionDate.year,
+            sessionDate.month,
+            sessionDate.day,
+            closingHour,
+          ).add(const Duration(days: 1));
+        } else {
+          sessionEnd = DateTime(
+            sessionDate.year,
+            sessionDate.month,
+            sessionDate.day,
+            closingHour,
+          );
+        }
         final localCount =
             await (_db.select(_db.orders)
                   ..where(
@@ -125,14 +158,25 @@ class SessionManager {
       sessionDate.year,
       sessionDate.month,
       sessionDate.day,
-      OPENING_HOUR,
+      openingHour,
     );
-    final sessionEnd = DateTime(
-      sessionDate.year,
-      sessionDate.month,
-      sessionDate.day,
-      CLOSING_HOUR,
-    ).add(const Duration(days: 1));
+
+    DateTime sessionEnd;
+    if (closingHour <= openingHour) {
+      sessionEnd = DateTime(
+        sessionDate.year,
+        sessionDate.month,
+        sessionDate.day,
+        closingHour,
+      ).add(const Duration(days: 1));
+    } else {
+      sessionEnd = DateTime(
+        sessionDate.year,
+        sessionDate.month,
+        sessionDate.day,
+        closingHour,
+      );
+    }
 
     final query = _db.select(_db.orders)
       ..where((tbl) => tbl.createdAt.isBiggerOrEqualValue(sessionStart))
@@ -154,14 +198,26 @@ class SessionManager {
         sessionDate.year,
         sessionDate.month,
         sessionDate.day,
-        OPENING_HOUR,
+        openingHour,
       );
-      final sessionEnd = DateTime(
-        sessionDate.year,
-        sessionDate.month,
-        sessionDate.day,
-        CLOSING_HOUR,
-      ).add(const Duration(days: 1));
+
+      DateTime sessionEnd;
+      if (closingHour <= openingHour) {
+        sessionEnd = DateTime(
+          sessionDate.year,
+          sessionDate.month,
+          sessionDate.day,
+          closingHour,
+        ).add(const Duration(days: 1));
+      } else {
+        sessionEnd = DateTime(
+          sessionDate.year,
+          sessionDate.month,
+          sessionDate.day,
+          closingHour,
+        );
+      }
+
       final localCount =
           await (_db.select(_db.orders)
                 ..where(
@@ -193,22 +249,33 @@ class SessionManager {
     }
 
     // Fallback to local counting
-    final sessionStart = DateTime(
+    final sessionStartFallback = DateTime(
       sessionDate.year,
       sessionDate.month,
       sessionDate.day,
-      OPENING_HOUR,
+      openingHour,
     );
-    final sessionEnd = DateTime(
-      sessionDate.year,
-      sessionDate.month,
-      sessionDate.day,
-      CLOSING_HOUR,
-    ).add(const Duration(days: 1));
+
+    DateTime sessionEndFallback;
+    if (closingHour <= openingHour) {
+      sessionEndFallback = DateTime(
+        sessionDate.year,
+        sessionDate.month,
+        sessionDate.day,
+        closingHour,
+      ).add(const Duration(days: 1));
+    } else {
+      sessionEndFallback = DateTime(
+        sessionDate.year,
+        sessionDate.month,
+        sessionDate.day,
+        closingHour,
+      );
+    }
 
     final query = _db.select(_db.orders)
-      ..where((tbl) => tbl.createdAt.isBiggerOrEqualValue(sessionStart))
-      ..where((tbl) => tbl.createdAt.isSmallerThanValue(sessionEnd));
+      ..where((tbl) => tbl.createdAt.isBiggerOrEqualValue(sessionStartFallback))
+      ..where((tbl) => tbl.createdAt.isSmallerThanValue(sessionEndFallback));
 
     final count = await query.get();
     final nextNumber = 1001 + count.length;
@@ -222,14 +289,25 @@ class SessionManager {
       sessionDate.year,
       sessionDate.month,
       sessionDate.day,
-      OPENING_HOUR,
+      openingHour,
     );
-    final sessionEnd = DateTime(
-      sessionDate.year,
-      sessionDate.month,
-      sessionDate.day,
-      CLOSING_HOUR,
-    ).add(const Duration(days: 1));
+
+    DateTime sessionEnd;
+    if (closingHour <= openingHour) {
+      sessionEnd = DateTime(
+        sessionDate.year,
+        sessionDate.month,
+        sessionDate.day,
+        closingHour,
+      ).add(const Duration(days: 1));
+    } else {
+      sessionEnd = DateTime(
+        sessionDate.year,
+        sessionDate.month,
+        sessionDate.day,
+        closingHour,
+      );
+    }
 
     return (_db.select(_db.orders)
           ..where((tbl) => tbl.createdAt.isBiggerOrEqualValue(sessionStart))
@@ -247,6 +325,23 @@ class SessionManager {
     final sessionDate = getCurrentSessionDate();
     final nextSessionDate = sessionDate.add(const Duration(days: 1));
 
+    DateTime sessionEnd;
+    if (closingHour <= openingHour) {
+      sessionEnd = DateTime(
+        sessionDate.year,
+        sessionDate.month,
+        sessionDate.day,
+        closingHour,
+      ).add(const Duration(days: 1));
+    } else {
+      sessionEnd = DateTime(
+        sessionDate.year,
+        sessionDate.month,
+        sessionDate.day,
+        closingHour,
+      );
+    }
+
     return {
       'sessionId': getCurrentSessionId(),
       'sessionDate': sessionDate,
@@ -256,18 +351,44 @@ class SessionManager {
         sessionDate.year,
         sessionDate.month,
         sessionDate.day,
-        OPENING_HOUR,
+        openingHour,
       ),
-      'closesAt': DateTime(
+      'closesAt': sessionEnd,
+    };
+  }
+
+  Map<String, DateTime> getSessionRange(DateTime sessionDate) {
+    DateTime sessionEnd;
+    if (closingHour <= openingHour) {
+      sessionEnd = DateTime(
         sessionDate.year,
         sessionDate.month,
         sessionDate.day,
-        CLOSING_HOUR,
-      ).add(const Duration(days: 1)),
+        closingHour,
+      ).add(const Duration(days: 1));
+    } else {
+      sessionEnd = DateTime(
+        sessionDate.year,
+        sessionDate.month,
+        sessionDate.day,
+        closingHour,
+      );
+    }
+
+    return {
+      'start': DateTime(
+        sessionDate.year,
+        sessionDate.month,
+        sessionDate.day,
+        openingHour,
+      ),
+      'end': sessionEnd,
     };
   }
 }
 
 final sessionManagerProvider = Provider<SessionManager>((ref) {
-  return SessionManager(ref.watch(appDatabaseProvider));
+  final db = ref.watch(appDatabaseProvider);
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return SessionManager(db, prefs);
 });

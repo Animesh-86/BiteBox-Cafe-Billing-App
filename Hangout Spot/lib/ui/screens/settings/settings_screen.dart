@@ -15,6 +15,7 @@ import 'sections/locations_settings.dart';
 import 'sections/loyalty_settings.dart';
 import 'sections/promo_settings.dart';
 import 'sections/receipt_settings.dart';
+import 'sections/operating_hours_settings.dart';
 import 'active_sessions_screen.dart';
 import 'widgets/settings_shared.dart';
 import 'sections/printer_settings_screen.dart';
@@ -344,6 +345,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         Icons.stars_rounded,
                         "Configure rewards and points",
                         const LoyaltySettingsScreen(),
+                      ),
+                      _buildNavTile(
+                        "Operating Hours",
+                        Icons.access_time_rounded,
+                        "Configure shift cutoffs",
+                        const OperatingHoursSettingsScreen(),
                       ),
                       _buildNavTile(
                         "Active Promotion",

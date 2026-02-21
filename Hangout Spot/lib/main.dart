@@ -3,9 +3,15 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hangout_spot/ui/theme/app_theme.dart';
 import 'package:hangout_spot/ui/screens/splash_screen.dart';
 import 'package:hangout_spot/data/providers/theme_provider.dart';
+
+// Global synchronous access to SharedPreferences for Riverpod providers
+final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
+  throw UnimplementedError('sharedPreferencesProvider must be overridden');
+});
 
 void main() async {
   runZonedGuarded(
@@ -24,7 +30,14 @@ void main() async {
         debugPrint("Firebase init failed: $e");
       }
 
-      runApp(const ProviderScope(child: HangoutSpotApp()));
+      final prefs = await SharedPreferences.getInstance();
+
+      runApp(
+        ProviderScope(
+          overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+          child: const HangoutSpotApp(),
+        ),
+      );
     },
     (error, stack) {
       debugPrint("CRASH ERROR: $error");

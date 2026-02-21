@@ -23,8 +23,9 @@ class DateFilter {
     required this.label,
   });
 
-  factory DateFilter.yesterday() {
-    final yesterday = DateTime.now().subtract(const Duration(days: 1));
+  factory DateFilter.yesterday([DateTime? referenceDate]) {
+    final now = referenceDate ?? DateTime.now();
+    final yesterday = now.subtract(const Duration(days: 1));
     final start = DateTime(yesterday.year, yesterday.month, yesterday.day);
     final end = DateTime(
       yesterday.year,
@@ -42,15 +43,15 @@ class DateFilter {
     );
   }
 
-  factory DateFilter.thisWeek() {
-    final now = DateTime.now();
+  factory DateFilter.thisWeek([DateTime? referenceDate]) {
+    final now = referenceDate ?? DateTime.now();
     final weekday = now.weekday; // 1 = Monday, 7 = Sunday
     final start = DateTime(
       now.year,
       now.month,
       now.day,
     ).subtract(Duration(days: weekday - 1));
-    final end = DateTime.now();
+    final end = now;
     return DateFilter(
       type: DateFilterType.thisWeek,
       startDate: start,
@@ -59,10 +60,10 @@ class DateFilter {
     );
   }
 
-  factory DateFilter.thisMonth() {
-    final now = DateTime.now();
+  factory DateFilter.thisMonth([DateTime? referenceDate]) {
+    final now = referenceDate ?? DateTime.now();
     final start = DateTime(now.year, now.month, 1);
-    final end = DateTime.now();
+    final end = now;
     return DateFilter(
       type: DateFilterType.thisMonth,
       startDate: start,
@@ -71,10 +72,10 @@ class DateFilter {
     );
   }
 
-  factory DateFilter.thisYear() {
-    final now = DateTime.now();
+  factory DateFilter.thisYear([DateTime? referenceDate]) {
+    final now = referenceDate ?? DateTime.now();
     final start = DateTime(now.year, 1, 1);
-    final end = DateTime.now();
+    final end = now;
     return DateFilter(
       type: DateFilterType.thisYear,
       startDate: start,
@@ -83,9 +84,10 @@ class DateFilter {
     );
   }
 
-  factory DateFilter.last7Days() {
-    final end = DateTime.now();
-    final start = DateTime.now().subtract(const Duration(days: 6));
+  factory DateFilter.last7Days([DateTime? referenceDate]) {
+    final now = referenceDate ?? DateTime.now();
+    final end = now;
+    final start = now.subtract(const Duration(days: 6));
     return DateFilter(
       type: DateFilterType.last7Days,
       startDate: start,
@@ -94,9 +96,10 @@ class DateFilter {
     );
   }
 
-  factory DateFilter.last30Days() {
-    final end = DateTime.now();
-    final start = DateTime.now().subtract(const Duration(days: 29));
+  factory DateFilter.last30Days([DateTime? referenceDate]) {
+    final now = referenceDate ?? DateTime.now();
+    final end = now;
+    final start = now.subtract(const Duration(days: 29));
     return DateFilter(
       type: DateFilterType.last30Days,
       startDate: start,

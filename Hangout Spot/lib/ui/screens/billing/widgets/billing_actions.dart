@@ -133,6 +133,12 @@ Future<void> holdOrder(BuildContext context, WidgetRef ref) async {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text("Order held!")));
+
+      // Close the Cart modal if on a mobile view
+      if (MediaQuery.of(context).size.width <= 900 &&
+          Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
     }
   } catch (e) {
     if (context.mounted) {

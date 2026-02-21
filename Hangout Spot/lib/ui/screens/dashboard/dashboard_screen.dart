@@ -8,6 +8,7 @@ import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/data/repositories/auth_repository.dart';
 import 'package:intl/intl.dart';
 import 'package:hangout_spot/logic/locations/location_provider.dart';
+import 'package:hangout_spot/data/repositories/customer_repository.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -17,7 +18,7 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
-  DateTime _selectedDate = DateTime.now();
+  DateTime? _selectedDate; // Null means 'current session date'
   late String _quote;
 
   final List<String> _quotes = [
@@ -40,9 +41,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Future<void> _pickDate(BuildContext context) async {
+    final sessionManager = ref.read(sessionManagerProvider);
+    final initialDate = _selectedDate ?? sessionManager.getCurrentSessionDate();
+
     final picked = await showDatePicker(
       context: context,
-      initialDate: _selectedDate,
+      initialDate: initialDate,
       firstDate: DateTime(2020),
       lastDate: DateTime.now(),
       builder: (context, child) {
@@ -63,7 +67,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         );
       },
     );
-    if (picked != null && picked != _selectedDate) {
+    if (picked != null &&
+        picked != (_selectedDate ?? sessionManager.getCurrentSessionDate())) {
       setState(() {
         _selectedDate = picked;
       });
@@ -83,24 +88,38 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final currentLocationAsync = ref.watch(currentLocationIdProvider);
     final currentLocationId = currentLocationAsync.value;
 
-    // Calculate start and end based on SESSION WINDOW (3 PM to 3 AM)
-    // instead of calendar day
+    final currentDate = _selectedDate ?? sessionManager.getCurrentSessionDate();
+
+    // Calculate start and end based on SESSION WINDOW
     final startOfDay = DateTime(
-      _selectedDate.year,
-      _selectedDate.month,
-      _selectedDate.day,
-      SessionManager.OPENING_HOUR, // 3 PM
+      currentDate.year,
+      currentDate.month,
+      currentDate.day,
+      sessionManager.openingHour,
       0,
       0,
     );
-    final endOfDay = DateTime(
-      _selectedDate.year,
-      _selectedDate.month,
-      _selectedDate.day,
-      SessionManager.CLOSING_HOUR, // 3 AM
-      0,
-      0,
-    ).add(const Duration(days: 1)); // Next day at 3 AM
+
+    DateTime endOfDay;
+    if (sessionManager.closingHour <= sessionManager.openingHour) {
+      endOfDay = DateTime(
+        currentDate.year,
+        currentDate.month,
+        currentDate.day,
+        sessionManager.closingHour,
+        0,
+        0,
+      ).add(const Duration(days: 1));
+    } else {
+      endOfDay = DateTime(
+        currentDate.year,
+        currentDate.month,
+        currentDate.day,
+        sessionManager.closingHour,
+        0,
+        0,
+      );
+    }
 
     final width = MediaQuery.of(context).size.width;
     final isWide = width > 900;
@@ -236,7 +255,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     Icon(Icons.calendar_today, size: 16, color: coffee),
                     const SizedBox(width: 8),
                     Text(
-                      DateFormat('EEE, d MMM').format(_selectedDate),
+                      DateFormat('EEE, d MMM').format(currentDate),
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: coffeeDark,
@@ -465,41 +484,78 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         return Column(
                           children: orders.map((order) {
                             final timeAgo = _getTimeAgo(order.createdAt);
-                            return ListTile(
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 20,
-                                vertical: 8,
-                              ),
-                              leading: CircleAvatar(
-                                backgroundColor: theme.colorScheme.primary
-                                    .withOpacity(0.1),
-                                child: Icon(
-                                  Icons.local_cafe,
-                                  size: 20,
-                                  color: theme.colorScheme.primary,
-                                ),
-                              ),
-                              title: Text(
-                                "Order ${order.invoiceNumber}",
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              subtitle: Text(
-                                "$timeAgo • ${order.status}",
-                                style: TextStyle(
-                                  color: theme.colorScheme.onSurface
-                                      .withOpacity(0.5),
-                                ),
-                              ),
-                              trailing: Text(
-                                "₹${order.totalAmount.toStringAsFixed(0)}",
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                  color: theme.colorScheme.primary,
-                                ),
-                              ),
+                            final isCancelled = order.status == 'cancelled';
+
+                            return FutureBuilder<Customer?>(
+                              future: order.customerId != null
+                                  ? ref
+                                        .read(customerRepositoryProvider)
+                                        .getCustomerById(order.customerId!)
+                                  : Future.value(null),
+                              builder: (context, custSnapshot) {
+                                final customerName =
+                                    custSnapshot.data?.name ?? 'Walk-in';
+                                final displayName = order.customerId != null
+                                    ? " • $customerName"
+                                    : "";
+
+                                return ListTile(
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                    vertical: 8,
+                                  ),
+                                  leading: CircleAvatar(
+                                    backgroundColor: isCancelled
+                                        ? Colors.red.withOpacity(0.1)
+                                        : theme.colorScheme.primary.withOpacity(
+                                            0.1,
+                                          ),
+                                    child: Icon(
+                                      isCancelled
+                                          ? Icons.cancel
+                                          : Icons.local_cafe,
+                                      size: 20,
+                                      color: isCancelled
+                                          ? Colors.red
+                                          : theme.colorScheme.primary,
+                                    ),
+                                  ),
+                                  title: Text(
+                                    "${order.invoiceNumber}$displayName",
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      decoration: isCancelled
+                                          ? TextDecoration.lineThrough
+                                          : null,
+                                      color: isCancelled
+                                          ? Colors.red.withOpacity(0.8)
+                                          : null,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    "$timeAgo • ${order.status.toUpperCase()}",
+                                    style: TextStyle(
+                                      color: isCancelled
+                                          ? Colors.red.withOpacity(0.7)
+                                          : theme.colorScheme.onSurface
+                                                .withOpacity(0.5),
+                                      fontWeight: isCancelled
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                    ),
+                                  ),
+                                  trailing: Text(
+                                    "₹${order.totalAmount.toStringAsFixed(0)}",
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                      color: isCancelled
+                                          ? Colors.red
+                                          : theme.colorScheme.primary,
+                                    ),
+                                  ),
+                                );
+                              },
                             );
                           }).toList(),
                         );
