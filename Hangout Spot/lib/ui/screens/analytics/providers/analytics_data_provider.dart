@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/data/repositories/analytics_repository.dart';
 import 'package:hangout_spot/data/providers/database_provider.dart';
-import 'package:hangout_spot/logic/locations/location_provider.dart';
+import 'package:hangout_spot/data/local/db/app_database.dart';
 
 // Data Models
 class AnalyticsData {
@@ -214,6 +214,10 @@ class DiscountEffectiveness {
   });
 }
 
+// State provider specifically isolated for the Analytics dashboards,
+// allowing "All Outlets" selection without affecting the global active POS outlet
+final analyticsSelectedOutletProvider = StateProvider<Location?>((ref) => null);
+
 // Provider
 final analyticsDataProvider =
     FutureProvider.family<
@@ -223,8 +227,8 @@ final analyticsDataProvider =
       final db = ref.watch(appDatabaseProvider);
       final repository = AnalyticsRepository(db);
 
-      // Get active outlet
-      final activeOutlet = await ref.watch(activeOutletProvider.future);
+      // Get active analytics outlet
+      final activeOutlet = ref.watch(analyticsSelectedOutletProvider);
       final locationId = activeOutlet?.id;
 
       // Calculate date ranges

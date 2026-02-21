@@ -4,6 +4,7 @@ import 'package:hangout_spot/ui/screens/analytics/theme/analytics_theme.dart';
 import 'package:hangout_spot/ui/screens/analytics/utils/date_filter_utils.dart';
 import 'package:hangout_spot/logic/locations/location_provider.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
+import 'package:hangout_spot/ui/screens/analytics/providers/analytics_data_provider.dart';
 import 'package:intl/intl.dart';
 
 class AnalyticsHeader extends ConsumerWidget {
@@ -236,16 +237,9 @@ class AnalyticsHeader extends ConsumerWidget {
                       color: AnalyticsTheme.primaryGold,
                     )
                   : null,
-              onTap: () async {
-                final locations = await ref.read(
-                  locationsStreamProvider.future,
-                );
-                for (final location in locations) {
-                  await ref
-                      .read(locationsControllerProvider.notifier)
-                      .deactivateOutlet(location.id);
-                }
-                if (context.mounted) Navigator.pop(context);
+              onTap: () {
+                ref.read(analyticsSelectedOutletProvider.notifier).state = null;
+                Navigator.pop(context);
               },
             ),
             const Divider(color: Colors.white12),
@@ -278,6 +272,16 @@ class AnalyticsHeader extends ConsumerWidget {
                         : FontWeight.normal,
                   ),
                 ),
+                subtitle:
+                    location.address != null && location.address!.isNotEmpty
+                    ? Text(
+                        location.address!,
+                        style: TextStyle(
+                          color: AnalyticsTheme.secondaryText,
+                          fontSize: 12,
+                        ),
+                      )
+                    : null,
                 trailing: location.id == currentOutlet?.id
                     ? const Icon(
                         Icons.check_circle_rounded,
@@ -285,9 +289,8 @@ class AnalyticsHeader extends ConsumerWidget {
                       )
                     : null,
                 onTap: () {
-                  ref
-                      .read(locationsControllerProvider.notifier)
-                      .activateOutlet(location.id);
+                  ref.read(analyticsSelectedOutletProvider.notifier).state =
+                      location;
                   Navigator.pop(context);
                 },
               ),
@@ -322,7 +325,7 @@ class AnalyticsHeader extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final activeOutlet = ref.watch(activeOutletProvider).valueOrNull;
+    final activeOutlet = ref.watch(analyticsSelectedOutletProvider);
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
@@ -417,8 +420,8 @@ class AnalyticsHeader extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(16),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
+                      horizontal: 12,
+                      vertical: 10,
                     ),
                     decoration: AnalyticsTheme.glassCard().copyWith(
                       borderRadius: BorderRadius.circular(16),
@@ -433,9 +436,9 @@ class AnalyticsHeader extends ConsumerWidget {
                               ? Icons.store_mall_directory_rounded
                               : Icons.store_rounded,
                           color: AnalyticsTheme.primaryGold,
-                          size: 20,
+                          size: 18,
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -444,7 +447,7 @@ class AnalyticsHeader extends ConsumerWidget {
                                 'Outlet',
                                 style: TextStyle(
                                   color: AnalyticsTheme.secondaryText,
-                                  fontSize: 11,
+                                  fontSize: 10,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -453,18 +456,33 @@ class AnalyticsHeader extends ConsumerWidget {
                                 activeOutlet?.name ?? 'All Outlets',
                                 style: const TextStyle(
                                   color: AnalyticsTheme.primaryText,
-                                  fontSize: 14,
+                                  fontSize: 13,
                                   fontWeight: FontWeight.bold,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
+                              if (activeOutlet?.address != null &&
+                                  activeOutlet!.address!.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2),
+                                  child: Text(
+                                    activeOutlet.address!,
+                                    style: TextStyle(
+                                      color: AnalyticsTheme.secondaryText,
+                                      fontSize: 10,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
                             ],
                           ),
                         ),
                         const Icon(
                           Icons.keyboard_arrow_down_rounded,
                           color: AnalyticsTheme.primaryGold,
+                          size: 20,
                         ),
                       ],
                     ),
@@ -478,8 +496,8 @@ class AnalyticsHeader extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(16),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
+                      horizontal: 12,
+                      vertical: 10,
                     ),
                     decoration: AnalyticsTheme.glassCard().copyWith(
                       borderRadius: BorderRadius.circular(16),
@@ -492,9 +510,9 @@ class AnalyticsHeader extends ConsumerWidget {
                         const Icon(
                           Icons.calendar_month_rounded,
                           color: AnalyticsTheme.primaryGold,
-                          size: 20,
+                          size: 18,
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -503,7 +521,7 @@ class AnalyticsHeader extends ConsumerWidget {
                                 'Duration',
                                 style: TextStyle(
                                   color: AnalyticsTheme.secondaryText,
-                                  fontSize: 11,
+                                  fontSize: 10,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -512,7 +530,7 @@ class AnalyticsHeader extends ConsumerWidget {
                                 _getFilterLabel(),
                                 style: const TextStyle(
                                   color: AnalyticsTheme.primaryText,
-                                  fontSize: 14,
+                                  fontSize: 13,
                                   fontWeight: FontWeight.bold,
                                 ),
                                 maxLines: 1,
@@ -524,6 +542,7 @@ class AnalyticsHeader extends ConsumerWidget {
                         const Icon(
                           Icons.keyboard_arrow_down_rounded,
                           color: AnalyticsTheme.primaryGold,
+                          size: 20,
                         ),
                       ],
                     ),
