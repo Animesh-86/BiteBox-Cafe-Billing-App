@@ -906,10 +906,16 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
             enabled: true,
             touchTooltipData: BarTouchTooltipData(
               getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                final month = data.monthlySales[groupIndex].month;
+                final monthStr = data.monthlySales[groupIndex].month;
+                final parts = monthStr.split('-');
+                String displayMonth = monthStr;
+                if (parts.length == 2) {
+                  final mInt = int.tryParse(parts[1]) ?? 1;
+                  displayMonth = DateFormat('MMM').format(DateTime(2024, mInt));
+                }
                 final amount = rod.toY;
                 return BarTooltipItem(
-                  '$month\n₹${amount.toStringAsFixed(0)}',
+                  '$displayMonth\n₹${amount.toStringAsFixed(0)}',
                   const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -923,16 +929,23 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
+                interval: 1,
                 getTitlesWidget: (value, meta) {
                   if (value.toInt() >= 0 &&
                       value.toInt() < data.monthlySales.length) {
                     final month = data.monthlySales[value.toInt()].month;
                     final parts = month.split('-');
                     if (parts.length == 2) {
-                      return Padding(
-                        padding: const EdgeInsets.only(top: 8),
+                      final monthInt = int.tryParse(parts[1]) ?? 1;
+                      final monthName = DateFormat(
+                        'MMM',
+                      ).format(DateTime(2024, monthInt));
+
+                      return SideTitleWidget(
+                        meta: meta,
+                        space: 8,
                         child: Text(
-                          parts[1], // Just show month number
+                          monthName,
                           style: TextStyle(
                             color: AnalyticsTheme.secondaryText,
                             fontSize: 10,
@@ -941,7 +954,7 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
                       );
                     }
                   }
-                  return const Text('');
+                  return SideTitleWidget(meta: meta, child: const Text(''));
                 },
                 reservedSize: 30,
               ),

@@ -615,7 +615,7 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
           // Peak Hours
           _buildSectionCard(
             icon: Icons.access_time_rounded,
-            title: 'Peak Hours (2PM - 2AM)',
+            title: 'Peak Hours',
             subtitle: 'Order distribution during operating hours',
             child: _buildPeakHoursChart(data),
           ),

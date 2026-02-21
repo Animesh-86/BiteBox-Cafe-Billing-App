@@ -323,15 +323,6 @@ class _ForecastScreenState extends ConsumerState<ForecastScreen> {
             subtitle: 'Next day average forecast',
             child: _buildExpectedDemandList(data),
           ),
-          const SizedBox(height: 24),
-
-          // Bundle Suggestions Section
-          _buildSectionCard(
-            icon: Icons.local_offer_rounded,
-            title: 'Bundle Suggestions',
-            subtitle: 'Popular item combinations',
-            child: _buildBundleSuggestions(data),
-          ),
         ],
       ),
     );
@@ -478,108 +469,6 @@ class _ForecastScreenState extends ConsumerState<ForecastScreen> {
                 style: TextStyle(
                   color: AnalyticsTheme.secondaryText,
                   fontSize: 11,
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildBundleSuggestions(AnalyticsData data) {
-    if (data.bundleSuggestions.isEmpty) {
-      return _buildEmptyState(
-        icon: Icons.shopping_bag_outlined,
-        title: 'No Bundle Suggestions',
-        subtitle: 'Analyze more orders to discover combo patterns',
-      );
-    }
-
-    // Use GridView for better layout
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 1,
-        mainAxisSpacing: 12,
-        childAspectRatio: 4,
-      ),
-      itemCount: data.bundleSuggestions.length,
-      itemBuilder: (context, index) {
-        final bundle = data.bundleSuggestions[index];
-        return Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AnalyticsTheme.cardBackground,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: AnalyticsTheme.chartPurple.withOpacity(0.3),
-              width: 1,
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: AnalyticsTheme.chartPurple.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Center(
-                  child: Text(
-                    '${index + 1}',
-                    style: const TextStyle(
-                      color: AnalyticsTheme.chartPurple,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      '${bundle.item1} + ${bundle.item2}',
-                      style: const TextStyle(
-                        color: AnalyticsTheme.primaryText,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Text(
-                      'Frequently ordered together',
-                      style: TextStyle(
-                        color: AnalyticsTheme.secondaryText,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: AnalyticsTheme.chartPurple.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  '${bundle.count}x',
-                  style: const TextStyle(
-                    color: AnalyticsTheme.chartPurple,
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                  ),
                 ),
               ),
             ],

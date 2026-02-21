@@ -897,23 +897,16 @@ class _LoyaltyScreenState extends ConsumerState<LoyaltyScreen> {
   Widget _buildAtRiskCustomers(AnalyticsData data) {
     if (data.atRiskCustomers.isEmpty) {
       return Center(
-        child: Column(
-          children: [
-            const Icon(
-              Icons.check_circle_rounded,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24.0),
+          child: Text(
+            '✅ All regulars are still active!',
+            style: const TextStyle(
               color: AnalyticsTheme.chartGreen,
-              size: 48,
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
             ),
-            const SizedBox(height: 16),
-            Text(
-              '✅ All regulars are still active!',
-              style: const TextStyle(
-                color: AnalyticsTheme.chartGreen,
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
+          ),
         ),
       );
     }

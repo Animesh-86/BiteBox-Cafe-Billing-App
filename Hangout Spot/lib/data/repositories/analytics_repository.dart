@@ -1072,26 +1072,33 @@ class AnalyticsRepository {
     final now = DateTime.now();
     final startDate = DateTime(now.year, now.month - months, 1);
 
-    String sql =
-        "SELECT strftime('%Y-%m', created_at) as month, "
-        'SUM(total_amount) as sales '
-        'FROM orders '
-        "WHERE status = 'completed' AND created_at >= ? ";
-    final vars = <Variable>[Variable.withDateTime(startDate)];
+    final query = _db.selectOnly(_db.orders)
+      ..addColumns([_db.orders.createdAt, _db.orders.totalAmount])
+      ..where(_db.orders.status.equals('completed'))
+      ..where(_db.orders.createdAt.isBiggerOrEqualValue(startDate));
+
     if (locationId != null) {
-      sql += 'AND location_id = ? ';
-      vars.add(Variable.withString(locationId));
+      query.where(_db.orders.locationId.equals(locationId));
     }
-    sql += 'GROUP BY month ORDER BY month';
-    final rows = await _db
-        .customSelect(sql, variables: vars, readsFrom: {_db.orders})
-        .get();
-    return rows.map((r) {
-      return MapEntry(
-        r.read<String?>('month') ?? 'Unknown',
-        r.read<double?>('sales') ?? 0.0,
-      );
-    }).toList();
+
+    final rows = await query.get();
+
+    final salesByMonth = <String, double>{};
+    for (final row in rows) {
+      final date = row.read(_db.orders.createdAt);
+      final total = row.read(_db.orders.totalAmount) ?? 0.0;
+
+      if (date != null) {
+        final monthStr =
+            '${date.year}-${date.month.toString().padLeft(2, '0')}';
+        salesByMonth[monthStr] = (salesByMonth[monthStr] ?? 0.0) + total;
+      }
+    }
+
+    final sorted = salesByMonth.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+
+    return sorted;
   }
 
   /// Get customer frequency segmentation
