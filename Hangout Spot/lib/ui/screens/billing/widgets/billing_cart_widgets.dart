@@ -36,7 +36,7 @@ class CartItemTile extends StatelessWidget {
                       fontWeight: FontWeight.bold,
                       color: billingText(context),
                     ),
-                    maxLines: 1,
+                    maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),

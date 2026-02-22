@@ -293,7 +293,7 @@ class _AdminItemCard extends ConsumerWidget {
                     Flexible(
                       child: Text(
                         item.name,
-                        maxLines: 2,
+                        maxLines: 4,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
