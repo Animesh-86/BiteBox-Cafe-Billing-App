@@ -602,8 +602,12 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
                               );
                             }
 
-                            // Sign out
-                            await ref.read(authRepositoryProvider).signOut();
+                            // Terminate all remote sessions (Global Logout)
+                            final authRepo = ref.read(authRepositoryProvider);
+                            await authRepo.sessionManager.endAllSessions();
+
+                            // Sign out current device securely
+                            await authRepo.signOut();
                             orderService.stopListening();
 
                             if (mounted) {

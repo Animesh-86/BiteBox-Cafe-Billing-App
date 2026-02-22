@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:drift/drift.dart';
 import 'connection.dart';
+import 'menu_seeder.dart';
 
 part 'app_database.g.dart';
 
@@ -306,6 +307,9 @@ class AppDatabase extends _$AppDatabase {
           );
           debugPrint('✅ Default outlet seeded: Hangout Spot – Kanha Dreamland');
         }
+
+        // Seed default menu items
+        await MenuSeeder.seedDefaultMenu(this);
       },
     );
   }

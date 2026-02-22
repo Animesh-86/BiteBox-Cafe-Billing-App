@@ -316,9 +316,9 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
-                      // 1. Read-only Store Profile (auto-fetched from outlet)
+                      // 1. Read-only Cafe Profile (auto-fetched from outlet)
                       SettingsSection(
-                        title: "Store Profile",
+                        title: "Cafe Profile",
                         icon: Icons.store_rounded,
                         children: [
                           activeOutletAsync.when(
@@ -604,7 +604,7 @@ class _StoreProfileContentState extends State<_StoreProfileContent> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _infoRow(Icons.store_rounded, 'Store Name', outlet?.name ?? '—'),
+              _infoRow(Icons.store_rounded, 'Cafe Name', outlet?.name ?? '—'),
               _infoRow(
                 Icons.location_on_rounded,
                 'Address',

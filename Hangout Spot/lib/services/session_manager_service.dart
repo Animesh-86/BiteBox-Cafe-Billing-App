@@ -529,6 +529,37 @@ class SessionManagerService {
     }
   }
 
+  /// Global Logout: End all active sessions across all devices (Danger Zone)
+  Future<void> endAllSessions() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final snapshot = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('sessions')
+          .get();
+
+      final batch = _firestore.batch();
+      for (var doc in snapshot.docs) {
+        batch.update(doc.reference, {
+          'status': 'logged_out',
+          'lastActivity': FieldValue.serverTimestamp(),
+        });
+      }
+      await batch.commit();
+
+      _heartbeatTimer?.cancel();
+      _sessionListener?.cancel();
+      _currentSessionId = null;
+
+      debugPrint('💥 All device sessions have been globally terminated.');
+    } catch (e) {
+      debugPrint('⚠️ Error ending all sessions globally: $e');
+    }
+  }
+
   /// Dispose resources
   void dispose() {
     _heartbeatTimer?.cancel();

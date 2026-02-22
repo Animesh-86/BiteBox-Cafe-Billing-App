@@ -218,14 +218,61 @@ class _ActiveSessionsScreenState extends ConsumerState<ActiveSessionsScreen> {
                         session.sessionId == currentSessionId;
                     final lastActivityAgo = _getTimeAgo(session.lastActivity);
 
-                    return _buildSessionCard(
-                      context,
-                      theme,
-                      session,
-                      isCurrentDevice,
-                      lastActivityAgo,
-                      sessionManager,
-                    );
+                    final isDismissible =
+                        !isCurrentDevice && _isCurrentDeviceTrusted;
+
+                    return isDismissible
+                        ? Dismissible(
+                            key: ValueKey(session.sessionId),
+                            direction: DismissDirection.endToStart,
+                            background: Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade400,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.only(right: 20),
+                              child: const Icon(
+                                Icons.logout_rounded,
+                                color: Colors.white,
+                                size: 28,
+                              ),
+                            ),
+                            confirmDismiss: (direction) async {
+                              return await _showLogoutConfirmation(
+                                context,
+                                session,
+                              );
+                            },
+                            onDismissed: (direction) {
+                              sessionManager.remoteLogout(session.sessionId);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Logged out ${session.deviceName}',
+                                  ),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                            },
+                            child: _buildSessionCard(
+                              context,
+                              theme,
+                              session,
+                              isCurrentDevice,
+                              lastActivityAgo,
+                              sessionManager,
+                            ),
+                          )
+                        : _buildSessionCard(
+                            context,
+                            theme,
+                            session,
+                            isCurrentDevice,
+                            lastActivityAgo,
+                            sessionManager,
+                          );
                   },
                 ),
               ),
@@ -397,11 +444,23 @@ class _ActiveSessionsScreenState extends ConsumerState<ActiveSessionsScreen> {
 
                   // Logout button (only for trusted devices)
                   TextButton.icon(
-                    onPressed: () => _showLogoutConfirmation(
-                      context,
-                      session,
-                      sessionManager,
-                    ),
+                    onPressed: () async {
+                      final confirmed = await _showLogoutConfirmation(
+                        context,
+                        session,
+                      );
+                      if (confirmed == true) {
+                        sessionManager.remoteLogout(session.sessionId);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Logged out ${session.deviceName}'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        }
+                      }
+                    },
                     icon: const Icon(Icons.logout, size: 18),
                     label: const Text('Logout'),
                     style: TextButton.styleFrom(foregroundColor: Colors.red),
@@ -702,12 +761,11 @@ class _ActiveSessionsScreenState extends ConsumerState<ActiveSessionsScreen> {
     }
   }
 
-  void _showLogoutConfirmation(
+  Future<bool> _showLogoutConfirmation(
     BuildContext context,
     UserSession session,
-    dynamic sessionManager,
-  ) {
-    showDialog(
+  ) async {
+    final result = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Confirm Logout'),
@@ -717,20 +775,11 @@ class _ActiveSessionsScreenState extends ConsumerState<ActiveSessionsScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
+            onPressed: () => Navigator.pop(ctx, false),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              sessionManager.remoteLogout(session.sessionId);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Logged out ${session.deviceName}'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-            },
+            onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
@@ -740,6 +789,7 @@ class _ActiveSessionsScreenState extends ConsumerState<ActiveSessionsScreen> {
         ],
       ),
     );
+    return result ?? false;
   }
 
   void _showInfoDialog(BuildContext context) {
