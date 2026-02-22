@@ -9,6 +9,7 @@ import 'package:hangout_spot/data/repositories/auth_repository.dart';
 import 'package:intl/intl.dart';
 import 'package:hangout_spot/logic/locations/location_provider.dart';
 import 'package:hangout_spot/data/repositories/customer_repository.dart';
+import 'package:hangout_spot/data/repositories/order_repository.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -486,72 +487,112 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             final timeAgo = _getTimeAgo(order.createdAt);
                             final isCancelled = order.status == 'cancelled';
 
-                            return FutureBuilder<Customer?>(
-                              future: order.customerId != null
-                                  ? ref
+                            return FutureBuilder<(
+                              Customer?,
+                              List<OrderItem>
+                            )>(
+                              future: Future.wait([
+                                order.customerId != null
+                                    ? ref
                                         .read(customerRepositoryProvider)
                                         .getCustomerById(order.customerId!)
-                                  : Future.value(null),
-                              builder: (context, custSnapshot) {
-                                final customerName =
-                                    custSnapshot.data?.name ?? 'Walk-in';
-                                final displayName = order.customerId != null
-                                    ? " • $customerName"
-                                    : "";
+                                    : Future.value(null) as Future<Customer?>,
+                                ref
+                                    .read(orderRepositoryProvider)
+                                    .getOrderItems(order.id),
+                              ]).then((results) => (
+                                results[0] as Customer?,
+                                results[1] as List<OrderItem>
+                              )),
+                              builder: (context, snapshot) {
+                                final customer = snapshot.data?.$1;
+                                final items = snapshot.data?.$2 ?? [];
+                                
+                                // Consistent customer display
+                                final customerDisplay = order.customerId != null
+                                    ? (customer?.name ?? 'Customer')
+                                    : 'Walk-In';
 
-                                return ListTile(
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 20,
-                                    vertical: 8,
-                                  ),
-                                  leading: CircleAvatar(
-                                    backgroundColor: isCancelled
-                                        ? Colors.red.withOpacity(0.1)
-                                        : theme.colorScheme.primary.withOpacity(
-                                            0.1,
+                                // Get item names
+                                final itemNames = items
+                                    .map((item) => item.itemName)
+                                    .toList();
+                                final itemsDisplay = itemNames.isNotEmpty
+                                    ? itemNames.join(', ')
+                                    : 'No items';
+
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 1),
+                                  child: ListTile(
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 20,
+                                      vertical: 12,
+                                    ),
+                                    leading: CircleAvatar(
+                                      backgroundColor: isCancelled
+                                          ? Colors.red.withOpacity(0.1)
+                                          : theme.colorScheme.primary
+                                              .withOpacity(0.1),
+                                      child: Icon(
+                                        isCancelled
+                                            ? Icons.cancel
+                                            : Icons.local_cafe,
+                                        size: 20,
+                                        color: isCancelled
+                                            ? Colors.red
+                                            : theme.colorScheme.primary,
+                                      ),
+                                    ),
+                                    title: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          "${order.invoiceNumber} • $customerDisplay",
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            decoration: isCancelled
+                                                ? TextDecoration.lineThrough
+                                                : null,
+                                            color: isCancelled
+                                                ? Colors.red.withOpacity(0.8)
+                                                : null,
                                           ),
-                                    child: Icon(
-                                      isCancelled
-                                          ? Icons.cancel
-                                          : Icons.local_cafe,
-                                      size: 20,
-                                      color: isCancelled
-                                          ? Colors.red
-                                          : theme.colorScheme.primary,
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          itemsDisplay,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: theme.colorScheme.onSurface
+                                                .withOpacity(0.6),
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ),
-                                  title: Text(
-                                    "${order.invoiceNumber}$displayName",
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      decoration: isCancelled
-                                          ? TextDecoration.lineThrough
-                                          : null,
-                                      color: isCancelled
-                                          ? Colors.red.withOpacity(0.8)
-                                          : null,
-                                    ),
-                                  ),
-                                  subtitle: Text(
-                                    "$timeAgo • ${order.status.toUpperCase()}",
-                                    style: TextStyle(
-                                      color: isCancelled
-                                          ? Colors.red.withOpacity(0.7)
-                                          : theme.colorScheme.onSurface
+                                    subtitle: Text(
+                                      "$timeAgo • ${order.status.toUpperCase()}",
+                                      style: TextStyle(
+                                        color: isCancelled
+                                            ? Colors.red.withOpacity(0.7)
+                                            : theme.colorScheme.onSurface
                                                 .withOpacity(0.5),
-                                      fontWeight: isCancelled
-                                          ? FontWeight.bold
-                                          : FontWeight.normal,
+                                        fontWeight: isCancelled
+                                            ? FontWeight.bold
+                                            : FontWeight.normal,
+                                      ),
                                     ),
-                                  ),
-                                  trailing: Text(
-                                    "₹${order.totalAmount.toStringAsFixed(0)}",
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                      color: isCancelled
-                                          ? Colors.red
-                                          : theme.colorScheme.primary,
+                                    trailing: Text(
+                                      "₹${order.totalAmount.toStringAsFixed(0)}",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                        color: isCancelled
+                                            ? Colors.red
+                                            : theme.colorScheme.primary,
+                                      ),
                                     ),
                                   ),
                                 );

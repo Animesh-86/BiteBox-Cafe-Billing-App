@@ -52,41 +52,70 @@ class CustomerProfileScreen extends ConsumerWidget {
                   ),
                   itemBuilder: (context, index) {
                     final order = orders[index];
-                    return ListTile(
-                      title: Text('Order ${order.invoiceNumber}'),
-                      subtitle: Text(
-                        DateFormat('dd MMM, hh:mm a').format(order.createdAt),
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '₹${order.totalAmount.toStringAsFixed(0)}',
-                            style: TextStyle(
-                              color: theme.colorScheme.primary,
-                              fontWeight: FontWeight.bold,
-                            ),
+                    return FutureBuilder<List<OrderItem>>(
+                      future: ref
+                          .read(orderRepositoryProvider)
+                          .getOrderItems(order.id),
+                      builder: (context, itemSnapshot) {
+                        final items = itemSnapshot.data ?? [];
+                        final itemNames = items
+                            .map((item) => item.itemName)
+                            .toList();
+                        final itemsDisplay = itemNames.isNotEmpty
+                            ? itemNames.join(', ')
+                            : 'No items';
+
+                        return ListTile(
+                          title: Text('Order ${order.invoiceNumber}'),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                DateFormat('dd MMM, hh:mm a')
+                                    .format(order.createdAt),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                itemsDisplay,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: theme.colorScheme.onSurface
+                                      .withOpacity(0.6),
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 12),
-                          if (isBillWhatsAppEnabled)
-                            IconButton(
-                              icon: const Icon(Icons.share_outlined),
-                              tooltip: 'Share Bill',
-                              onPressed: () async {
-                                final items = await ref
-                                    .read(orderRepositoryProvider)
-                                    .getOrderItems(order.id);
-                                await ref
-                                    .read(shareServiceProvider)
-                                    .shareInvoiceWhatsApp(
-                                      order,
-                                      items,
-                                      customer,
-                                    );
-                              },
-                            ),
-                        ],
-                      ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '₹${order.totalAmount.toStringAsFixed(0)}',
+                                style: TextStyle(
+                                  color: theme.colorScheme.primary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              if (isBillWhatsAppEnabled)
+                                IconButton(
+                                  icon: const Icon(Icons.share_outlined),
+                                  tooltip: 'Share Bill',
+                                  onPressed: () async {
+                                    await ref
+                                        .read(shareServiceProvider)
+                                        .shareInvoiceWhatsApp(
+                                          order,
+                                          items,
+                                          customer,
+                                        );
+                                  },
+                                ),
+                            ],
+                          ),
+                        );
+                      },
                     );
                   },
                 );

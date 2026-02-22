@@ -178,7 +178,7 @@ class ThermalPrintingService {
           item.itemName,
           styles: const PosStyles(bold: true),
         );
-        
+
         // Print qty, rate, total in a compact row
         bytes += generator.row([
           PosColumn(text: '', width: 5),
@@ -257,7 +257,9 @@ class ThermalPrintingService {
       }
 
       // Show loyalty points if customer is selected
-      if (customer != null && customerRewardBalance != null && customerRewardBalance > 0) {
+      if (customer != null &&
+          customerRewardBalance != null &&
+          customerRewardBalance > 0) {
         bytes += generator.hr();
         bytes += generator.row([
           PosColumn(text: 'Loyalty Points:', width: 6),
