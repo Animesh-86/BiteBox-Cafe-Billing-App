@@ -1,5 +1,8 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:hangout_spot/data/repositories/auth_repository.dart';
 import 'package:hangout_spot/logic/locations/location_provider.dart';
@@ -290,62 +293,9 @@ class SettingsScreen extends ConsumerWidget {
                             error: (_, __) =>
                                 const Text("Unable to load outlet data"),
                             data: (outlet) {
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _buildInfoRow(
-                                    context,
-                                    Icons.store_rounded,
-                                    "Store Name",
-                                    outlet?.name ?? '—',
-                                  ),
-                                  _buildInfoRow(
-                                    context,
-                                    Icons.location_on_rounded,
-                                    "Address",
-                                    outlet?.address ?? '—',
-                                  ),
-                                  _buildInfoRow(
-                                    context,
-                                    Icons.phone_rounded,
-                                    "Phone Number",
-                                    outlet?.phoneNumber ?? '—',
-                                  ),
-                                  _buildInfoRow(
-                                    context,
-                                    Icons.email_rounded,
-                                    "Email",
-                                    user?.email ?? '—',
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Icons.info_outline_rounded,
-                                        size: 14,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurface
-                                            .withValues(alpha: 0.4),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Expanded(
-                                        child: Text(
-                                          "Profile is managed through Outlets settings.",
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .labelSmall
-                                              ?.copyWith(
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .onSurface
-                                                    .withValues(alpha: 0.4),
-                                              ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
+                              return _StoreProfileContent(
+                                outlet: outlet,
+                                userEmail: user?.email ?? '—',
                               );
                             },
                           ),
@@ -412,42 +362,6 @@ class SettingsScreen extends ConsumerWidget {
                 ),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(
-    BuildContext context,
-    IconData icon,
-    String label,
-    String value,
-  ) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 18, color: theme.colorScheme.primary),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                ),
-              ),
-              Text(
-                value.isNotEmpty ? value : '—',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
           ),
         ],
       ),
@@ -562,6 +476,176 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ─── Store Profile Content Widget (with logo picker) ─────────────────────────
+
+class _StoreProfileContent extends StatefulWidget {
+  final dynamic outlet;
+  final String userEmail;
+  const _StoreProfileContent({required this.outlet, required this.userEmail});
+
+  @override
+  State<_StoreProfileContent> createState() => _StoreProfileContentState();
+}
+
+class _StoreProfileContentState extends State<_StoreProfileContent> {
+  String? _logoPath;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLogo();
+  }
+
+  Future<void> _loadLogo() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() => _logoPath = prefs.getString('store_logo_path'));
+  }
+
+  Future<void> _pickLogo() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      allowMultiple: false,
+    );
+    if (result != null && result.files.single.path != null) {
+      final path = result.files.single.path!;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('store_logo_path', path);
+      if (mounted) setState(() => _logoPath = path);
+    }
+  }
+
+  Widget _infoRow(IconData icon, String label, String value) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 17, color: theme.colorScheme.primary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                  ),
+                ),
+                Text(
+                  value.isNotEmpty ? value : '—',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final outlet = widget.outlet;
+    final theme = Theme.of(context);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Left: info rows
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _infoRow(Icons.store_rounded, 'Store Name', outlet?.name ?? '—'),
+              _infoRow(
+                Icons.location_on_rounded,
+                'Address',
+                outlet?.address ?? '—',
+              ),
+              _infoRow(
+                Icons.phone_rounded,
+                'Phone',
+                outlet?.phoneNumber ?? '—',
+              ),
+              _infoRow(Icons.email_rounded, 'Email', widget.userEmail),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 13,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                  ),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: Text(
+                      'Profile is managed through Outlets settings.',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.4,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        // Right: logo avatar
+        GestureDetector(
+          onTap: _pickLogo,
+          child: Stack(
+            children: [
+              CircleAvatar(
+                radius: 40,
+                backgroundColor: theme.colorScheme.primary.withValues(
+                  alpha: 0.1,
+                ),
+                backgroundImage: _logoPath != null
+                    ? FileImage(File(_logoPath!))
+                    : null,
+                child: _logoPath == null
+                    ? Icon(
+                        Icons.store_rounded,
+                        size: 36,
+                        color: theme.colorScheme.primary.withValues(alpha: 0.6),
+                      )
+                    : null,
+              ),
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(5),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: theme.colorScheme.surface,
+                      width: 2,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.camera_alt_rounded,
+                    size: 12,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hangout_spot/data/repositories/sync_repository.dart';
@@ -381,6 +381,14 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
                       width: double.infinity,
                       child: ElevatedButton.icon(
                         onPressed: () async {
+                          // Step 0: Password gate
+                          final passwordOk = await showDialog<bool>(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (_) => const _DangerPasswordDialog(),
+                          );
+                          if (passwordOk != true || !mounted) return;
+
                           // Step 1: First confirmation
                           final confirm1 = await showDialog<bool>(
                             context: context,
@@ -399,7 +407,7 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
                                 ],
                               ),
                               content: const Text(
-                                'This will permanently erase ALL orders, customers, settings, menu, and outlet data from both the cloud and this device.\n\nAre you absolutely sure?',
+                                'This will permanently erase ALL orders, customers, settings, and outlet data from both the cloud and this device.\n\nAre you absolutely sure?',
                               ),
                               actions: [
                                 TextButton(
@@ -617,6 +625,94 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ─── Password dialog for the Danger Zone ────────────────────────────────────
+
+const String _kDangerPassword = 'admin123';
+
+class _DangerPasswordDialog extends StatefulWidget {
+  const _DangerPasswordDialog();
+
+  @override
+  State<_DangerPasswordDialog> createState() => _DangerPasswordDialogState();
+}
+
+class _DangerPasswordDialogState extends State<_DangerPasswordDialog> {
+  final _controller = TextEditingController();
+  bool _obscure = true;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(
+        children: [
+          const Icon(Icons.lock_rounded, color: Colors.red, size: 22),
+          const SizedBox(width: 10),
+          Text(
+            'Manager Authorisation',
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(color: Colors.red),
+          ),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Enter manager password to continue with data deletion.',
+            style: TextStyle(fontSize: 13),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _controller,
+            obscureText: _obscure,
+            autofocus: true,
+            onSubmitted: (_) =>
+                Navigator.pop(context, _controller.text == _kDangerPassword),
+            decoration: InputDecoration(
+              labelText: 'Password',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Colors.red),
+              ),
+              suffixIcon: IconButton(
+                icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
+                onPressed: () => setState(() => _obscure = !_obscure),
+              ),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.red,
+            foregroundColor: Colors.white,
+          ),
+          onPressed: () =>
+              Navigator.pop(context, _controller.text == _kDangerPassword),
+          child: const Text('Confirm'),
+        ),
+      ],
     );
   }
 }
