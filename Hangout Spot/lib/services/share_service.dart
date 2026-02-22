@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -115,7 +116,17 @@ class ShareService {
       buffer.writeln();
     }
 
-    // 4. Total Amount
+    // 4. Discount (if any)
+    if (order.discountAmount > 0) {
+      final discountPercent = order.subtotal > 0
+          ? (order.discountAmount / order.subtotal * 100)
+          : 0.0;
+      buffer.writeln(
+        '🎁 *Discount (${discountPercent.toStringAsFixed(0)}%):* -₹${order.discountAmount.toStringAsFixed(2)}',
+      );
+    }
+
+    // 5. Total Amount
     if (showTotal) {
       buffer.writeln(
         '💰 *Total Amount:* ₹${order.totalAmount.toStringAsFixed(2)}',
@@ -123,13 +134,33 @@ class ShareService {
       buffer.writeln();
     }
 
-    // 5. Payment Mode
+    // 6. Payment Mode
     if (showPayment) {
       buffer.writeln('💳 *Payment:* ${order.paymentMode}');
       buffer.writeln();
     }
 
-    // 6. Closing line
+    // 7. Loyalty Points (if customer has them)
+    if (customer != null) {
+      try {
+        // Fetch customer reward balance
+        final rewardTransactions = await (_db.select(
+          _db.rewardTransactions,
+        )..where((t) => t.customerId.equals(customer.id))).get();
+        final balance = rewardTransactions.fold<double>(
+          0,
+          (sum, t) => sum + (t.type == 'earn' ? t.amount : -t.amount),
+        );
+        if (balance > 0) {
+          buffer.writeln('⭐ *Loyalty Points:* ${balance.toStringAsFixed(0)}');
+          buffer.writeln();
+        }
+      } catch (e) {
+        // Skip if can't fetch points
+      }
+    }
+
+    // 8. Closing line
     buffer.write(closing);
 
     return buffer.toString();
@@ -187,7 +218,8 @@ class ShareService {
       }
     }
 
-    await shareInvoice(order, items, customer);
+    // Don't fall back to PDF share - just fail silently if WhatsApp can't open
+    debugPrint('WhatsApp share failed: could not open WhatsApp');
   }
 
   Future<void> openWhatsAppChat(String phone, {String? text}) async {

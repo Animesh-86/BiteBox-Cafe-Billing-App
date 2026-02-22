@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/data/providers/database_provider.dart';
 import 'package:drift/drift.dart';
+import 'package:uuid/uuid.dart';
 
 // Service to listen for real-time order updates and sync to local DB
 class RealTimeOrderService {
@@ -126,6 +127,9 @@ class RealTimeOrderService {
         await _db
             .into(_db.orders)
             .insert(cloudOrder, mode: InsertMode.insertOrReplace);
+
+        // Restore orderItems if available
+        await _restoreOrderItems(cloudOrder.id, orderMap);
       } else {
         // Existing Order - Use timestamp to resolve conflicts
         final cloudModified = orderMap['lastModified'];
@@ -162,6 +166,8 @@ class RealTimeOrderService {
               '🔄 Updating Order (cloud newer): ${cloudOrder.invoiceNumber}',
             );
             await _db.update(_db.orders).replace(cloudOrder);
+            // Update orderItems as well
+            await _restoreOrderItems(cloudOrder.id, orderMap);
           } else {
             debugPrint(
               '⏭️ Skipping update (local newer): ${cloudOrder.invoiceNumber}',
@@ -177,11 +183,57 @@ class RealTimeOrderService {
               '🔄 Updating Order (field changed): ${cloudOrder.invoiceNumber}',
             );
             await _db.update(_db.orders).replace(cloudOrder);
+            // Update orderItems as well
+            await _restoreOrderItems(cloudOrder.id, orderMap);
           }
         }
       }
     } catch (e) {
       debugPrint('❌ Error syncing order: $e');
+    }
+  }
+
+  // Restore orderItems from cloud data
+  Future<void> _restoreOrderItems(
+    String orderId,
+    Map<String, dynamic> orderMap,
+  ) async {
+    try {
+      final itemsData = orderMap['items'] as List<dynamic>?;
+      if (itemsData == null || itemsData.isEmpty) {
+        debugPrint('⚠️ No items data in cloud order: $orderId');
+        return;
+      }
+
+      // Delete existing orderItems for this order
+      await (_db.delete(
+        _db.orderItems,
+      )..where((t) => t.orderId.equals(orderId))).go();
+
+      // Insert items from cloud
+      for (final itemData in itemsData) {
+        final itemMap = itemData as Map<String, dynamic>;
+        await _db
+            .into(_db.orderItems)
+            .insert(
+              OrderItemsCompanion(
+                id: Value(const Uuid().v4()),
+                orderId: Value(orderId),
+                itemId: Value(itemMap['itemId'] as String),
+                itemName: Value(itemMap['itemName'] as String),
+                price: Value((itemMap['price'] as num).toDouble()),
+                quantity: Value(itemMap['quantity'] as int),
+                note: Value(itemMap['note'] as String? ?? ''),
+                discountAmount: Value(
+                  (itemMap['discountAmount'] as num?)?.toDouble() ?? 0.0,
+                ),
+              ),
+            );
+      }
+
+      debugPrint('✅ Restored ${itemsData.length} items for order: $orderId');
+    } catch (e) {
+      debugPrint('❌ Error restoring orderItems: $e');
     }
   }
 }

@@ -92,6 +92,58 @@ class AnalyticsRepository {
     DateTime end, {
     String? locationId,
   }) async {
+    // Debug logging
+    print('DEBUG: getSessionItemsSold called');
+    print('  Start: $start');
+    print('  End: $end');
+    print('  LocationId: $locationId');
+
+    // Check total orders in database
+    final totalOrdersQuery = _db.select(_db.orders);
+    final allOrders = await totalOrdersQuery.get();
+    print('  Total orders in DB: ${allOrders.length}');
+
+    // Check orders in date range
+    final ordersInRange = allOrders
+        .where((o) => o.createdAt.isAfter(start) && o.createdAt.isBefore(end))
+        .toList();
+    print('  Orders in date range: ${ordersInRange.length}');
+
+    // Check completed orders
+    final completedOrders = ordersInRange
+        .where((o) => o.status == 'completed')
+        .toList();
+    print('  Completed orders: ${completedOrders.length}');
+
+    // Check location filtered
+    final locationFiltered = locationId != null
+        ? completedOrders.where((o) => o.locationId == locationId).toList()
+        : completedOrders;
+    print('  After location filter: ${locationFiltered.length}');
+
+    // Check orderItems table
+    final allOrderItems = await _db.select(_db.orderItems).get();
+    print('  Total orderItems in DB: ${allOrderItems.length}');
+
+    // Check if orderItems match the filtered orders
+    if (locationFiltered.isNotEmpty) {
+      final filteredOrderIds = locationFiltered.map((o) => o.id).toSet();
+      print('  Sample order IDs: ${filteredOrderIds.take(3).join(", ")}');
+
+      final matchingItems = allOrderItems
+          .where((item) => filteredOrderIds.contains(item.orderId))
+          .toList();
+      print('  OrderItems matching filtered orders: ${matchingItems.length}');
+
+      if (matchingItems.isNotEmpty) {
+        final totalQty = matchingItems.fold<int>(
+          0,
+          (sum, item) => sum + item.quantity,
+        );
+        print('  Manual quantity sum: $totalQty');
+      }
+    }
+
     final query =
         _db.selectOnly(_db.orderItems).join([
             innerJoin(
@@ -107,7 +159,9 @@ class AnalyticsRepository {
       query.where(_db.orders.locationId.equals(locationId));
     }
     final result = await query.getSingle();
-    return result.read(_db.orderItems.quantity.sum()) ?? 0;
+    final itemsSold = result.read(_db.orderItems.quantity.sum()) ?? 0;
+    print('  Items sold result: $itemsSold');
+    return itemsSold;
   }
 
   Future<int> getUniqueCustomersCount({String? locationId}) async {

@@ -181,6 +181,20 @@ class OrderRepository {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
+        // Convert cart items to JSON format
+        final itemsData = cart.items
+            .map(
+              (ci) => {
+                'itemId': ci.item.id,
+                'itemName': ci.item.name,
+                'price': ci.item.price,
+                'quantity': ci.quantity,
+                'note': ci.note,
+                'discountAmount': ci.discountAmount,
+              },
+            )
+            .toList();
+
         final orderData = {
           'id': orderId,
           'invoiceNumber': invoiceNum,
@@ -197,6 +211,7 @@ class OrderRepository {
           'createdAt': DateTime.now().toIso8601String(),
           'isSynced': true,
           'lastModified': FieldValue.serverTimestamp(),
+          'items': itemsData, // Include items in the order data
         };
 
         // Push as individual order document (better for multi-device sync)
@@ -220,6 +235,24 @@ class OrderRepository {
               'list': FieldValue.arrayUnion([orderDataArray]),
               'lastUpdated': FieldValue.serverTimestamp(),
             }, SetOptions(merge: true));
+
+        // Push orderItems to separate collection for manual restore support
+        for (final itemData in itemsData) {
+          final itemWithOrderId = Map<String, dynamic>.from(itemData);
+          itemWithOrderId['orderId'] = orderId;
+          itemWithOrderId['id'] = const Uuid()
+              .v4(); // Generate unique ID for orderItem
+
+          await FirebaseFirestore.instance
+              .collection('cafes')
+              .doc(user.uid)
+              .collection('data')
+              .doc('order_items')
+              .set({
+                'list': FieldValue.arrayUnion([itemWithOrderId]),
+                'lastUpdated': FieldValue.serverTimestamp(),
+              }, SetOptions(merge: true));
+        }
 
         // Mark as synced locally
         await (_db.update(_db.orders)..where((t) => t.id.equals(orderId)))

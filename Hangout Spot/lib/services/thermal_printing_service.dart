@@ -209,8 +209,15 @@ class ThermalPrintingService {
 
         // Print discount if any
         if (item.discountAmount > 0) {
+          // Calculate discount percentage from amount and price
+          final discountPercent = item.price > 0
+              ? (item.discountAmount / item.price * 100)
+              : 0.0;
           bytes += generator.row([
-            PosColumn(text: '  Item Discount', width: 8),
+            PosColumn(
+              text: '  Discount (${discountPercent.toStringAsFixed(0)}%)',
+              width: 8,
+            ),
             PosColumn(
               text: '-${item.discountAmount.toStringAsFixed(0)}',
               width: 4,
@@ -243,14 +250,23 @@ class ThermalPrintingService {
         ),
       ]);
 
-      bytes += generator.row([
-        PosColumn(text: 'Order Discount:', width: 6),
-        PosColumn(
-          text: 'Rs.${order.discountAmount.toStringAsFixed(0)}',
-          width: 6,
-          styles: const PosStyles(align: PosAlign.right),
-        ),
-      ]);
+      if (order.discountAmount > 0) {
+        // Calculate order discount percentage
+        final orderDiscountPercent = order.subtotal > 0
+            ? (order.discountAmount / order.subtotal * 100)
+            : 0.0;
+        bytes += generator.row([
+          PosColumn(
+            text: 'Discount (${orderDiscountPercent.toStringAsFixed(0)}%):',
+            width: 6,
+          ),
+          PosColumn(
+            text: 'Rs.${order.discountAmount.toStringAsFixed(0)}',
+            width: 6,
+            styles: const PosStyles(align: PosAlign.right),
+          ),
+        ]);
+      }
 
       if (order.taxAmount > 0) {
         bytes += generator.row([

@@ -11,6 +11,22 @@ class AnalyticsExportService {
     required DateTime startDate,
     required DateTime endDate,
   }) async {
+    print('DEBUG: Excel export started');
+    print('  Total Sales: ${data.totalSales}');
+    print('  Total Orders: ${data.totalOrders}');
+    print('  Total Items Sold: ${data.totalItemsSold}');
+    print('  Total Customers: ${data.totalCustomers}');
+
+    // Check if there's any data to export
+    if (data.totalOrders == 0 &&
+        data.totalSales == 0 &&
+        data.totalItemsSold == 0) {
+      print('DEBUG: No data to export');
+      throw Exception(
+        'No data available for the selected period. Please ensure you have orders with status = "completed" in this date range.',
+      );
+    }
+
     var excel = Excel.createExcel();
 
     // Remove default sheet
