@@ -71,40 +71,82 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Printer Settings"),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _scanning ? null : _scan,
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _buildStatusCard(),
-          const SizedBox(height: 20),
-          Text(
-            "Paired Devices",
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 10),
-          if (_devices.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(20),
-              child: Center(
-                child: Text(
-                  "No paired devices found. Pair a printer in system settings first.",
+    return Dialog(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Container(
+        width: 450,
+        constraints: const BoxConstraints(maxHeight: 700),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.only(
+                left: 20,
+                right: 8,
+                top: 12,
+                bottom: 12,
+              ),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(
+                    color: Theme.of(context).dividerColor.withOpacity(0.5),
+                  ),
                 ),
               ),
-            )
-          else
-            ..._devices.map(_buildDeviceTile).toList(),
-        ],
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    "Printer Settings",
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.refresh),
+                        color: Theme.of(context).colorScheme.primary,
+                        onPressed: _scanning ? null : _scan,
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  _buildStatusCard(),
+                  const SizedBox(height: 20),
+                  Text(
+                    "Paired Devices",
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  if (_devices.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(20),
+                      child: Center(
+                        child: Text(
+                          "No paired devices found. Pair a printer in system settings first.",
+                        ),
+                      ),
+                    )
+                  else
+                    ..._devices.map(_buildDeviceTile).toList(),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

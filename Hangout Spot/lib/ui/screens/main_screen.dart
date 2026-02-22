@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:hangout_spot/ui/screens/dashboard/dashboard_screen.dart';
 import 'package:hangout_spot/ui/screens/analytics/premium_analytics_screen.dart';
 import 'package:hangout_spot/ui/screens/menu/manage_menu_screen.dart';
