@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/data/repositories/analytics_repository.dart';
 import 'package:hangout_spot/data/providers/database_provider.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
+import 'package:hangout_spot/logic/billing/session_provider.dart';
 
 // Data Models
 class AnalyticsData {
@@ -222,20 +223,66 @@ final analyticsSelectedOutletProvider = StateProvider<Location?>((ref) => null);
 final analyticsDataProvider =
     FutureProvider.family<
       AnalyticsData,
-      ({DateTime startDate, DateTime endDate})
+      ({DateTime startDate, DateTime endDate, String? filterName})
     >((ref, params) async {
       final db = ref.watch(appDatabaseProvider);
       final repository = AnalyticsRepository(db);
+      final sessionManager = ref.watch(sessionManagerProvider);
 
       // Get active analytics outlet
       final activeOutlet = ref.watch(analyticsSelectedOutletProvider);
       final locationId = activeOutlet?.id;
 
-      // Calculate date ranges
-      final startDate = params.startDate;
-      final endDate = params.endDate.add(const Duration(days: 1));
+      // Smart shift-aware date bounds calculation
+      DateTime startDate = params.startDate;
+      DateTime endDate = params.endDate;
+
+      if (params.filterName == 'Today' || params.filterName == 'Yesterday') {
+        final referenceDate = params.filterName == 'Today'
+            ? DateTime.now()
+            : DateTime.now().subtract(const Duration(days: 1));
+
+        startDate = DateTime(
+          referenceDate.year,
+          referenceDate.month,
+          referenceDate.day,
+          sessionManager.openingHour,
+        );
+
+        if (sessionManager.closingHour <= sessionManager.openingHour) {
+          endDate = DateTime(
+            referenceDate.year,
+            referenceDate.month,
+            referenceDate.day,
+            sessionManager.closingHour,
+          ).add(const Duration(days: 1));
+        } else {
+          endDate = DateTime(
+            referenceDate.year,
+            referenceDate.month,
+            referenceDate.day,
+            sessionManager.closingHour,
+          );
+        }
+      } else if (params.filterName == 'Custom Range') {
+        // Push the end date to the end of the day to capture the whole day
+        endDate = DateTime(
+          params.endDate.year,
+          params.endDate.month,
+          params.endDate.day,
+          23,
+          59,
+          59,
+        );
+      } else {
+        // For 'This Week', 'This Month', etc., just let the end boundary be the current moment
+        // We do not artificially add +1 day anymore to prevent bleeding into tomorrow
+      }
+
       final daysDiff = endDate.difference(startDate).inDays;
-      final previousStart = startDate.subtract(Duration(days: daysDiff));
+      final previousStart = startDate.subtract(
+        Duration(days: daysDiff == 0 ? 1 : daysDiff),
+      );
       final previousEnd = startDate;
 
       // Fetch current period data

@@ -27,7 +27,11 @@ class _ForecastScreenState extends ConsumerState<ForecastScreen> {
   @override
   Widget build(BuildContext context) {
     final analyticsData = ref.watch(
-      analyticsDataProvider((startDate: _startDate, endDate: _endDate)),
+      analyticsDataProvider((
+        startDate: _startDate,
+        endDate: _endDate,
+        filterName: _dateFilter.label,
+      )),
     );
     return Column(
       children: [

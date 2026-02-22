@@ -154,6 +154,7 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
         analyticsDataProvider((
           startDate: filter.startDate,
           endDate: filter.endDate,
+          filterName: filter.label,
         )).future,
       );
 
@@ -187,7 +188,11 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
   @override
   Widget build(BuildContext context) {
     final analyticsData = ref.watch(
-      analyticsDataProvider((startDate: _startDate, endDate: _endDate)),
+      analyticsDataProvider((
+        startDate: _startDate,
+        endDate: _endDate,
+        filterName: _dateFilter.label,
+      )),
     );
     return Column(
       children: [

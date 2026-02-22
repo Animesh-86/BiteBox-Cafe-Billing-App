@@ -154,6 +154,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
         analyticsDataProvider((
           startDate: filter.startDate,
           endDate: filter.endDate,
+          filterName: filter.label,
         )).future,
       );
 
@@ -187,7 +188,11 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
   @override
   Widget build(BuildContext context) {
     final analyticsData = ref.watch(
-      analyticsDataProvider((startDate: _startDate, endDate: _endDate)),
+      analyticsDataProvider((
+        startDate: _startDate,
+        endDate: _endDate,
+        filterName: _dateFilter.label,
+      )),
     );
     return Column(
       children: [
@@ -670,7 +675,12 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
           ),
           titlesData: FlTitlesData(
             bottomTitles: AxisTitles(
-              axisNameWidget: Text('Revenue', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AnalyticsTheme.secondaryText)),
+              axisNameWidget: Text(
+                'Revenue',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AnalyticsTheme.secondaryText,
+                ),
+              ),
               sideTitles: SideTitles(
                 showTitles: true,
                 getTitlesWidget: (value, meta) {
@@ -685,7 +695,12 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
               ),
             ),
             leftTitles: AxisTitles(
-              axisNameWidget: Text('Volume', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AnalyticsTheme.secondaryText)),
+              axisNameWidget: Text(
+                'Volume',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AnalyticsTheme.secondaryText,
+                ),
+              ),
               sideTitles: SideTitles(
                 showTitles: true,
                 reservedSize: 40,

@@ -154,6 +154,7 @@ class _LoyaltyScreenState extends ConsumerState<LoyaltyScreen> {
         analyticsDataProvider((
           startDate: filter.startDate,
           endDate: filter.endDate,
+          filterName: filter.label,
         )).future,
       );
 
@@ -187,7 +188,11 @@ class _LoyaltyScreenState extends ConsumerState<LoyaltyScreen> {
   @override
   Widget build(BuildContext context) {
     final analyticsData = ref.watch(
-      analyticsDataProvider((startDate: _startDate, endDate: _endDate)),
+      analyticsDataProvider((
+        startDate: _startDate,
+        endDate: _endDate,
+        filterName: _dateFilter.label,
+      )),
     );
     return Column(
       children: [
@@ -520,7 +525,12 @@ class _LoyaltyScreenState extends ConsumerState<LoyaltyScreen> {
           ),
         ),
         const SizedBox(height: 4),
-        Text(label, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AnalyticsTheme.secondaryText)),
+        Text(
+          label,
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: AnalyticsTheme.secondaryText),
+        ),
       ],
     );
   }
