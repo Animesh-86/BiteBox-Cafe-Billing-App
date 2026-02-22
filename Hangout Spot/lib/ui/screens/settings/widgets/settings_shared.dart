@@ -93,7 +93,7 @@ class SettingsTextField extends StatelessWidget {
       controller: controller,
       keyboardType: inputType,
       maxLines: maxLines,
-      style: const TextStyle(fontSize: 14),
+      style: Theme.of(context).textTheme.bodyLarge,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, size: 18),
@@ -209,7 +209,7 @@ class SettingsDateBtn extends StatelessWidget {
                 date == null
                     ? label
                     : "${date!.day}/${date!.month}/${date!.year}",
-                style: const TextStyle(fontSize: 13),
+                style: Theme.of(context).textTheme.bodyMedium,
               ),
             ),
           ],

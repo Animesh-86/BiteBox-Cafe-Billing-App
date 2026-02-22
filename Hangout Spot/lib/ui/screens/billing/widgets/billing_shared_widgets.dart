@@ -33,8 +33,7 @@ class PaymentChip extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: TextStyle(
-            fontSize: 11,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             color: isSelected
                 ? Theme.of(context).colorScheme.primary
@@ -115,12 +114,16 @@ class _RedemptionDialogState extends State<RedemptionDialog> {
                   const SizedBox(height: 4),
                   Text(
                     'Max Redemption: ₹${widget.maxRedemption}',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'Current Total: ₹${widget.currentTotal.toStringAsFixed(2)}',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
                   ),
                 ],
               ),

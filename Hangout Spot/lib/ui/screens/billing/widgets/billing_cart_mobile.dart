@@ -47,15 +47,13 @@ class CartMobileBottomBar extends ConsumerWidget {
               children: [
                 Text(
                   "${cart.items.length} items",
-                  style: TextStyle(
-                    fontSize: 12,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: billingMutedText(context),
                   ),
                 ),
                 Text(
                   "₹${cart.grandTotal.toStringAsFixed(2)}",
-                  style: TextStyle(
-                    fontSize: 16,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: billingText(context),
                   ),
@@ -103,11 +101,11 @@ class _MobileCartModalState extends ConsumerState<MobileCartModal> {
                   cart.invoiceNumber != null
                       ? Text(
                           'Order - ${cart.invoiceNumber}',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: billingText(context),
-                          ),
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: billingText(context),
+                              ),
                         )
                       : FutureBuilder<String>(
                           future: ref
@@ -115,11 +113,11 @@ class _MobileCartModalState extends ConsumerState<MobileCartModal> {
                               .peekNextInvoiceNumber(),
                           builder: (context, snapshot) => Text(
                             'Order - ${snapshot.data ?? '...'}',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: billingText(context),
-                            ),
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: billingText(context),
+                                ),
                           ),
                         ),
                   Row(
@@ -207,10 +205,8 @@ class _MobileCartModalState extends ConsumerState<MobileCartModal> {
                       Expanded(
                         child: Text(
                           cart.customer!.name,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: billingMutedText(context),
-                          ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: billingMutedText(context)),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -240,26 +236,22 @@ class _MobileCartModalState extends ConsumerState<MobileCartModal> {
                           children: [
                             Text(
                               'Select Customer',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: billingMutedText(context),
-                              ),
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(color: billingMutedText(context)),
                             ),
                             if (cart.customer == null)
                               Text(
                                 'Tap to select',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: billingMutedText(context),
-                                ),
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: billingMutedText(context),
+                                    ),
                               )
                             else
                               Text(
                                 '${cart.customer!.name} (${cart.customer!.totalVisits} visits)',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: billingText(context),
-                                ),
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(color: billingText(context)),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -294,27 +286,33 @@ class _MobileCartModalState extends ConsumerState<MobileCartModal> {
                                   .when(
                                     data: (balance) => Text(
                                       '${balance.toInt()} pts',
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.orange,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelSmall
+                                          ?.copyWith(
+                                            color: Colors.orange,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                     ),
-                                    loading: () => const Text(
+                                    loading: () => Text(
                                       '... pts',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.orange,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelSmall
+                                          ?.copyWith(
+                                            color: Colors.orange,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                     ),
-                                    error: (_, __) => const Text(
+                                    error: (_, __) => Text(
                                       '0 pts',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.orange,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelSmall
+                                          ?.copyWith(
+                                            color: Colors.orange,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                     ),
                                   ),
                             );
@@ -339,9 +337,8 @@ class _MobileCartModalState extends ConsumerState<MobileCartModal> {
               ? Center(
                   child: Text(
                     'Cart empty',
-                    style: TextStyle(
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: billingMutedText(context),
-                      fontSize: 12,
                     ),
                   ),
                 )

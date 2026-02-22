@@ -70,12 +70,16 @@ class _ActiveSessionsScreenState extends ConsumerState<ActiveSessionsScreen> {
                   const SizedBox(height: 16),
                   Text(
                     'Error loading sessions',
-                    style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      color: Colors.grey.shade600,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     snapshot.error.toString(),
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: Colors.grey.shade500,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                 ],
@@ -96,12 +100,16 @@ class _ActiveSessionsScreenState extends ConsumerState<ActiveSessionsScreen> {
                   const SizedBox(height: 16),
                   Text(
                     'No active sessions',
-                    style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      color: Colors.grey.shade600,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Devices will appear here when logged in',
-                    style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: Colors.grey.shade500,
+                    ),
                   ),
                 ],
               ),
@@ -166,10 +174,9 @@ class _ActiveSessionsScreenState extends ConsumerState<ActiveSessionsScreen> {
                           Expanded(
                             child: Text(
                               'This device is pending approval',
-                              style: TextStyle(
+                              style: theme.textTheme.titleMedium?.copyWith(
                                 color: Colors.blue.shade900,
                                 fontWeight: FontWeight.w600,
-                                fontSize: 15,
                               ),
                             ),
                           ),
@@ -178,9 +185,8 @@ class _ActiveSessionsScreenState extends ConsumerState<ActiveSessionsScreen> {
                       const SizedBox(height: 12),
                       Text(
                         'You can use the app normally, but cannot manage other devices. If you own this account, claim trust with your password.',
-                        style: TextStyle(
+                        style: theme.textTheme.bodyMedium?.copyWith(
                           color: Colors.blue.shade800,
-                          fontSize: 13,
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -275,9 +281,8 @@ class _ActiveSessionsScreenState extends ConsumerState<ActiveSessionsScreen> {
                     children: [
                       Text(
                         session.deviceName,
-                        style: const TextStyle(
+                        style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
-                          fontSize: 16,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -291,8 +296,7 @@ class _ActiveSessionsScreenState extends ConsumerState<ActiveSessionsScreen> {
                           const SizedBox(width: 4),
                           Text(
                             '${session.deviceType} • v${session.appVersion}',
-                            style: TextStyle(
-                              fontSize: 13,
+                            style: theme.textTheme.bodyMedium?.copyWith(
                               color: Colors.grey.shade700,
                             ),
                           ),
@@ -318,8 +322,7 @@ class _ActiveSessionsScreenState extends ConsumerState<ActiveSessionsScreen> {
                     const SizedBox(width: 4),
                     Text(
                       session.androidVersion!,
-                      style: TextStyle(
-                        fontSize: 13,
+                      style: theme.textTheme.bodyMedium?.copyWith(
                         color: Colors.grey.shade700,
                       ),
                     ),
@@ -334,7 +337,9 @@ class _ActiveSessionsScreenState extends ConsumerState<ActiveSessionsScreen> {
                 const SizedBox(width: 4),
                 Text(
                   'Last active: $lastActivityAgo',
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: Colors.grey.shade600,
+                  ),
                 ),
               ],
             ),
@@ -348,11 +353,10 @@ class _ActiveSessionsScreenState extends ConsumerState<ActiveSessionsScreen> {
                   color: Colors.green,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Text(
+                child: Text(
                   'This Device',
-                  style: TextStyle(
+                  style: theme.textTheme.labelSmall?.copyWith(
                     color: Colors.white,
-                    fontSize: 10,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -452,9 +456,8 @@ class _ActiveSessionsScreenState extends ConsumerState<ActiveSessionsScreen> {
           const SizedBox(width: 4),
           Text(
             label,
-            style: TextStyle(
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
               color: color,
-              fontSize: 11,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -594,7 +597,9 @@ class _ActiveSessionsScreenState extends ConsumerState<ActiveSessionsScreen> {
               const SizedBox(height: 8),
               Text(
                 'Note: Limited to 3 attempts per hour',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
               ),
             ],
           ),
@@ -767,11 +772,11 @@ class _ActiveSessionsScreenState extends ConsumerState<ActiveSessionsScreen> {
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 '• Password Claim: Re-authenticate to claim trust\n'
                 '• Multiple Trusted Devices: Up to 3 for redundancy\n'
                 '• Email Recovery: For lost devices (coming soon)',
-                style: TextStyle(fontSize: 13),
+                style: Theme.of(context).textTheme.bodyMedium,
               ),
             ],
           ),
@@ -792,7 +797,7 @@ class _ActiveSessionsScreenState extends ConsumerState<ActiveSessionsScreen> {
       children: [
         Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
-        Text(description, style: const TextStyle(fontSize: 13)),
+        Text(description, style: Theme.of(context).textTheme.bodyMedium),
       ],
     );
   }

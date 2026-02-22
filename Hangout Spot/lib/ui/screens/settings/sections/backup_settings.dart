@@ -199,11 +199,13 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
                 title: "Account Actions",
                 icon: Icons.account_circle_rounded,
                 children: [
-                  const Padding(
-                    padding: EdgeInsets.only(bottom: 16),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
                     child: Text(
                       "Logging out will backup your data to the cloud and clear all local data from this device.",
-                      style: TextStyle(fontSize: 13, color: Colors.grey),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: Colors.grey),
                     ),
                   ),
                   SizedBox(
@@ -356,21 +358,23 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
                           size: 20,
                         ),
                         const SizedBox(width: 8),
-                        const Text(
+                        Text(
                           'Danger Zone',
-                          style: TextStyle(
-                            color: Colors.red,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                            letterSpacing: 0.5,
-                          ),
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(
+                                color: Colors.red,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 8),
-                    const Text(
+                    Text(
                       'This will permanently delete ALL data from the cloud and this device, then log you out. This action cannot be undone.',
-                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: Colors.grey),
                     ),
                     const SizedBox(height: 16),
                     SizedBox(
@@ -506,7 +510,10 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
 
                             // Mark factory reset to skip any immediate restore
                             final prefs = await SharedPreferences.getInstance();
-                            await prefs.setBool('factory_reset_completed', true);
+                            await prefs.setBool(
+                              'factory_reset_completed',
+                              true,
+                            );
                             await prefs.setBool('skip_auto_restore', true);
                             await prefs.remove('last_sync_app_version');
 

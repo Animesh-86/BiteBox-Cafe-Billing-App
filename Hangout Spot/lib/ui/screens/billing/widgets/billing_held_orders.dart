@@ -45,7 +45,10 @@ class HeldOrdersButton extends ConsumerWidget {
                   backgroundColor: Colors.red,
                   child: Text(
                     "${snapshot.data!.length}",
-                    style: TextStyle(fontSize: 9, color: billingText(context)),
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      fontSize: 9,
+                      color: billingText(context),
+                    ),
                   ),
                 ),
               );
@@ -82,8 +85,7 @@ class HeldOrdersDialog extends ConsumerWidget {
               decoration: BoxDecoration(boxShadow: billingShadow(context)),
               child: Text(
                 "Held Orders",
-                style: TextStyle(
-                  fontSize: 16,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: billingText(context),
                 ),
@@ -156,31 +158,33 @@ class HeldOrdersDialog extends ConsumerWidget {
                                   ),
                                   child: Text(
                                     "${order.invoiceNumber}",
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.primary,
-                                      fontSize: 13,
-                                    ),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelLarge
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.primary,
+                                        ),
                                   ),
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
                                   "₹${order.totalAmount.toStringAsFixed(0)}",
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: billingText(context),
-                                    fontSize: 16,
-                                  ),
+                                  style: Theme.of(context).textTheme.titleMedium
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: billingText(context),
+                                      ),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
                                   timeago.format(order.createdAt),
-                                  style: TextStyle(
-                                    color: billingMutedText(context),
-                                    fontSize: 11,
-                                  ),
+                                  style: Theme.of(context).textTheme.labelSmall
+                                      ?.copyWith(
+                                        color: billingMutedText(context),
+                                      ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),

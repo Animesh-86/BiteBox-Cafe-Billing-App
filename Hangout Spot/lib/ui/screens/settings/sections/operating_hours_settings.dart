@@ -147,10 +147,9 @@ class _OperatingHoursSettingsScreenState
                       title: const Text('Store Opens At'),
                       subtitle: Text(
                         _formatTime(_openingHour),
-                        style: TextStyle(
+                        style: theme.textTheme.titleMedium?.copyWith(
                           color: theme.colorScheme.primary,
                           fontWeight: FontWeight.bold,
-                          fontSize: 16,
                         ),
                       ),
                       trailing: Icon(
@@ -167,10 +166,9 @@ class _OperatingHoursSettingsScreenState
                         isMidnightCrossing
                             ? '${_formatTime(_closingHour)} (Next Day)'
                             : _formatTime(_closingHour),
-                        style: TextStyle(
+                        style: theme.textTheme.titleMedium?.copyWith(
                           color: theme.colorScheme.primary,
                           fontWeight: FontWeight.bold,
-                          fontSize: 16,
                         ),
                       ),
                       trailing: Icon(

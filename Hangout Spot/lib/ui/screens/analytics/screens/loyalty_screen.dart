@@ -520,7 +520,7 @@ class _LoyaltyScreenState extends ConsumerState<LoyaltyScreen> {
           ),
         ),
         const SizedBox(height: 4),
-        Text(label, style: AnalyticsTheme.subtitle),
+        Text(label, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AnalyticsTheme.secondaryText)),
       ],
     );
   }

@@ -167,9 +167,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.bold,
-                        fontSize: 13,
                         height: 1.1,
                       ),
                     ),
@@ -178,9 +177,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       subtitle,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
+                      style: theme.textTheme.labelSmall?.copyWith(
                         color: theme.colorScheme.onSurface.withOpacity(0.6),
-                        fontSize: 10,
                         height: 1.2,
                       ),
                     ),
@@ -340,13 +338,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                             const SizedBox(height: 4),
                                             Text(
                                               'Logo',
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .onSurface
-                                                    .withOpacity(0.5),
-                                              ),
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .labelSmall
+                                                  ?.copyWith(
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .onSurface
+                                                        .withOpacity(0.5),
+                                                  ),
                                             ),
                                           ],
                                         )
@@ -451,22 +451,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           children: [
                             Text(
                               "Hangout Spot v1.0.0",
-                              style: TextStyle(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withOpacity(0.3),
-                                fontSize: 12,
-                              ),
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface.withOpacity(0.3),
+                                  ),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               "Developed by Animesh Sharma",
-                              style: TextStyle(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withOpacity(0.3),
-                                fontSize: 12,
-                              ),
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface.withOpacity(0.3),
+                                  ),
                             ),
                           ],
                         ),

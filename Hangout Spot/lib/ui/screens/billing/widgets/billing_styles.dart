@@ -52,9 +52,8 @@ Widget billingPricePill(BuildContext context, String text) {
     ),
     child: Text(
       text,
-      style: TextStyle(
+      style: theme.textTheme.labelMedium?.copyWith(
         fontWeight: FontWeight.w700,
-        fontSize: 12,
         color: isDark ? const Color(0xFFFFE0B2) : coffeeDark,
       ),
     ),

@@ -32,9 +32,8 @@ class CartItemTile extends StatelessWidget {
                 Expanded(
                   child: Text(
                     item.item.name,
-                    style: TextStyle(
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       fontWeight: FontWeight.bold,
-                      fontSize: 13,
                       color: billingText(context),
                     ),
                     maxLines: 1,
@@ -53,8 +52,7 @@ class CartItemTile extends StatelessWidget {
                   children: [
                     Text(
                       "₹${item.item.price}",
-                      style: TextStyle(
-                        fontSize: 11,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
                         color: billingMutedText(context),
                       ),
                     ),
@@ -62,8 +60,7 @@ class CartItemTile extends StatelessWidget {
                         item.discountAmount > 0)
                       Text(
                         'Discount: ₹${item.discountAmount.toStringAsFixed(0)}',
-                        style: TextStyle(
-                          fontSize: 10,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           color: Colors.orange.shade300,
                           fontWeight: FontWeight.w500,
                         ),
@@ -93,11 +90,11 @@ class CartItemTile extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         child: Text(
                           "${item.quantity}",
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                            color: billingText(context),
-                          ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: billingText(context),
+                              ),
                         ),
                       ),
                       GestureDetector(
@@ -152,8 +149,7 @@ class CartFooter extends ConsumerWidget {
               const SizedBox(width: 8),
               Text(
                 'Discount %',
-                style: TextStyle(
-                  fontSize: 12,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: billingMutedText(context),
                 ),
               ),
@@ -161,7 +157,9 @@ class CartFooter extends ConsumerWidget {
               Expanded(
                 child: TextField(
                   keyboardType: TextInputType.number,
-                  style: TextStyle(fontSize: 13, color: billingText(context)),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: billingText(context)),
                   decoration: InputDecoration(
                     hintText: '0',
                     hintStyle: TextStyle(
@@ -213,8 +211,7 @@ class CartFooter extends ConsumerWidget {
                   const SizedBox(width: 8),
                   Text(
                     'Payment Method',
-                    style: TextStyle(
-                      fontSize: 12,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: billingMutedText(context),
                     ),
                   ),
@@ -248,8 +245,7 @@ class CartFooter extends ConsumerWidget {
                     Expanded(
                       child: TextField(
                         keyboardType: TextInputType.number,
-                        style: TextStyle(
-                          fontSize: 12,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: billingText(context),
                         ),
                         decoration: InputDecoration(
@@ -283,8 +279,7 @@ class CartFooter extends ConsumerWidget {
                               : '',
                         ),
                         keyboardType: TextInputType.number,
-                        style: TextStyle(
-                          fontSize: 12,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: billingText(context),
                         ),
                         decoration: InputDecoration(
@@ -329,15 +324,13 @@ class CartFooter extends ConsumerWidget {
                 children: [
                   Text(
                     'Subtotal',
-                    style: TextStyle(
-                      fontSize: 12,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: billingMutedText(context),
                     ),
                   ),
                   Text(
                     "₹${cart.subtotal.toStringAsFixed(2)}",
-                    style: TextStyle(
-                      fontSize: 12,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: billingMutedText(context),
                     ),
                   ),
@@ -350,17 +343,15 @@ class CartFooter extends ConsumerWidget {
                   children: [
                     Text(
                       'Promo',
-                      style: TextStyle(
-                        fontSize: 12,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: billingMutedText(context),
                       ),
                     ),
                     Text(
                       "-₹${cart.promoDiscount.toStringAsFixed(2)}",
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.pinkAccent,
-                      ),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: Colors.pinkAccent),
                     ),
                   ],
                 ),
@@ -371,14 +362,15 @@ class CartFooter extends ConsumerWidget {
                   children: [
                     Text(
                       'Discount',
-                      style: TextStyle(
-                        fontSize: 12,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: billingMutedText(context),
                       ),
                     ),
                     Text(
                       "-₹${nonPromoDiscount.toStringAsFixed(2)}",
-                      style: const TextStyle(fontSize: 12, color: Colors.green),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: Colors.green),
                     ),
                   ],
                 ),
@@ -389,15 +381,13 @@ class CartFooter extends ConsumerWidget {
                   children: [
                     Text(
                       'Tax',
-                      style: TextStyle(
-                        fontSize: 12,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: billingMutedText(context),
                       ),
                     ),
                     Text(
                       "+₹${cart.taxAmount.toStringAsFixed(2)}",
-                      style: TextStyle(
-                        fontSize: 12,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: billingMutedText(context),
                       ),
                     ),
@@ -412,17 +402,15 @@ class CartFooter extends ConsumerWidget {
                 children: [
                   Text(
                     'Total',
-                    style: TextStyle(
-                      fontSize: 14,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: billingText(context),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   Text(
                     "₹${cart.grandTotal.toStringAsFixed(2)}",
-                    style: TextStyle(
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
-                      fontSize: 18,
                       color: Theme.of(context).colorScheme.primary,
                     ),
                   ),
@@ -453,20 +441,20 @@ class CartFooter extends ConsumerWidget {
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
+                                  Text(
                                     'Reward Points',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.orange,
-                                    ),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(color: Colors.orange),
                                   ),
                                   Text(
                                     '${balance.toInt()} points available',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: billingText(context),
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(
+                                          color: billingText(context),
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                   ),
                                 ],
                               ),
@@ -475,11 +463,11 @@ class CartFooter extends ConsumerWidget {
                                 children: [
                                   Text(
                                     '₹${(balance * 1.0).toStringAsFixed(2)}',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.orange,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(
+                                          color: Colors.orange,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                   ),
                                   if (balance >= MIN_REDEMPTION_POINTS)
                                     TextButton(
@@ -494,13 +482,15 @@ class CartFooter extends ConsumerWidget {
                                         tapTargetSize:
                                             MaterialTapTargetSize.shrinkWrap,
                                       ),
-                                      child: const Text(
+                                      child: Text(
                                         'Redeem',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: Colors.orange,
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .labelSmall
+                                            ?.copyWith(
+                                              color: Colors.orange,
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                       ),
                                     ),
                                 ],
@@ -528,7 +518,10 @@ class CartFooter extends ConsumerWidget {
                   side: BorderSide(color: billingOutline(context)),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
-                child: const Text('Hold', style: TextStyle(fontSize: 13)),
+                child: Text(
+                  'Hold',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
               ),
             ),
             const SizedBox(width: 10),
@@ -543,8 +536,7 @@ class CartFooter extends ConsumerWidget {
                 ),
                 child: Text(
                   'Print Bill',
-                  style: TextStyle(
-                    fontSize: 13,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: Theme.of(context).colorScheme.onPrimary,
                   ),

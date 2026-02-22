@@ -670,7 +670,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
           ),
           titlesData: FlTitlesData(
             bottomTitles: AxisTitles(
-              axisNameWidget: Text('Revenue', style: AnalyticsTheme.subtitle),
+              axisNameWidget: Text('Revenue', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AnalyticsTheme.secondaryText)),
               sideTitles: SideTitles(
                 showTitles: true,
                 getTitlesWidget: (value, meta) {
@@ -685,7 +685,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
               ),
             ),
             leftTitles: AxisTitles(
-              axisNameWidget: Text('Volume', style: AnalyticsTheme.subtitle),
+              axisNameWidget: Text('Volume', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AnalyticsTheme.secondaryText)),
               sideTitles: SideTitles(
                 showTitles: true,
                 reservedSize: 40,

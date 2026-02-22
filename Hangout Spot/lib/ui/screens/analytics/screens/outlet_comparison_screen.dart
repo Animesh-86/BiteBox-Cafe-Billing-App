@@ -30,14 +30,19 @@ class OutletComparisonScreen extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  const Text(
+                  Text(
                     'Outlet Comparison',
-                    style: AnalyticsTheme.headingMedium,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: AnalyticsTheme.primaryText,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Text(
                     'Compare performance across multiple outlets',
-                    style: AnalyticsTheme.subtitle,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AnalyticsTheme.secondaryText,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 24),
@@ -84,10 +89,13 @@ class OutletComparisonScreen extends ConsumerWidget {
             color: AnalyticsTheme.primaryGold,
             onPressed: onMenuPressed,
           ),
-          const Expanded(
+          Expanded(
             child: Text(
               'Outlet Comparison',
-              style: AnalyticsTheme.headingLarge,
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: AnalyticsTheme.primaryText,
+              ),
               textAlign: TextAlign.center,
             ),
           ),

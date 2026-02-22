@@ -254,27 +254,27 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
           const SizedBox(height: 24),
 
           // Key Metrics Grid (with AOV)
-          Text('Key Metrics', style: AnalyticsTheme.headingMedium),
+          Text('Key Metrics', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: AnalyticsTheme.primaryText)),
           const SizedBox(height: 16),
           _buildMetricsGrid(data, currencyFormat),
           const SizedBox(height: 32),
 
           // Monthly Sales Bar Graph
-          Text('Monthly Sales Trend', style: AnalyticsTheme.headingMedium),
+          Text('Monthly Sales Trend', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: AnalyticsTheme.primaryText)),
           const SizedBox(height: 16),
           _buildMonthlySalesChart(data),
           const SizedBox(height: 32),
 
           // Category Performance
           if (data.categoryPerformance.isNotEmpty) ...[
-            Text('Category Performance', style: AnalyticsTheme.headingMedium),
+            Text('Category Performance', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: AnalyticsTheme.primaryText)),
             const SizedBox(height: 16),
             _buildCategoryPerformance(data),
             const SizedBox(height: 32),
           ],
 
           // Top Selling Items
-          Text('Top Selling Items', style: AnalyticsTheme.headingMedium),
+          Text('Top Selling Items', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: AnalyticsTheme.primaryText)),
           const SizedBox(height: 16),
           _buildTopSellingItems(data),
         ],
@@ -301,7 +301,7 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              const Text('Smart Brief', style: AnalyticsTheme.headingSmall),
+              Text('Smart Brief', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600, color: AnalyticsTheme.primaryText)),
             ],
           ),
           const SizedBox(height: 16),
@@ -428,7 +428,7 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
                 ),
               ),
               const SizedBox(height: 4),
-              Text(title, style: AnalyticsTheme.subtitle),
+              Text(title, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AnalyticsTheme.secondaryText)),
             ],
           ),
         ],

@@ -86,9 +86,11 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
         children: [
           _buildStatusCard(),
           const SizedBox(height: 20),
-          const Text(
+          Text(
             "Paired Devices",
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 10),
           if (_devices.isEmpty)
@@ -126,9 +128,8 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
                   children: [
                     Text(
                       _connected ? "Connected" : "Not Connected",
-                      style: const TextStyle(
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
-                        fontSize: 18,
                       ),
                     ),
                     if (_selectedDevice != null)

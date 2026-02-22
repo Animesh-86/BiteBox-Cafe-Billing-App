@@ -387,8 +387,7 @@ class _ReceiptSettingsScreenState extends ConsumerState<ReceiptSettingsScreen>
               const SizedBox(width: 6),
               Text(
                 'Preview',
-                style: TextStyle(
-                  fontSize: 12,
+                style: theme.textTheme.labelSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: const Color(0xFF25D366),
                 ),
@@ -396,27 +395,27 @@ class _ReceiptSettingsScreenState extends ConsumerState<ReceiptSettingsScreen>
             ],
           ),
           const SizedBox(height: 8),
-          Text(greeting, style: const TextStyle(fontSize: 13)),
+          Text(greeting, style: theme.textTheme.bodyMedium),
           if (_waShowInvoice)
-            const Text(
+            Text(
               '🧾 Invoice #1042 · 19 Feb 2026',
-              style: TextStyle(fontSize: 12),
+              style: theme.textTheme.bodySmall,
             ),
           if (_waShowItems) ...[
             const SizedBox(height: 4),
-            const Text(
+            Text(
               '• Masala Chai × 2\n• Sandwich × 1',
-              style: TextStyle(fontSize: 12),
+              style: theme.textTheme.bodySmall,
             ),
           ],
           if (_waShowTotal)
-            const Text('💰 Total: ₹280', style: TextStyle(fontSize: 12)),
+            Text('💰 Total: ₹280', style: theme.textTheme.bodySmall),
           if (_waShowPayment)
-            const Text('💳 Paid via UPI', style: TextStyle(fontSize: 12)),
+            Text('💳 Paid via UPI', style: theme.textTheme.bodySmall),
           const SizedBox(height: 4),
           Text(
             _waClosingCtrl.text.isEmpty ? '' : _waClosingCtrl.text,
-            style: const TextStyle(fontSize: 13),
+            style: theme.textTheme.bodyMedium,
           ),
         ],
       ),
@@ -447,9 +446,8 @@ class _ReceiptSettingsScreenState extends ConsumerState<ReceiptSettingsScreen>
               const SizedBox(width: 6),
               Text(
                 label,
-                style: TextStyle(
+                style: theme.textTheme.labelLarge?.copyWith(
                   fontWeight: FontWeight.bold,
-                  fontSize: 13,
                   color: theme.colorScheme.primary,
                 ),
               ),
@@ -480,7 +478,7 @@ class _ReceiptSettingsScreenState extends ConsumerState<ReceiptSettingsScreen>
                     child: Chip(
                       label: Text(
                         '{{$c}}',
-                        style: const TextStyle(fontSize: 10),
+                        style: Theme.of(context).textTheme.labelSmall,
                       ),
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
@@ -494,7 +492,7 @@ class _ReceiptSettingsScreenState extends ConsumerState<ReceiptSettingsScreen>
           TextField(
             controller: controller,
             maxLines: 2,
-            style: const TextStyle(fontSize: 13),
+            style: theme.textTheme.bodyMedium,
             decoration: InputDecoration(
               hintText: hint,
               border: InputBorder.none,
@@ -541,8 +539,7 @@ class _ReceiptSettingsScreenState extends ConsumerState<ReceiptSettingsScreen>
           Expanded(
             child: Text(
               label,
-              style: TextStyle(
-                fontSize: 13,
+              style: theme.textTheme.bodyMedium?.copyWith(
                 color: value
                     ? theme.colorScheme.onSurface
                     : theme.colorScheme.onSurface.withOpacity(0.5),
@@ -566,7 +563,7 @@ class _ReceiptSettingsScreenState extends ConsumerState<ReceiptSettingsScreen>
       SwitchListTile(
         contentPadding: EdgeInsets.zero,
         secondary: Icon(icon, size: 20),
-        title: Text(label, style: const TextStyle(fontSize: 14)),
+        title: Text(label, style: Theme.of(context).textTheme.bodyLarge),
         value: value,
         onChanged: cb,
       );

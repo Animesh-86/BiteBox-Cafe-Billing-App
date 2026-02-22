@@ -54,9 +54,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                       const SizedBox(width: 8),
                       Text(
                         'Order',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold,
                           color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
@@ -142,9 +140,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                       child: cart.invoiceNumber != null
                           ? Text(
                               cart.invoiceNumber!,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
+                              style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold,
                                 color: Theme.of(context).colorScheme.primary,
                               ),
                             )
@@ -154,9 +150,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                                   .peekNextInvoiceNumber(),
                               builder: (context, snapshot) => Text(
                                 snapshot.data ?? '... ',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
+                                style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold,
                                   color: Theme.of(context).colorScheme.primary,
                                 ),
                               ),
@@ -176,9 +170,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                       Expanded(
                         child: Text(
                           cart.customer!.name,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: billingMutedText(context),
+                          style: Theme.of(context).textTheme.labelSmall?.copyWith(color: billingMutedText(context),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -196,10 +188,7 @@ class _CartPanelState extends ConsumerState<CartPanel> {
               ? Center(
                   child: Text(
                     'Cart empty',
-                    style: TextStyle(
-                      color: billingMutedText(context),
-                      fontSize: 12,
-                    ),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: billingMutedText(context)),
                   ),
                 )
               : ListView.separated(

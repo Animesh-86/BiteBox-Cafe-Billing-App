@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hangout_spot/ui/theme/app_theme.dart';
 import 'package:hangout_spot/ui/screens/splash_screen.dart';
 import 'package:hangout_spot/data/providers/theme_provider.dart';
+import 'package:hangout_spot/ui/utils/responsive_layout.dart';
 
 // Global synchronous access to SharedPreferences for Riverpod providers
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
@@ -59,6 +60,18 @@ class HangoutSpotApp extends ConsumerWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,
+      builder: (context, child) {
+        // Globally dynamically adjust all typography to prevent the
+        // application sounding "tiny" on large landscape Tablet/iPads.
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            textScaler: TextScaler.linear(
+              ResponsiveLayout.textScaleFactor(context),
+            ),
+          ),
+          child: child!,
+        );
+      },
       home: const _MobileTabletWrapper(),
     );
   }

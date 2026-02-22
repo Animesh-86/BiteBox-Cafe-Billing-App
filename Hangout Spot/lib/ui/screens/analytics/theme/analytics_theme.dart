@@ -72,45 +72,6 @@ class AnalyticsTheme {
     );
   }
 
-  // Typography
-  static const TextStyle headingLarge = TextStyle(
-    fontSize: 24,
-    fontWeight: FontWeight.bold,
-    color: primaryText,
-    letterSpacing: 0.5,
-  );
-
-  static const TextStyle headingMedium = TextStyle(
-    fontSize: 18,
-    fontWeight: FontWeight.bold,
-    color: primaryText,
-    letterSpacing: 0.3,
-  );
-
-  static const TextStyle headingSmall = TextStyle(
-    fontSize: 16,
-    fontWeight: FontWeight.w600,
-    color: primaryText,
-  );
-
-  static TextStyle subtitle = TextStyle(
-    fontSize: 14,
-    color: secondaryText,
-    height: 1.4,
-  );
-
-  static const TextStyle numberLarge = TextStyle(
-    fontSize: 32,
-    fontWeight: FontWeight.bold,
-    color: primaryGold,
-  );
-
-  static const TextStyle numberMedium = TextStyle(
-    fontSize: 24,
-    fontWeight: FontWeight.bold,
-    color: primaryGold,
-  );
-
   // Drawer Item Decoration
   static BoxDecoration selectedDrawerItem() {
     return BoxDecoration(

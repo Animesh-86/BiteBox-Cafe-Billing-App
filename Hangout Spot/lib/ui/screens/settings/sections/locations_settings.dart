@@ -72,11 +72,10 @@ class _LocationsSettingsScreenState
             children: [
               Text(
                 'Enter password to $action',
-                style: TextStyle(
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Theme.of(
                     context,
                   ).colorScheme.onSurface.withOpacity(0.7),
-                  fontSize: 13,
                 ),
               ),
               const SizedBox(height: 12),
@@ -367,17 +366,15 @@ class _LocationsSettingsScreenState
                               size: 48,
                             ),
                             const SizedBox(height: 8),
-                            const Text(
+                            Text(
                               'No outlets configured',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
                             ),
                             const SizedBox(height: 4),
-                            const Text(
+                            Text(
                               'Add your first outlet to start billing',
-                              style: TextStyle(fontSize: 12),
+                              style: Theme.of(context).textTheme.bodySmall,
                             ),
                           ],
                         ),
@@ -418,17 +415,20 @@ class _LocationsSettingsScreenState
                                             children: [
                                               Text(
                                                 loc.name,
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 16,
-                                                  color: isActive
-                                                      ? theme
-                                                            .colorScheme
-                                                            .primary
-                                                      : theme
-                                                            .colorScheme
-                                                            .onSurface,
-                                                ),
+                                                style: theme
+                                                    .textTheme
+                                                    .titleMedium
+                                                    ?.copyWith(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color: isActive
+                                                          ? theme
+                                                                .colorScheme
+                                                                .primary
+                                                          : theme
+                                                                .colorScheme
+                                                                .onSurface,
+                                                    ),
                                               ),
                                               if (isActive) ...[
                                                 const SizedBox(width: 8),
@@ -445,14 +445,16 @@ class _LocationsSettingsScreenState
                                                           12,
                                                         ),
                                                   ),
-                                                  child: const Text(
+                                                  child: Text(
                                                     'ACTIVE',
-                                                    style: TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 10,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                    ),
+                                                    style: theme
+                                                        .textTheme
+                                                        .labelSmall
+                                                        ?.copyWith(
+                                                          color: Colors.white,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                        ),
                                                   ),
                                                 ),
                                               ],
@@ -461,11 +463,13 @@ class _LocationsSettingsScreenState
                                           const SizedBox(height: 4),
                                           Text(
                                             loc.address ?? 'No Address',
-                                            style: TextStyle(
-                                              color: theme.colorScheme.onSurface
-                                                  .withOpacity(0.7),
-                                              fontSize: 13,
-                                            ),
+                                            style: theme.textTheme.bodyMedium
+                                                ?.copyWith(
+                                                  color: theme
+                                                      .colorScheme
+                                                      .onSurface
+                                                      .withOpacity(0.7),
+                                                ),
                                           ),
                                           const SizedBox(height: 2),
                                           Row(
@@ -481,13 +485,13 @@ class _LocationsSettingsScreenState
                                               const SizedBox(width: 4),
                                               Text(
                                                 loc.phoneNumber ?? 'No Phone',
-                                                style: TextStyle(
-                                                  color: theme
-                                                      .colorScheme
-                                                      .onSurface
-                                                      .withOpacity(0.6),
-                                                  fontSize: 12,
-                                                ),
+                                                style: theme.textTheme.bodySmall
+                                                    ?.copyWith(
+                                                      color: theme
+                                                          .colorScheme
+                                                          .onSurface
+                                                          .withOpacity(0.6),
+                                                    ),
                                               ),
                                             ],
                                           ),

@@ -101,7 +101,7 @@ class _ProfileHeader extends StatelessWidget {
             radius: 28,
             child: Text(
               customer.name.isNotEmpty ? customer.name[0].toUpperCase() : '?',
-              style: const TextStyle(fontSize: 22),
+              style: Theme.of(context).textTheme.headlineSmall,
             ),
           ),
           const SizedBox(width: 16),
@@ -111,10 +111,9 @@ class _ProfileHeader extends StatelessWidget {
               children: [
                 Text(
                   customer.name,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 4),
                 Row(

@@ -90,19 +90,15 @@ class _LoyaltySettingsScreenState extends ConsumerState<LoyaltySettingsScreen> {
                               Expanded(
                                 child: Text(
                                   'Current: ${(earningRate * 100).toStringAsFixed(1)}%',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey,
-                                  ),
+                                  style: Theme.of(context).textTheme.labelSmall
+                                      ?.copyWith(color: Colors.grey),
                                 ),
                               ),
                               Expanded(
                                 child: Text(
                                   'Redeem: ₹${redemptionRate.toStringAsFixed(2)}/pt',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey,
-                                  ),
+                                  style: Theme.of(context).textTheme.labelSmall
+                                      ?.copyWith(color: Colors.grey),
                                 ),
                               ),
                             ],
