@@ -196,7 +196,6 @@ class ThermalPrintingService {
             'Discount: -₹${item.discountAmount.toStringAsFixed(0)}',
             styles: const PosStyles(
               fontType: PosFontType.fontB,
-              fontSize: PosTextSize.small,
               align: PosAlign.right,
             ),
           );
@@ -381,20 +380,19 @@ class ThermalPrintingService {
           bold: true,
         ),
       );
-      
+
       // Print quantity
       bytes += generator.text(
         'Qty: ${item.quantity}',
-        styles: const PosStyles(
-          height: PosTextSize.size2,
-          bold: true,
-        ),
+        styles: const PosStyles(height: PosTextSize.size2, bold: true),
       );
-      
+
       if (item.note != null && item.note!.isNotEmpty) {
         bytes += generator.text(
           'Note: ${item.note}',
-          styles: const PosStyles(fontSize: PosTextSize.small),
+          styles: const PosStyles(
+            fontType: PosFontType.fontB,
+          ),
         );
       }
       bytes += generator.hr();
