@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:hangout_spot/data/repositories/auth_repository.dart';
 import 'package:hangout_spot/logic/locations/location_provider.dart';
 import 'package:hangout_spot/data/providers/theme_provider.dart';
 
 import '../customer/customer_list_screen.dart';
+import 'providers/settings_auth_provider.dart';
 import 'sections/backup_settings.dart';
 import 'sections/locations_settings.dart';
 import 'sections/loyalty_settings.dart';
@@ -18,9 +20,6 @@ import 'sections/operating_hours_settings.dart';
 import 'active_sessions_screen.dart';
 import 'widgets/settings_shared.dart';
 import 'sections/printer_settings_screen.dart';
-
-// The manager password — same as the one used in locations_settings.dart
-const String _kManagerPassword = 'admin123';
 
 /// A self-contained password dialog widget — avoids stale context crashes.
 class _PasswordDialog extends StatefulWidget {
@@ -61,7 +60,7 @@ class _PasswordDialogState extends State<_PasswordDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Enter password to open ${widget.action}.',
+            'Enter your account password to open ${widget.action}.',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: Theme.of(
                 context,
@@ -73,8 +72,7 @@ class _PasswordDialogState extends State<_PasswordDialog> {
             controller: _controller,
             obscureText: _obscure,
             autofocus: true,
-            onSubmitted: (_) =>
-                Navigator.pop(context, _controller.text == _kManagerPassword),
+            onSubmitted: (_) => Navigator.pop(context, _controller.text),
             decoration: InputDecoration(
               labelText: 'Password',
               border: OutlineInputBorder(
@@ -94,8 +92,7 @@ class _PasswordDialogState extends State<_PasswordDialog> {
           child: const Text('Cancel'),
         ),
         FilledButton(
-          onPressed: () =>
-              Navigator.pop(context, _controller.text == _kManagerPassword),
+          onPressed: () => Navigator.pop(context, _controller.text),
           child: const Text('Unlock'),
         ),
       ],
@@ -104,12 +101,46 @@ class _PasswordDialogState extends State<_PasswordDialog> {
 }
 
 /// Returns true if granted, false if wrong password, null if cancelled.
-Future<bool?> _verifyPassword(BuildContext context, String action) async {
-  return showDialog<bool>(
+Future<bool?> _verifyPassword(
+  BuildContext context,
+  WidgetRef ref,
+  String action,
+) async {
+  // Check if we have an active session
+  final lastAuth = ref.read(settingsAuthSessionProvider);
+  if (lastAuth != null) {
+    if (DateTime.now().difference(lastAuth) < kSettingsAuthTimeout) {
+      return true; // Auto-grant access since recently authenticated
+    } else {
+      // Session expired, clear it
+      ref.read(settingsAuthSessionProvider.notifier).state = null;
+    }
+  }
+
+  final password = await showDialog<String>(
     context: context,
     barrierDismissible: false,
     builder: (_) => _PasswordDialog(action: action),
   );
+  if (password == null) return null; // cancelled
+
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null || user.email == null) return false;
+
+  try {
+    // Verify credential
+    final credential = EmailAuthProvider.credential(
+      email: user.email!,
+      password: password,
+    );
+    await user.reauthenticateWithCredential(credential);
+
+    // Save success time to create session
+    ref.read(settingsAuthSessionProvider.notifier).state = DateTime.now();
+    return true;
+  } on FirebaseAuthException {
+    return false;
+  }
 }
 
 class SettingsScreen extends ConsumerWidget {
@@ -326,6 +357,7 @@ class SettingsScreen extends ConsumerWidget {
                           final item = navigationItems[index];
                           return _buildNavGridItem(
                             context,
+                            ref,
                             item['title'] as String,
                             item['icon'] as IconData,
                             item['subtitle'] as String,
@@ -377,6 +409,7 @@ class SettingsScreen extends ConsumerWidget {
 
   Widget _buildNavGridItem(
     BuildContext context,
+    WidgetRef ref,
     String title,
     IconData icon,
     String subtitle,
@@ -405,7 +438,7 @@ class SettingsScreen extends ConsumerWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: () async {
-            final result = await _verifyPassword(context, title);
+            final result = await _verifyPassword(context, ref, title);
             if (result == null) return; // cancelled — silent, no message
             if (result == false) {
               if (context.mounted) {

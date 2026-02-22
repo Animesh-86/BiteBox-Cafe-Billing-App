@@ -1,5 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hangout_spot/data/repositories/sync_repository.dart';
 import 'package:hangout_spot/data/repositories/auth_repository.dart';
@@ -382,13 +383,36 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
                       child: ElevatedButton.icon(
                         onPressed: () async {
                           // Step 0: Password gate
-                          final passwordOk = await showDialog<bool>(
+                          final password = await showDialog<String>(
                             context: context,
                             barrierDismissible: false,
                             builder: (_) => const _DangerPasswordDialog(),
                           );
-                          if (passwordOk != true || !mounted) return;
+                          if (password == null || !mounted) return; // Cancelled
 
+                          final user = FirebaseAuth.instance.currentUser;
+                          if (user == null || user.email == null) return;
+
+                          try {
+                            // Verify password with Firebase
+                            final credential = EmailAuthProvider.credential(
+                              email: user.email!,
+                              password: password,
+                            );
+                            await user.reauthenticateWithCredential(credential);
+                          } on FirebaseAuthException {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Incorrect password.'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                            return; // Stop if incorrect
+                          }
+
+                          if (!mounted) return;
                           // Step 1: First confirmation
                           final confirm1 = await showDialog<bool>(
                             context: context,
@@ -631,8 +655,6 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
 
 // ─── Password dialog for the Danger Zone ────────────────────────────────────
 
-const String _kDangerPassword = 'admin123';
-
 class _DangerPasswordDialog extends StatefulWidget {
   const _DangerPasswordDialog();
 
@@ -671,7 +693,7 @@ class _DangerPasswordDialogState extends State<_DangerPasswordDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Enter manager password to continue with data deletion.',
+            'Enter your account password to continue with data deletion.',
             style: TextStyle(fontSize: 13),
           ),
           const SizedBox(height: 16),
@@ -679,8 +701,7 @@ class _DangerPasswordDialogState extends State<_DangerPasswordDialog> {
             controller: _controller,
             obscureText: _obscure,
             autofocus: true,
-            onSubmitted: (_) =>
-                Navigator.pop(context, _controller.text == _kDangerPassword),
+            onSubmitted: (_) => Navigator.pop(context, _controller.text),
             decoration: InputDecoration(
               labelText: 'Password',
               border: OutlineInputBorder(
@@ -700,7 +721,7 @@ class _DangerPasswordDialogState extends State<_DangerPasswordDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Navigator.pop(context), // null = cancelled
           child: const Text('Cancel'),
         ),
         ElevatedButton(
@@ -708,8 +729,7 @@ class _DangerPasswordDialogState extends State<_DangerPasswordDialog> {
             backgroundColor: Colors.red,
             foregroundColor: Colors.white,
           ),
-          onPressed: () =>
-              Navigator.pop(context, _controller.text == _kDangerPassword),
+          onPressed: () => Navigator.pop(context, _controller.text),
           child: const Text('Confirm'),
         ),
       ],
