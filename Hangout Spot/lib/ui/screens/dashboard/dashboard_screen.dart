@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -141,12 +142,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       backgroundColor: cream,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        iconTheme: IconThemeData(color: coffeeDark),
-        title: Row(
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(kToolbarHeight),
+        child: ClipRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: AppBar(
+              backgroundColor: cream.withOpacity(0.8),
+              elevation: 0,
+              surfaceTintColor: Colors.transparent,
+              iconTheme: IconThemeData(color: coffeeDark),
+              title: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(8),
@@ -270,6 +276,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ),
           ),
         ],
+      ),
+          ),
+        ),
       ),
       body: SingleChildScrollView(
         child: Column(
