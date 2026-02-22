@@ -242,6 +242,18 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
     // AUTO-PRINT THERMAL BILL
     try {
       final activeOutlet = await ref.read(activeOutletProvider.future);
+      
+      // Fetch customer reward balance if customer is selected
+      double? rewardBalance;
+      if (customer != null) {
+        try {
+          rewardBalance = await ref
+              .read(customerRewardBalanceProvider(customer.id).future);
+        } catch (e) {
+          debugPrint("Failed to fetch reward balance: $e");
+        }
+      }
+      
       await ref
           .read(thermalPrintingServiceProvider)
           .printBill(
@@ -252,6 +264,7 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
             storeAddress: activeOutlet != null
                 ? '${activeOutlet.address}\nPhone: ${activeOutlet.phoneNumber}'
                 : null,
+            customerRewardBalance: rewardBalance,
           );
     } catch (e) {
       debugPrint("Thermal print failed: $e");

@@ -44,6 +44,7 @@ class ThermalPrintingService {
     String? storeName,
     String? storeAddress,
     String? footerMessage,
+    double? customerRewardBalance,
   }) async {
     try {
       debugPrint(
@@ -151,34 +152,39 @@ class ThermalPrintingService {
 
       // Items Header
       bytes += generator.row([
-        PosColumn(text: 'Item', width: 6, styles: const PosStyles(bold: true)),
+        PosColumn(text: 'ITEM', width: 5, styles: const PosStyles(bold: true)),
         PosColumn(
-          text: 'Qty',
+          text: 'QTY',
+          width: 1,
+          styles: const PosStyles(bold: true, align: PosAlign.right),
+        ),
+        PosColumn(
+          text: 'RATE',
           width: 2,
           styles: const PosStyles(bold: true, align: PosAlign.right),
         ),
         PosColumn(
-          text: 'Rate',
-          width: 2,
-          styles: const PosStyles(bold: true, align: PosAlign.right),
-        ),
-        PosColumn(
-          text: 'Total',
+          text: 'TOTAL',
           width: 2,
           styles: const PosStyles(bold: true, align: PosAlign.right),
         ),
       ]);
       bytes += generator.hr();
 
-      // Items
+      // Items - Print full names with wrapping
       for (var item in items) {
-        // If item name is too long, it might wrap naturally or we can split it
-        // esc_pos_utils_plus usually handles wrapping in columns
+        // Print item name on its own line for full visibility
+        bytes += generator.text(
+          item.itemName,
+          styles: const PosStyles(bold: true),
+        );
+        
+        // Print qty, rate, total in a compact row
         bytes += generator.row([
-          PosColumn(text: item.itemName, width: 6),
+          PosColumn(text: '', width: 5),
           PosColumn(
             text: item.quantity.toString(),
-            width: 2,
+            width: 1,
             styles: const PosStyles(align: PosAlign.right),
           ),
           PosColumn(
@@ -195,23 +201,13 @@ class ThermalPrintingService {
 
         // Print discount if any
         if (item.discountAmount > 0) {
-          bytes += generator.row([
-            PosColumn(
-              text: '  (Disc)',
-              width: 6,
-              styles: const PosStyles(fontType: PosFontType.fontB),
+          bytes += generator.text(
+            '  -₹${item.discountAmount.toStringAsFixed(0)} (Discount)',
+            styles: const PosStyles(
+              fontType: PosFontType.fontB,
+              fontSize: PosTextSize.small,
             ),
-            PosColumn(text: '', width: 2),
-            PosColumn(text: '', width: 2),
-            PosColumn(
-              text: '-${item.discountAmount.toStringAsFixed(0)}',
-              width: 2,
-              styles: const PosStyles(
-                align: PosAlign.right,
-                fontType: PosFontType.fontB,
-              ),
-            ),
-          ]);
+          );
         }
       }
 
@@ -232,7 +228,7 @@ class ThermalPrintingService {
       bytes += generator.row([
         PosColumn(text: 'Sub Total:', width: 6),
         PosColumn(
-          text: order.subtotal.toStringAsFixed(0),
+          text: '₹${order.subtotal.toStringAsFixed(0)}',
           width: 6,
           styles: const PosStyles(align: PosAlign.right, bold: true),
         ),
@@ -240,9 +236,9 @@ class ThermalPrintingService {
 
       if (order.discountAmount > 0) {
         bytes += generator.row([
-          PosColumn(text: 'Discount:', width: 6),
+          PosColumn(text: 'Order Discount:', width: 6),
           PosColumn(
-            text: '-${order.discountAmount.toStringAsFixed(0)}',
+            text: '-₹${order.discountAmount.toStringAsFixed(0)}',
             width: 6,
             styles: const PosStyles(align: PosAlign.right),
           ),
@@ -251,11 +247,28 @@ class ThermalPrintingService {
 
       if (order.taxAmount > 0) {
         bytes += generator.row([
-          PosColumn(text: 'Tax:', width: 6),
+          PosColumn(text: 'Tax (GST):', width: 6),
           PosColumn(
-            text: order.taxAmount.toStringAsFixed(0),
+            text: '+₹${order.taxAmount.toStringAsFixed(0)}',
             width: 6,
             styles: const PosStyles(align: PosAlign.right),
+          ),
+        ]);
+      }
+
+      // Show loyalty points if customer is selected
+      if (customer != null && customerRewardBalance != null && customerRewardBalance > 0) {
+        bytes += generator.hr();
+        bytes += generator.row([
+          PosColumn(text: 'Loyalty Points:', width: 6),
+          PosColumn(
+            text: customerRewardBalance.toStringAsFixed(0),
+            width: 6,
+            styles: const PosStyles(
+              align: PosAlign.right,
+              bold: true,
+              height: PosTextSize.size2,
+            ),
           ),
         ]);
       }
@@ -271,7 +284,7 @@ class ThermalPrintingService {
           ),
         ),
         PosColumn(
-          text: order.totalAmount.toStringAsFixed(0),
+          text: '₹${order.totalAmount.toStringAsFixed(0)}',
           width: 6,
           styles: const PosStyles(
             height: PosTextSize.size2,
