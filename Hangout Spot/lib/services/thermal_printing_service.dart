@@ -152,10 +152,10 @@ class ThermalPrintingService {
 
       // Items Header
       bytes += generator.row([
-        PosColumn(text: 'ITEM', width: 5, styles: const PosStyles(bold: true)),
+        PosColumn(text: 'ITEM', width: 6, styles: const PosStyles(bold: true)),
         PosColumn(
           text: 'QTY',
-          width: 1,
+          width: 2,
           styles: const PosStyles(bold: true, align: PosAlign.right),
         ),
         PosColumn(
@@ -390,9 +390,7 @@ class ThermalPrintingService {
       if (item.note != null && item.note!.isNotEmpty) {
         bytes += generator.text(
           'Note: ${item.note}',
-          styles: const PosStyles(
-            fontType: PosFontType.fontB,
-          ),
+          styles: const PosStyles(fontType: PosFontType.fontB),
         );
       }
       bytes += generator.hr();
