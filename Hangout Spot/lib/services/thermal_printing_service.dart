@@ -145,7 +145,7 @@ class ThermalPrintingService {
       if (customer != null) {
         bytes += generator.text('Customer: ${customer.name}');
       } else {
-        bytes += generator.text('Bill To: Cash Sale');
+        bytes += generator.text('Bill To: Walk-In');
       }
 
       bytes += generator.hr();
@@ -173,42 +173,35 @@ class ThermalPrintingService {
 
       // Items - Print full names with wrapping
       for (var item in items) {
-        // Print item name on its own line for full visibility
+        // Print full item name (allows natural wrapping)
         bytes += generator.text(
           item.itemName,
           styles: const PosStyles(bold: true),
         );
 
-        // Print qty, rate, total in a compact row
-        bytes += generator.row([
-          PosColumn(text: '', width: 5),
-          PosColumn(
-            text: item.quantity.toString(),
-            width: 1,
-            styles: const PosStyles(align: PosAlign.right),
+        // Format: Qty: X  @₹Price = ₹Total
+        final detailsLine =
+            'Qty: ${item.quantity}  @₹${item.price.toStringAsFixed(0)} = ₹${(item.price * item.quantity).toStringAsFixed(0)}';
+        bytes += generator.text(
+          detailsLine,
+          styles: const PosStyles(
+            align: PosAlign.right,
+            fontType: PosFontType.fontB,
           ),
-          PosColumn(
-            text: item.price.toStringAsFixed(0),
-            width: 2,
-            styles: const PosStyles(align: PosAlign.right),
-          ),
-          PosColumn(
-            text: (item.price * item.quantity).toStringAsFixed(0),
-            width: 2,
-            styles: const PosStyles(align: PosAlign.right),
-          ),
-        ]);
+        );
 
         // Print discount if any
         if (item.discountAmount > 0) {
           bytes += generator.text(
-            '  -₹${item.discountAmount.toStringAsFixed(0)} (Discount)',
+            'Discount: -₹${item.discountAmount.toStringAsFixed(0)}',
             styles: const PosStyles(
               fontType: PosFontType.fontB,
               fontSize: PosTextSize.small,
+              align: PosAlign.right,
             ),
           );
         }
+        bytes += generator.feed(1); // Space between items
       }
 
       bytes += generator.hr();
@@ -275,27 +268,15 @@ class ThermalPrintingService {
         ]);
       }
 
-      bytes += generator.row([
-        PosColumn(
-          text: 'Grand Total:',
-          width: 6,
-          styles: const PosStyles(
-            height: PosTextSize.size2,
-            width: PosTextSize.size2,
-            bold: true,
-          ),
+      bytes += generator.text(
+        'Grand Total: ₹${order.totalAmount.toStringAsFixed(0)}',
+        styles: const PosStyles(
+          height: PosTextSize.size2,
+          width: PosTextSize.size2,
+          bold: true,
+          align: PosAlign.center,
         ),
-        PosColumn(
-          text: '₹${order.totalAmount.toStringAsFixed(0)}',
-          width: 6,
-          styles: const PosStyles(
-            height: PosTextSize.size2,
-            width: PosTextSize.size2,
-            bold: true,
-            align: PosAlign.right,
-          ),
-        ),
-      ]);
+      );
 
       bytes += generator.hr();
 
@@ -391,19 +372,30 @@ class ThermalPrintingService {
 
     // Items
     for (var item in items) {
-      bytes += generator.row([
-        PosColumn(
-          text: '${item.itemName} x ${item.quantity}',
-          width: 12,
-          styles: const PosStyles(
-            height: PosTextSize.size2,
-            width: PosTextSize.size2,
-            bold: true,
-          ),
+      // Print full item name (allows wrapping for long names)
+      bytes += generator.text(
+        item.itemName,
+        styles: const PosStyles(
+          height: PosTextSize.size2,
+          width: PosTextSize.size2,
+          bold: true,
         ),
-      ]);
+      );
+      
+      // Print quantity
+      bytes += generator.text(
+        'Qty: ${item.quantity}',
+        styles: const PosStyles(
+          height: PosTextSize.size2,
+          bold: true,
+        ),
+      );
+      
       if (item.note != null && item.note!.isNotEmpty) {
-        bytes += generator.text('Note: ${item.note}');
+        bytes += generator.text(
+          'Note: ${item.note}',
+          styles: const PosStyles(fontSize: PosTextSize.small),
+        );
       }
       bytes += generator.hr();
     }

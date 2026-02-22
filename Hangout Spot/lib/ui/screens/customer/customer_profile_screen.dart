@@ -71,8 +71,9 @@ class CustomerProfileScreen extends ConsumerWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                DateFormat('dd MMM, hh:mm a')
-                                    .format(order.createdAt),
+                                DateFormat(
+                                  'dd MMM, hh:mm a',
+                                ).format(order.createdAt),
                               ),
                               const SizedBox(height: 4),
                               Text(

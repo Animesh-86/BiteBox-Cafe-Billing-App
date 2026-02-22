@@ -487,27 +487,30 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             final timeAgo = _getTimeAgo(order.createdAt);
                             final isCancelled = order.status == 'cancelled';
 
-                            return FutureBuilder<(
-                              Customer?,
-                              List<OrderItem>
-                            )>(
-                              future: Future.wait([
-                                order.customerId != null
-                                    ? ref
-                                        .read(customerRepositoryProvider)
-                                        .getCustomerById(order.customerId!)
-                                    : Future.value(null) as Future<Customer?>,
-                                ref
-                                    .read(orderRepositoryProvider)
-                                    .getOrderItems(order.id),
-                              ]).then((results) => (
-                                results[0] as Customer?,
-                                results[1] as List<OrderItem>
-                              )),
+                            return FutureBuilder<(Customer?, List<OrderItem>)>(
+                              future:
+                                  Future.wait([
+                                    order.customerId != null
+                                        ? ref
+                                              .read(customerRepositoryProvider)
+                                              .getCustomerById(
+                                                order.customerId!,
+                                              )
+                                        : Future.value(null)
+                                              as Future<Customer?>,
+                                    ref
+                                        .read(orderRepositoryProvider)
+                                        .getOrderItems(order.id),
+                                  ]).then(
+                                    (results) => (
+                                      results[0] as Customer?,
+                                      results[1] as List<OrderItem>,
+                                    ),
+                                  ),
                               builder: (context, snapshot) {
                                 final customer = snapshot.data?.$1;
                                 final items = snapshot.data?.$2 ?? [];
-                                
+
                                 // Consistent customer display
                                 final customerDisplay = order.customerId != null
                                     ? (customer?.name ?? 'Customer')
@@ -532,7 +535,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                       backgroundColor: isCancelled
                                           ? Colors.red.withOpacity(0.1)
                                           : theme.colorScheme.primary
-                                              .withOpacity(0.1),
+                                                .withOpacity(0.1),
                                       child: Icon(
                                         isCancelled
                                             ? Icons.cancel
@@ -578,7 +581,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                         color: isCancelled
                                             ? Colors.red.withOpacity(0.7)
                                             : theme.colorScheme.onSurface
-                                                .withOpacity(0.5),
+                                                  .withOpacity(0.5),
                                         fontWeight: isCancelled
                                             ? FontWeight.bold
                                             : FontWeight.normal,
