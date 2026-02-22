@@ -4,6 +4,26 @@ import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/data/repositories/menu_repository.dart';
 
 class MenuSeeder {
+  static const String _comboCategory = 'SPECIAL COMBO MEALS';
+  static const List<Map<String, dynamic>> _comboItems = [
+    {
+      'name': 'Veg Cheese Frankie + Corn Chilly Toast + Cold Drink (20rs)',
+      'price': 149.0,
+    },
+    {
+      'name': 'Veg Cheese Burger + Peri Peri French Fries + Cold Drink (20rs)',
+      'price': 159.0,
+    },
+    {
+      'name': 'Tandoori Paneer Sandwich + Peri Peri Burger + Cold Drink (20rs)',
+      'price': 189.0,
+    },
+    {
+      'name': 'Tandoori Paneer Pizza + Garlic Bread + Cold Drink (20rs)',
+      'price': 229.0,
+    },
+  ];
+
   static const Map<String, List<String>> menuData = {
     "TOAST": [
       "Cheese Chilly Toast — 80",
@@ -124,7 +144,10 @@ class MenuSeeder {
 
   static Future<void> seed(MenuRepository repo) async {
     final hasData = await repo.hasCategories();
-    if (hasData) return;
+    if (hasData) {
+      await _ensureComboMeals(repo);
+      return;
+    }
 
     int sortOrder = 0;
     const namespace = Uuid.NAMESPACE_URL;
@@ -156,6 +179,66 @@ class MenuSeeder {
           ),
         );
       }
+    }
+
+    await _ensureComboMeals(repo);
+  }
+
+  static Future<void> _ensureComboMeals(MenuRepository repo) async {
+    final categories = await repo.watchCategories().first;
+    final namespace = Uuid.NAMESPACE_URL;
+    final uuid = const Uuid();
+
+    String? comboCategoryId;
+    for (final category in categories) {
+      if (category.name.trim().toUpperCase() == _comboCategory) {
+        comboCategoryId = category.id;
+        break;
+      }
+    }
+
+    if (comboCategoryId == null || comboCategoryId.isEmpty) {
+      final nextSortOrder = categories.isEmpty
+          ? 0
+          : categories
+                    .map((category) => category.sortOrder)
+                    .reduce((a, b) => a > b ? a : b) +
+                1;
+
+      comboCategoryId = uuid.v5(namespace, 'category_$_comboCategory');
+      await repo.addCategory(
+        CategoriesCompanion(
+          id: drift.Value(comboCategoryId),
+          name: const drift.Value(_comboCategory),
+          sortOrder: drift.Value(nextSortOrder),
+          color: const drift.Value(0xFF4CAF50),
+        ),
+      );
+    }
+
+    final existingItems = await repo.watchAllItems().first;
+    final existingNames = existingItems
+        .where((item) => item.categoryId == comboCategoryId)
+        .map((item) => item.name.trim().toLowerCase())
+        .toSet();
+
+    for (final item in _comboItems) {
+      final itemName = item['name'] as String;
+      if (existingNames.contains(itemName.trim().toLowerCase())) {
+        continue;
+      }
+
+      await repo.addItem(
+        ItemsCompanion(
+          id: drift.Value(
+            uuid.v5(namespace, 'item_${comboCategoryId}_$itemName'),
+          ),
+          categoryId: drift.Value(comboCategoryId),
+          name: drift.Value(itemName),
+          price: drift.Value(item['price'] as double),
+          isAvailable: const drift.Value(true),
+        ),
+      );
     }
   }
 }
