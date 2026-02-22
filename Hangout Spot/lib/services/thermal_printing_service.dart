@@ -179,9 +179,9 @@ class ThermalPrintingService {
           styles: const PosStyles(bold: true),
         );
 
-        // Format: Qty: X  @₹Price = ₹Total
+        // Format: Qty: X  @Rs.Price = Rs.Total
         final detailsLine =
-            'Qty: ${item.quantity}  @₹${item.price.toStringAsFixed(0)} = ₹${(item.price * item.quantity).toStringAsFixed(0)}';
+            'Qty: ${item.quantity}  @Rs.${item.price.toStringAsFixed(0)} = Rs.${(item.price * item.quantity).toStringAsFixed(0)}';
         bytes += generator.text(
           detailsLine,
           styles: const PosStyles(
@@ -193,7 +193,7 @@ class ThermalPrintingService {
         // Print discount if any
         if (item.discountAmount > 0) {
           bytes += generator.text(
-            'Discount: -₹${item.discountAmount.toStringAsFixed(0)}',
+            'Discount: -Rs.${item.discountAmount.toStringAsFixed(0)}',
             styles: const PosStyles(
               fontType: PosFontType.fontB,
               align: PosAlign.right,
@@ -220,7 +220,7 @@ class ThermalPrintingService {
       bytes += generator.row([
         PosColumn(text: 'Sub Total:', width: 6),
         PosColumn(
-          text: '₹${order.subtotal.toStringAsFixed(0)}',
+          text: 'Rs.${order.subtotal.toStringAsFixed(0)}',
           width: 6,
           styles: const PosStyles(align: PosAlign.right, bold: true),
         ),
@@ -230,7 +230,7 @@ class ThermalPrintingService {
         bytes += generator.row([
           PosColumn(text: 'Order Discount:', width: 6),
           PosColumn(
-            text: '-₹${order.discountAmount.toStringAsFixed(0)}',
+            text: '-Rs.${order.discountAmount.toStringAsFixed(0)}',
             width: 6,
             styles: const PosStyles(align: PosAlign.right),
           ),
@@ -241,7 +241,7 @@ class ThermalPrintingService {
         bytes += generator.row([
           PosColumn(text: 'Tax (GST):', width: 6),
           PosColumn(
-            text: '+₹${order.taxAmount.toStringAsFixed(0)}',
+            text: '+Rs.${order.taxAmount.toStringAsFixed(0)}',
             width: 6,
             styles: const PosStyles(align: PosAlign.right),
           ),
@@ -268,7 +268,7 @@ class ThermalPrintingService {
       }
 
       bytes += generator.text(
-        'Grand Total: ₹${order.totalAmount.toStringAsFixed(0)}',
+        'Grand Total: Rs.${order.totalAmount.toStringAsFixed(0)}',
         styles: const PosStyles(
           height: PosTextSize.size2,
           width: PosTextSize.size2,
