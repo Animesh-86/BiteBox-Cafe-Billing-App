@@ -13,6 +13,19 @@ class ThermalPrintingService {
 
   ThermalPrintingService();
 
+  Future<void> _writeBytesInChunks(
+    Uint8List data, {
+    int chunkSize = 512,
+  }) async {
+    for (int index = 0; index < data.length; index += chunkSize) {
+      final end = (index + chunkSize < data.length)
+          ? index + chunkSize
+          : data.length;
+      await _bluetooth.writeBytes(data.sublist(index, end));
+      await Future.delayed(const Duration(milliseconds: 20));
+    }
+  }
+
   Future<bool> get isConnected =>
       _bluetooth.isConnected.then((v) => v ?? false);
 
@@ -171,36 +184,40 @@ class ThermalPrintingService {
       ]);
       bytes += generator.hr();
 
-      // Items - Print full names with wrapping
+      // Items - row-based values to avoid clipped rate/total lines
       for (var item in items) {
-        // Print full item name (allows natural wrapping)
-        bytes += generator.text(
-          item.itemName,
-          styles: const PosStyles(bold: true),
-        );
+        final itemTotal = (item.price * item.quantity) - item.discountAmount;
 
-        // Format: Qty: X  Rate: Rs.Price  Total: Rs.Total
-        final detailsLine =
-            'Qty: ${item.quantity}  Rate: Rs.${item.price.toStringAsFixed(0)}  Total: Rs.${(item.price * item.quantity).toStringAsFixed(0)}';
-        bytes += generator.text(
-          detailsLine,
-          styles: const PosStyles(
-            align: PosAlign.right,
-            fontType: PosFontType.fontB,
+        bytes += generator.row([
+          PosColumn(text: item.itemName, width: 6),
+          PosColumn(
+            text: item.quantity.toString(),
+            width: 2,
+            styles: const PosStyles(align: PosAlign.right),
           ),
-        );
+          PosColumn(
+            text: item.price.toStringAsFixed(0),
+            width: 2,
+            styles: const PosStyles(align: PosAlign.right),
+          ),
+          PosColumn(
+            text: itemTotal.toStringAsFixed(0),
+            width: 2,
+            styles: const PosStyles(align: PosAlign.right),
+          ),
+        ]);
 
         // Print discount if any
         if (item.discountAmount > 0) {
-          bytes += generator.text(
-            'Discount: Rs.${item.discountAmount.toStringAsFixed(0)}',
-            styles: const PosStyles(
-              fontType: PosFontType.fontB,
-              align: PosAlign.right,
+          bytes += generator.row([
+            PosColumn(text: '  Item Discount', width: 8),
+            PosColumn(
+              text: '-${item.discountAmount.toStringAsFixed(0)}',
+              width: 4,
+              styles: const PosStyles(align: PosAlign.right),
             ),
-          );
+          ]);
         }
-        bytes += generator.feed(1); // Space between items
       }
 
       bytes += generator.hr();
@@ -226,16 +243,14 @@ class ThermalPrintingService {
         ),
       ]);
 
-      if (order.discountAmount > 0) {
-        bytes += generator.row([
-          PosColumn(text: 'Order Discount:', width: 6),
-          PosColumn(
-            text: 'Rs.${order.discountAmount.toStringAsFixed(0)}',
-            width: 6,
-            styles: const PosStyles(align: PosAlign.right),
-          ),
-        ]);
-      }
+      bytes += generator.row([
+        PosColumn(text: 'Order Discount:', width: 6),
+        PosColumn(
+          text: 'Rs.${order.discountAmount.toStringAsFixed(0)}',
+          width: 6,
+          styles: const PosStyles(align: PosAlign.right),
+        ),
+      ]);
 
       if (order.taxAmount > 0) {
         bytes += generator.row([
@@ -310,7 +325,7 @@ class ThermalPrintingService {
       bytes += generator.cut();
 
       debugPrint("[printBill] Sending ${bytes.length} bytes to printer...");
-      await _bluetooth.writeBytes(Uint8List.fromList(bytes));
+      await _writeBytesInChunks(Uint8List.fromList(bytes));
       debugPrint("[printBill] Print completed successfully!");
     } catch (e) {
       debugPrint("[printBill] ERROR: $e");
@@ -399,7 +414,7 @@ class ThermalPrintingService {
     bytes += generator.feed(3); // Feed more lines before cut
     bytes += generator.cut();
 
-    await _bluetooth.writeBytes(Uint8List.fromList(bytes));
+    await _writeBytesInChunks(Uint8List.fromList(bytes));
   }
 }
 

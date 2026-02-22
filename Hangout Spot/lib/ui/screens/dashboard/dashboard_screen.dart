@@ -153,130 +153,137 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               surfaceTintColor: Colors.transparent,
               iconTheme: IconThemeData(color: coffeeDark),
               title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: coffee.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.store_mall_directory_rounded,
-                color: coffee,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    "Hangout Spot",
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: coffeeDark,
-                      letterSpacing: 0.5,
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: coffee.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.store_mall_directory_rounded,
+                      color: coffee,
+                      size: 20,
                     ),
                   ),
-                  Consumer(
-                    builder: (context, ref, child) {
-                      final locationsAsync = ref.watch(locationsStreamProvider);
-                      final currentIdAsync = ref.watch(
-                        currentLocationIdProvider,
-                      );
-
-                      return locationsAsync.when(
-                        data: (locations) {
-                          final currentId = currentIdAsync.valueOrNull;
-                          final location = locations.firstWhere(
-                            (l) => l.id == currentId,
-                            orElse: () => locations.isNotEmpty
-                                ? locations.first
-                                : Location(
-                                    id: '',
-                                    name: '',
-                                    address: '',
-                                    phoneNumber: '',
-                                    isActive: true,
-                                    createdAt: DateTime.now(),
-                                  ),
-                          );
-
-                          // Use address if available, falling back to name
-                          String subtitle = (location.address ?? '').isNotEmpty
-                              ? location.address!
-                              : location.name;
-                          if (subtitle.isEmpty) subtitle = location.name;
-
-                          return Text(
-                            subtitle,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: coffeeDark.withOpacity(0.7),
-                              fontWeight: FontWeight.w500,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          );
-                        },
-                        loading: () => const SizedBox(
-                          height: 10,
-                          width: 50,
-                          child: LinearProgressIndicator(minHeight: 2),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          "Hangout Spot",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: coffeeDark,
+                            letterSpacing: 0.5,
+                          ),
                         ),
-                        error: (_, __) => const SizedBox.shrink(),
-                      );
-                    },
+                        Consumer(
+                          builder: (context, ref, child) {
+                            final locationsAsync = ref.watch(
+                              locationsStreamProvider,
+                            );
+                            final currentIdAsync = ref.watch(
+                              currentLocationIdProvider,
+                            );
+
+                            return locationsAsync.when(
+                              data: (locations) {
+                                final currentId = currentIdAsync.valueOrNull;
+                                final location = locations.firstWhere(
+                                  (l) => l.id == currentId,
+                                  orElse: () => locations.isNotEmpty
+                                      ? locations.first
+                                      : Location(
+                                          id: '',
+                                          name: '',
+                                          address: '',
+                                          phoneNumber: '',
+                                          isActive: true,
+                                          createdAt: DateTime.now(),
+                                        ),
+                                );
+
+                                // Use address if available, falling back to name
+                                String subtitle =
+                                    (location.address ?? '').isNotEmpty
+                                    ? location.address!
+                                    : location.name;
+                                if (subtitle.isEmpty) subtitle = location.name;
+
+                                return Text(
+                                  subtitle,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: coffeeDark.withOpacity(0.7),
+                                    fontWeight: FontWeight.w500,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                );
+                              },
+                              loading: () => const SizedBox(
+                                height: 10,
+                                width: 50,
+                                child: LinearProgressIndicator(minHeight: 2),
+                              ),
+                              error: (_, __) => const SizedBox.shrink(),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
-            ),
-          ],
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: GestureDetector(
-              onTap: () => _pickDate(context),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: cream,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: coffee.withOpacity(0.2)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.calendar_today, size: 16, color: coffee),
-                    const SizedBox(width: 8),
-                    Text(
-                      DateFormat('EEE, d MMM').format(currentDate),
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: coffeeDark,
+              actions: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 16),
+                  child: GestureDetector(
+                    onTap: () => _pickDate(context),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: cream,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: coffee.withOpacity(0.2)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.calendar_today, size: 16, color: coffee),
+                          const SizedBox(width: 8),
+                          Text(
+                            DateFormat('EEE, d MMM').format(currentDate),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: coffeeDark,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.arrow_drop_down,
+                            size: 18,
+                            color: coffeeDark,
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 4),
-                    Icon(Icons.arrow_drop_down, size: 18, color: coffeeDark),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
-          ),
-        ],
-      ),
           ),
         ),
       ),
