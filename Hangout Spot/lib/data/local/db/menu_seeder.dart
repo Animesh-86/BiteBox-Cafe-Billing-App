@@ -32,6 +32,7 @@ class MenuSeeder {
       {'name': 'Cold Beverages', 'color': 0xFF2196F3}, // Blue
       {'name': 'Shakes', 'color': 0xFFE91E63}, // Pink
       {'name': 'Mojito & Mocktail', 'color': 0xFF00BCD4}, // Cyan
+      {'name': 'SPECIAL COMBO MEALS', 'color': 0xFF4CAF50}, // Green
     ];
 
     final Map<String, String> categoryIds = {};
@@ -218,6 +219,30 @@ class MenuSeeder {
         'price': 110,
       },
       {'category': 'Mojito & Mocktail', 'name': 'Chilli Guava', 'price': 120},
+
+      // 🍱 SPECIAL COMBO MEALS
+      {
+        'category': 'SPECIAL COMBO MEALS',
+        'name': 'Veg Cheese Frankie + Corn Chilly Toast + Cold Drink (20rs)',
+        'price': 149,
+      },
+      {
+        'category': 'SPECIAL COMBO MEALS',
+        'name':
+            'Veg Cheese Burger + Peri Peri French Fries + Cold Drink (20rs)',
+        'price': 159,
+      },
+      {
+        'category': 'SPECIAL COMBO MEALS',
+        'name':
+            'Tandoori Paneer Sandwich + Peri Peri Burger + Cold Drink (20rs)',
+        'price': 189,
+      },
+      {
+        'category': 'SPECIAL COMBO MEALS',
+        'name': 'Tandoori Paneer Pizza + Garlic Bread + Cold Drink (20rs)',
+        'price': 229,
+      },
     ];
 
     await db.batch((batch) {

@@ -1,6 +1,5 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hangout_spot/data/repositories/sync_repository.dart';
 import 'package:hangout_spot/data/repositories/auth_repository.dart';
@@ -11,6 +10,7 @@ import 'package:hangout_spot/logic/locations/location_provider.dart';
 import 'package:hangout_spot/ui/screens/analytics/providers/analytics_data_provider.dart';
 import 'package:hangout_spot/services/realtime_order_service.dart';
 import 'package:hangout_spot/logic/billing/cart_provider.dart';
+import '../utils/password_reauth.dart';
 import '../widgets/settings_shared.dart';
 
 class BackupSettingsScreen extends ConsumerStatefulWidget {
@@ -390,26 +390,20 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
                           );
                           if (password == null || !mounted) return; // Cancelled
 
-                          final user = FirebaseAuth.instance.currentUser;
-                          if (user == null || user.email == null) return;
-
-                          try {
-                            // Verify password with Firebase
-                            final credential = EmailAuthProvider.credential(
-                              email: user.email!,
-                              password: password,
-                            );
-                            await user.reauthenticateWithCredential(credential);
-                          } on FirebaseAuthException {
+                          final errorMessage =
+                              await reauthenticateCurrentUserWithPassword(
+                                password: password,
+                              );
+                          if (errorMessage != null) {
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Incorrect password.'),
+                                SnackBar(
+                                  content: Text(errorMessage),
                                   backgroundColor: Colors.red,
                                 ),
                               );
                             }
-                            return; // Stop if incorrect
+                            return;
                           }
 
                           if (!mounted) return;

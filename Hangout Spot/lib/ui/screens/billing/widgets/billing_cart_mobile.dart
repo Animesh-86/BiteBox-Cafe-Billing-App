@@ -357,13 +357,23 @@ class _MobileCartModalState extends ConsumerState<MobileCartModal> {
         ),
 
         // Footer
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: billingSurface(context, darkOpacity: 0.05),
-            boxShadow: billingShadow(context),
+        AnimatedPadding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.viewInsetsOf(context).bottom,
           ),
-          child: const CartFooter(),
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeOut,
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: billingSurface(context, darkOpacity: 0.05),
+              boxShadow: billingShadow(context),
+            ),
+            child: const SingleChildScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              child: CartFooter(),
+            ),
+          ),
         ),
       ],
     );

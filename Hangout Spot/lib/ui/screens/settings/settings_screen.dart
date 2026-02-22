@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:hangout_spot/data/repositories/auth_repository.dart';
 import 'package:hangout_spot/logic/locations/location_provider.dart';
@@ -20,6 +19,7 @@ import 'sections/operating_hours_settings.dart';
 import 'active_sessions_screen.dart';
 import 'widgets/settings_shared.dart';
 import 'sections/printer_settings_screen.dart';
+import 'utils/password_reauth.dart';
 
 /// A self-contained password dialog widget — avoids stale context crashes.
 class _PasswordDialog extends StatefulWidget {
@@ -101,7 +101,7 @@ class _PasswordDialogState extends State<_PasswordDialog> {
 }
 
 /// Returns true if granted, false if wrong password, null if cancelled.
-Future<bool?> _verifyPassword(
+Future<bool?> verifyManagerPassword(
   BuildContext context,
   WidgetRef ref,
   String action,
@@ -124,23 +124,25 @@ Future<bool?> _verifyPassword(
   );
   if (password == null) return null; // cancelled
 
-  final user = FirebaseAuth.instance.currentUser;
-  if (user == null || user.email == null) return false;
-
-  try {
-    // Verify credential
-    final credential = EmailAuthProvider.credential(
-      email: user.email!,
-      password: password,
-    );
-    await user.reauthenticateWithCredential(credential);
-
-    // Save success time to create session
-    ref.read(settingsAuthSessionProvider.notifier).state = DateTime.now();
-    return true;
-  } on FirebaseAuthException {
+  final errorMessage = await reauthenticateCurrentUserWithPassword(
+    password: password,
+  );
+  if (errorMessage != null) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Colors.redAccent,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
     return false;
   }
+
+  // Save success time to create session
+  ref.read(settingsAuthSessionProvider.notifier).state = DateTime.now();
+  return true;
 }
 
 class SettingsScreen extends ConsumerWidget {
@@ -438,20 +440,9 @@ class SettingsScreen extends ConsumerWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: () async {
-            final result = await _verifyPassword(context, ref, title);
+            final result = await verifyManagerPassword(context, ref, title);
             if (result == null) return; // cancelled — silent, no message
-            if (result == false) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Incorrect password.'),
-                    backgroundColor: Colors.redAccent,
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              }
-              return;
-            }
+            if (result == false) return;
             if (context.mounted) {
               Navigator.of(
                 context,
