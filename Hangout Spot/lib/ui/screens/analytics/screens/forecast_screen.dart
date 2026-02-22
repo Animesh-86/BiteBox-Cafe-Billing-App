@@ -75,6 +75,14 @@ class _ForecastScreenState extends ConsumerState<ForecastScreen> {
             subtitle: 'Next day average forecast',
             child: _buildExpectedDemandList(data),
           ),
+          const SizedBox(height: 20),
+          // Peak Hours by Day
+          _buildSectionCard(
+            icon: Icons.schedule_rounded,
+            title: 'Peak Hours by Day',
+            subtitle: 'Expected busiest hours for each day',
+            child: _buildPeakHoursByDay(data),
+          ),
         ],
       ),
     );
@@ -270,6 +278,117 @@ class _ForecastScreenState extends ConsumerState<ForecastScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildPeakHoursByDay(AnalyticsData data) {
+    if (data.peakHoursByDay.isEmpty) {
+      return _buildEmptyState(
+        icon: Icons.access_time_outlined,
+        title: 'No Peak Hour Data',
+        subtitle: 'Build sales history to see peak hours patterns',
+      );
+    }
+
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: data.peakHoursByDay.length,
+      separatorBuilder: (context, index) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        final peakHour = data.peakHoursByDay[index];
+
+        // Format hour as 12-hour time
+        final hour = peakHour.peakHour;
+        final period = hour >= 12 ? 'PM' : 'AM';
+        final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+        final timeStr = '$displayHour:00 $period';
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AnalyticsTheme.cardBackground,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: AnalyticsTheme.primaryGold.withOpacity(0.2),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              // Day icon
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AnalyticsTheme.primaryGold.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.calendar_today_rounded,
+                  color: AnalyticsTheme.primaryGold,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              // Day info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      peakHour.dayName,
+                      style: const TextStyle(
+                        color: AnalyticsTheme.primaryText,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${peakHour.orderCount} orders',
+                      style: TextStyle(
+                        color: AnalyticsTheme.secondaryText,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Peak time badge
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: AnalyticsTheme.primaryGold.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.schedule_rounded,
+                      color: AnalyticsTheme.primaryGold,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      timeStr,
+                      style: const TextStyle(
+                        color: AnalyticsTheme.primaryGold,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

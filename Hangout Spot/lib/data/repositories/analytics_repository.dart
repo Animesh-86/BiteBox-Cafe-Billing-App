@@ -448,6 +448,106 @@ class AnalyticsRepository {
     return sorted.map((e) => MapEntry(e.key, e.value.toDouble())).toList();
   }
 
+  /// Get peak hours organized by day of week (for last 30 days)
+  Future<Map<int, Map<int, int>>> getPeakHoursByDayOfWeek({
+    String? locationId,
+  }) async {
+    final now = DateTime.now();
+    final thirtyDaysAgo = now.subtract(const Duration(days: 30));
+
+    final query = _db.selectOnly(_db.orders)
+      ..addColumns([_db.orders.createdAt])
+      ..where(_db.orders.status.equals('completed'))
+      ..where(_db.orders.createdAt.isBiggerOrEqualValue(thirtyDaysAgo));
+    if (locationId != null) {
+      query.where(_db.orders.locationId.equals(locationId));
+    }
+
+    final rows = await query.get();
+
+    // Map: dayOfWeek -> (hour -> count)
+    final dayHourCounts = <int, Map<int, int>>{};
+
+    for (final row in rows) {
+      final date = row.read(_db.orders.createdAt);
+      if (date != null) {
+        final dayOfWeek = date.weekday; // 1 = Monday, 7 = Sunday
+        final hour = date.hour;
+
+        dayHourCounts.putIfAbsent(dayOfWeek, () => {});
+        dayHourCounts[dayOfWeek]![hour] =
+            (dayHourCounts[dayOfWeek]![hour] ?? 0) + 1;
+      }
+    }
+
+    return dayHourCounts;
+  }
+
+  /// Get predicted peak hour for today based on historical same-day data
+  Future<Map<String, dynamic>?> getTodayPeakForecast({
+    String? locationId,
+  }) async {
+    final now = DateTime.now();
+    final currentDayOfWeek = now.weekday; // 1 = Monday, 7 = Sunday
+
+    // Get data from last 4-8 weeks for this specific day
+    final sixtyDaysAgo = now.subtract(const Duration(days: 60));
+
+    final query = _db.selectOnly(_db.orders)
+      ..addColumns([_db.orders.createdAt])
+      ..where(_db.orders.status.equals('completed'))
+      ..where(_db.orders.createdAt.isBiggerOrEqualValue(sixtyDaysAgo));
+    if (locationId != null) {
+      query.where(_db.orders.locationId.equals(locationId));
+    }
+
+    final rows = await query.get();
+
+    // Filter only orders from the same day of week
+    final hourCounts = <int, int>{};
+    for (final row in rows) {
+      final date = row.read(_db.orders.createdAt);
+      if (date != null && date.weekday == currentDayOfWeek) {
+        final hour = date.hour;
+        hourCounts[hour] = (hourCounts[hour] ?? 0) + 1;
+      }
+    }
+
+    if (hourCounts.isEmpty) {
+      return null; // No historical data
+    }
+
+    // Find peak hour
+    final peakEntry = hourCounts.entries.reduce(
+      (a, b) => a.value > b.value ? a : b,
+    );
+
+    // Format time
+    final hour = peakEntry.key;
+    final period = hour >= 12 ? 'PM' : 'AM';
+    final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+    final formattedTime = '$displayHour:00 $period';
+
+    // Get day name
+    const dayNames = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+    final dayName = dayNames[currentDayOfWeek - 1];
+
+    return {
+      'expectedPeakHour': hour,
+      'formattedTime': formattedTime,
+      'historicalOrderCount': peakEntry.value,
+      'dayName': dayName,
+    };
+  }
+
   Future<List<MapEntry<String, double>>> getTopSellingItemsSince(
     DateTime start,
     DateTime end, {

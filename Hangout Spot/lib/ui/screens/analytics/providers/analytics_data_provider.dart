@@ -68,6 +68,12 @@ class AnalyticsData {
   // NEW: Discount effectiveness
   final DiscountEffectiveness discountEffectiveness;
 
+  // NEW: Peak hours by day of week
+  final List<PeakHourByDay> peakHoursByDay;
+
+  // NEW: Today's peak hour forecast
+  final TodayPeakForecast? todayPeakForecast;
+
   AnalyticsData({
     required this.totalSales,
     required this.totalOrders,
@@ -99,6 +105,8 @@ class AnalyticsData {
     required this.aovChange,
     required this.dayOfWeekSales,
     required this.discountEffectiveness,
+    required this.peakHoursByDay,
+    this.todayPeakForecast,
   });
 }
 
@@ -212,6 +220,34 @@ class DiscountEffectiveness {
     required this.totalDiscountAmount,
     required this.ordersWithoutDiscount,
     required this.revenueWithoutDiscount,
+  });
+}
+
+class PeakHourByDay {
+  final String dayName; // Monday, Tuesday, etc.
+  final int dayOfWeek; // 1 = Monday, 7 = Sunday
+  final int peakHour; // 0-23
+  final int orderCount;
+
+  PeakHourByDay({
+    required this.dayName,
+    required this.dayOfWeek,
+    required this.peakHour,
+    required this.orderCount,
+  });
+}
+
+class TodayPeakForecast {
+  final int expectedPeakHour; // 0-23
+  final String formattedTime; // "7:00 PM"
+  final int historicalOrderCount;
+  final String dayName; // "Sunday"
+
+  TodayPeakForecast({
+    required this.expectedPeakHour,
+    required this.formattedTime,
+    required this.historicalOrderCount,
+    required this.dayName,
   });
 }
 
@@ -515,6 +551,56 @@ final analyticsDataProvider =
         {'segment': 'One-time', 'count': freqSegments['oneTime'] ?? 0},
       ];
 
+      // Fetch peak hours by day of week
+      final peakHoursByDayRaw = await repository.getPeakHoursByDayOfWeek(
+        locationId: locationId,
+      );
+
+      // Process peak hours by day
+      const dayNames = [
+        'Monday',
+        'Tuesday',
+        'Wednesday',
+        'Thursday',
+        'Friday',
+        'Saturday',
+        'Sunday',
+      ];
+      final peakHoursByDay = <PeakHourByDay>[];
+
+      for (int dayOfWeek = 1; dayOfWeek <= 7; dayOfWeek++) {
+        final hourData = peakHoursByDayRaw[dayOfWeek];
+        if (hourData != null && hourData.isNotEmpty) {
+          // Find peak hour for this day
+          final peakEntry = hourData.entries.reduce(
+            (a, b) => a.value > b.value ? a : b,
+          );
+          peakHoursByDay.add(
+            PeakHourByDay(
+              dayName: dayNames[dayOfWeek - 1],
+              dayOfWeek: dayOfWeek,
+              peakHour: peakEntry.key,
+              orderCount: peakEntry.value,
+            ),
+          );
+        }
+      }
+
+      // Fetch today's peak forecast
+      final todayPeakData = await repository.getTodayPeakForecast(
+        locationId: locationId,
+      );
+
+      TodayPeakForecast? todayPeakForecast;
+      if (todayPeakData != null) {
+        todayPeakForecast = TodayPeakForecast(
+          expectedPeakHour: todayPeakData['expectedPeakHour'] as int,
+          formattedTime: todayPeakData['formattedTime'] as String,
+          historicalOrderCount: todayPeakData['historicalOrderCount'] as int,
+          dayName: todayPeakData['dayName'] as String,
+        );
+      }
+
       return AnalyticsData(
         totalSales: totalSales,
         totalOrders: totalOrders,
@@ -562,6 +648,8 @@ final analyticsDataProvider =
         aovChange: aovChange,
         dayOfWeekSales: dayOfWeekSales,
         discountEffectiveness: discountEffectiveness,
+        peakHoursByDay: peakHoursByDay,
+        todayPeakForecast: todayPeakForecast,
       );
     });
 
