@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/data/repositories/customer_repository.dart';
 import 'package:hangout_spot/ui/screens/customer/customer_profile_screen.dart';
+import 'package:hangout_spot/logic/rewards/reward_provider.dart';
 
 class CustomerListScreen extends ConsumerStatefulWidget {
   final bool isSelectionMode;
@@ -87,6 +88,39 @@ class _CustomerListScreenState extends ConsumerState<CustomerListScreen> {
                   children: [
                     Text("${customer.totalVisits} visits"),
                     Text("₹${customer.totalSpent.toStringAsFixed(0)}"),
+                    Consumer(
+                      builder: (context, ref, _) {
+                        final pointsAsync = ref.watch(
+                          customerRewardBalanceProvider(customer.id),
+                        );
+                        return pointsAsync.when(
+                          data: (points) {
+                            if (points <= 0) return const SizedBox.shrink();
+                            return Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.stars,
+                                  size: 12,
+                                  color: Colors.amber,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  "${points.toStringAsFixed(0)} pts",
+                                  style: const TextStyle(
+                                    color: Colors.amber,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                          loading: () => const SizedBox.shrink(),
+                          error: (_, __) => const SizedBox.shrink(),
+                        );
+                      },
+                    ),
                   ],
                 ),
                 onTap: () {

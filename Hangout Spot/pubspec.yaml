@@ -83,6 +83,8 @@ dev_dependencies:
   build_runner: ^2.4.14
   custom_lint: ^0.7.0
   riverpod_lint: ^2.6.3
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -99,6 +101,7 @@ flutter:
   assets:
     - assets/videos/
     - assets/logo.png
+    - assets/logo-full.jpeg
     # - images/a_dot_burr.jpeg
     # - images/a_dot_ham.jpeg
 
@@ -127,3 +130,17 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/logo.png"
+
+flutter_native_splash:
+  color: "#ffffff"
+  color_dark: "#000000"
+  image: "assets/logo.png"
+  android_12:
+    image: "assets/logo.png"
+    color: "#ffffff"
+    color_dark: "#000000"

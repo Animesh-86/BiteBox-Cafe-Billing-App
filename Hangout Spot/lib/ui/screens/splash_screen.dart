@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:video_player/video_player.dart';
 import 'package:hangout_spot/data/repositories/auth_repository.dart';
 import 'package:hangout_spot/data/repositories/menu_repository.dart';
 import 'package:hangout_spot/data/repositories/sync_repository.dart';
@@ -20,15 +19,12 @@ class SplashScreen extends ConsumerStatefulWidget {
 }
 
 class _SplashScreenState extends ConsumerState<SplashScreen> {
-  late VideoPlayerController _controller;
-  bool _initialized = false;
   bool _navigated = false;
   Timer? _timeoutTimer;
 
   @override
   void initState() {
     super.initState();
-    _initializeVideo();
     // Defer _seedData() to after first frame to avoid ref.read() in initState
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _seedData();
@@ -104,37 +100,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     }
   }
 
-  Future<void> _initializeVideo() async {
-    try {
-      _controller = VideoPlayerController.asset('assets/videos/splash.mp4');
-      await _controller.initialize();
-      if (mounted) {
-        setState(() {
-          _initialized = true;
-        });
-        _controller.play();
-        _controller.setLooping(false);
-        _controller.addListener(_checkVideoEnd);
-      }
-    } catch (e) {
-      debugPrint("Video Splash Error: $e");
-      _navigateAway();
-    }
-  }
-
-  void _checkVideoEnd() {
-    if (_controller.value.isInitialized &&
-        !_controller.value.isPlaying &&
-        _controller.value.position >= _controller.value.duration) {
-      _navigateAway();
-    }
-  }
-
   Future<void> _navigateAway() async {
     if (!mounted || _navigated) return;
     _navigated = true;
     _timeoutTimer?.cancel();
-    _controller.removeListener(_checkVideoEnd);
 
     final authRepo = ref.read(authRepositoryProvider);
     final user = authRepo.currentUser;
@@ -171,23 +140,22 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
   void dispose() {
     _timeoutTimer?.cancel();
-    _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: isDark ? Colors.black : Colors.white,
       body: GestureDetector(
-        onTap: _navigateAway, // Tap to skip
+        onTap: _navigateAway,
         child: Center(
-          child: _initialized
-              ? AspectRatio(
-                  aspectRatio: _controller.value.aspectRatio,
-                  child: VideoPlayer(_controller),
-                )
-              : const SizedBox.shrink(),
+          child: Image.asset(
+            'assets/logo.png',
+            width: 200, // Roughly matching native splash proportions
+          ),
         ),
       ),
     );
