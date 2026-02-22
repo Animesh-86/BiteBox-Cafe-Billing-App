@@ -16,6 +16,11 @@ class ShareService {
 
   ShareService(this._db);
 
+  Future<bool> _isBillWhatsAppEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(BILL_WHATSAPP_ENABLED_KEY) ?? true;
+  }
+
   Future<void> shareInvoice(
     Order order,
     List<OrderItem> items,
@@ -135,6 +140,10 @@ class ShareService {
     List<OrderItem> items,
     Customer? customer,
   ) async {
+    if (!await _isBillWhatsAppEnabled()) {
+      return;
+    }
+
     final message = await _buildWhatsAppMessage(order, items, customer);
 
     // Use customer phone if available
@@ -182,6 +191,10 @@ class ShareService {
   }
 
   Future<void> openWhatsAppChat(String phone, {String? text}) async {
+    if (!await _isBillWhatsAppEnabled()) {
+      return;
+    }
+
     if (phone.isEmpty) return;
 
     String cleanPhone = phone.replaceAll(RegExp(r'[^0-9]'), '');

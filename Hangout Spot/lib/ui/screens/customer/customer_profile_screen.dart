@@ -5,6 +5,8 @@ import 'package:hangout_spot/data/repositories/order_repository.dart';
 import 'package:hangout_spot/services/share_service.dart';
 import 'package:intl/intl.dart';
 import 'package:hangout_spot/logic/locations/location_provider.dart';
+import 'package:hangout_spot/main.dart';
+import 'package:hangout_spot/utils/constants/app_keys.dart';
 
 class CustomerProfileScreen extends ConsumerWidget {
   final Customer customer;
@@ -12,6 +14,9 @@ class CustomerProfileScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final prefs = ref.watch(sharedPreferencesProvider);
+    final isBillWhatsAppEnabled =
+        prefs.getBool(BILL_WHATSAPP_ENABLED_KEY) ?? true;
     final locationId = ref.watch(currentLocationIdProvider).valueOrNull;
     final Stream<List<Order>> ordersStream = ref
         .watch(orderRepositoryProvider)
@@ -22,7 +27,10 @@ class CustomerProfileScreen extends ConsumerWidget {
       appBar: AppBar(title: Text(customer.name)),
       body: Column(
         children: [
-          _ProfileHeader(customer: customer),
+          _ProfileHeader(
+            customer: customer,
+            isBillWhatsAppEnabled: isBillWhatsAppEnabled,
+          ),
           const Divider(),
           Expanded(
             child: StreamBuilder<List<Order>>(
@@ -60,18 +68,23 @@ class CustomerProfileScreen extends ConsumerWidget {
                             ),
                           ),
                           const SizedBox(width: 12),
-                          IconButton(
-                            icon: const Icon(Icons.share_outlined),
-                            tooltip: 'Share Bill',
-                            onPressed: () async {
-                              final items = await ref
-                                  .read(orderRepositoryProvider)
-                                  .getOrderItems(order.id);
-                              await ref
-                                  .read(shareServiceProvider)
-                                  .shareInvoiceWhatsApp(order, items, customer);
-                            },
-                          ),
+                          if (isBillWhatsAppEnabled)
+                            IconButton(
+                              icon: const Icon(Icons.share_outlined),
+                              tooltip: 'Share Bill',
+                              onPressed: () async {
+                                final items = await ref
+                                    .read(orderRepositoryProvider)
+                                    .getOrderItems(order.id);
+                                await ref
+                                    .read(shareServiceProvider)
+                                    .shareInvoiceWhatsApp(
+                                      order,
+                                      items,
+                                      customer,
+                                    );
+                              },
+                            ),
                         ],
                       ),
                     );
@@ -86,12 +99,16 @@ class CustomerProfileScreen extends ConsumerWidget {
   }
 }
 
-class _ProfileHeader extends StatelessWidget {
+class _ProfileHeader extends ConsumerWidget {
   final Customer customer;
-  const _ProfileHeader({required this.customer});
+  final bool isBillWhatsAppEnabled;
+  const _ProfileHeader({
+    required this.customer,
+    required this.isBillWhatsAppEnabled,
+  });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -119,29 +136,25 @@ class _ProfileHeader extends StatelessWidget {
                 Row(
                   children: [
                     Text(customer.phone ?? 'No phone'),
-                    if (customer.phone?.isNotEmpty ?? false) ...[
+                    if (isBillWhatsAppEnabled &&
+                        (customer.phone?.isNotEmpty ?? false)) ...[
                       const SizedBox(width: 8),
-                      // We need a Consumer here to access the provider, since _ProfileHeader is StatelessWidget
-                      Consumer(
-                        builder: (context, ref, _) {
-                          return IconButton(
-                            icon: const Icon(
-                              Icons.chat_bubble_outline,
-                              color: Colors.green,
-                              size: 20,
-                            ),
-                            constraints: const BoxConstraints(),
-                            padding: EdgeInsets.zero,
-                            tooltip: 'Chat on WhatsApp',
-                            onPressed: () {
-                              ref
-                                  .read(shareServiceProvider)
-                                  .openWhatsAppChat(
-                                    customer.phone!,
-                                    text: "Hi ${customer.name}!",
-                                  );
-                            },
-                          );
+                      IconButton(
+                        icon: const Icon(
+                          Icons.chat_bubble_outline,
+                          color: Colors.green,
+                          size: 20,
+                        ),
+                        constraints: const BoxConstraints(),
+                        padding: EdgeInsets.zero,
+                        tooltip: 'Chat on WhatsApp',
+                        onPressed: () {
+                          ref
+                              .read(shareServiceProvider)
+                              .openWhatsAppChat(
+                                customer.phone!,
+                                text: "Hi ${customer.name}!",
+                              );
                         },
                       ),
                     ],

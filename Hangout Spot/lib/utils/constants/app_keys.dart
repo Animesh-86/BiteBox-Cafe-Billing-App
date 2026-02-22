@@ -7,6 +7,7 @@ const String STORE_LOGO_KEY = 'store_logo';
 const String STORE_LOGO_URL_KEY = 'store_logo_url'; // Legacy/Fallback
 const String RECEIPT_FOOTER_KEY = 'receipt_footer';
 const String RECEIPT_SHOW_THANK_YOU_KEY = 'receipt_show_thank_you';
+const String BILL_WHATSAPP_ENABLED_KEY = 'bill_whatsapp_enabled';
 const String CLOUD_AUTO_SYNC_ENABLED_KEY = 'cloud_auto_sync_enabled';
 const String CLOUD_AUTO_SYNC_INTERVAL_KEY = 'cloud_auto_sync_interval_mins';
 

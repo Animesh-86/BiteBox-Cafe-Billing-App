@@ -49,6 +49,7 @@ class _ReceiptSettingsScreenState extends ConsumerState<ReceiptSettingsScreen>
   final _kotNotesCtrl = TextEditingController();
 
   // ── WhatsApp blocks ───────────────────
+  bool _waEnabled = true;
   final _waGreetingCtrl = TextEditingController();
   bool _waShowInvoice = true;
   bool _waShowItems = true;
@@ -91,6 +92,7 @@ class _ReceiptSettingsScreenState extends ConsumerState<ReceiptSettingsScreen>
       _waGreetingCtrl.text =
           p.getString(_kWaGreeting) ??
           'Hi {{customer_name}} 👋, thank you for visiting *{{store_name}}*!';
+      _waEnabled = p.getBool(BILL_WHATSAPP_ENABLED_KEY) ?? true;
       _waShowInvoice = p.getBool(_kWaShowInvoice) ?? true;
       _waShowItems = p.getBool(_kWaShowItems) ?? true;
       _waShowTotal = p.getBool(_kWaShowTotal) ?? true;
@@ -124,6 +126,7 @@ class _ReceiptSettingsScreenState extends ConsumerState<ReceiptSettingsScreen>
 
   Future<void> _saveWhatsApp() async {
     final p = await SharedPreferences.getInstance();
+    await p.setBool(BILL_WHATSAPP_ENABLED_KEY, _waEnabled);
     await p.setString(_kWaGreeting, _waGreetingCtrl.text);
     await p.setBool(_kWaShowInvoice, _waShowInvoice);
     await p.setBool(_kWaShowItems, _waShowItems);
@@ -131,6 +134,12 @@ class _ReceiptSettingsScreenState extends ConsumerState<ReceiptSettingsScreen>
     await p.setBool(_kWaShowPayment, _waShowPayment);
     await p.setString(_kWaClosing, _waClosingCtrl.text);
     _snack('WhatsApp template saved');
+  }
+
+  Future<void> _setWhatsAppEnabled(bool value) async {
+    setState(() => _waEnabled = value);
+    final p = await SharedPreferences.getInstance();
+    await p.setBool(BILL_WHATSAPP_ENABLED_KEY, value);
   }
 
   Future<void> _resetWhatsApp() async {
@@ -291,6 +300,14 @@ class _ReceiptSettingsScreenState extends ConsumerState<ReceiptSettingsScreen>
             title: 'Message Blocks',
             icon: Icons.chat_bubble_outline_rounded,
             children: [
+              _sw(
+                'Enable WhatsApp Bill Share',
+                Icons.chat,
+                _waEnabled,
+                _setWhatsAppEnabled,
+              ),
+              const SizedBox(height: 12),
+
               // Block 1: Greeting
               _blockEditor(
                 theme,

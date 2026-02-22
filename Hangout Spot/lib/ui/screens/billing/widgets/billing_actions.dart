@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/data/providers/database_provider.dart';
 import 'package:hangout_spot/logic/billing/cart_provider.dart';
@@ -16,6 +17,11 @@ import 'package:uuid/uuid.dart';
 import 'package:hangout_spot/utils/constants/app_keys.dart';
 
 import 'package:hangout_spot/services/thermal_printing_service.dart';
+
+Future<bool> _isBillWhatsAppEnabled() async {
+  final prefs = await SharedPreferences.getInstance();
+  return prefs.getBool(BILL_WHATSAPP_ENABLED_KEY) ?? true;
+}
 
 Future<void> printKot(BuildContext context, WidgetRef ref) async {
   final cart = ref.read(cartProvider);
@@ -272,8 +278,11 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
       }
     }
 
-    // Auto-Send to WhatsApp if customer has phone
-    if (customer != null && (customer.phone?.isNotEmpty ?? false)) {
+    // Auto-Send to WhatsApp if enabled and customer has phone
+    final isWhatsAppEnabled = await _isBillWhatsAppEnabled();
+    if (isWhatsAppEnabled &&
+        customer != null &&
+        (customer.phone?.isNotEmpty ?? false)) {
       try {
         await ref
             .read(shareServiceProvider)
@@ -302,6 +311,7 @@ Future<void> showPostCheckoutActions(
   Customer? customer,
 ) async {
   final db = ref.read(appDatabaseProvider);
+  final isWhatsAppEnabled = await _isBillWhatsAppEnabled();
   final order = await (db.select(
     db.orders,
   )..where((t) => t.id.equals(orderId))).getSingle();
@@ -341,16 +351,17 @@ Future<void> showPostCheckoutActions(
           icon: const Icon(Icons.print_outlined),
           label: const Text('Print Bill'),
         ),
-        TextButton.icon(
-          onPressed: () async {
-            Navigator.pop(ctx);
-            await ref
-                .read(shareServiceProvider)
-                .shareInvoiceWhatsApp(order, items, customer);
-          },
-          icon: const Icon(Icons.share_outlined),
-          label: const Text('Share (WhatsApp)'),
-        ),
+        if (isWhatsAppEnabled)
+          TextButton.icon(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await ref
+                  .read(shareServiceProvider)
+                  .shareInvoiceWhatsApp(order, items, customer);
+            },
+            icon: const Icon(Icons.share_outlined),
+            label: const Text('Share (WhatsApp)'),
+          ),
       ],
     ),
   );
