@@ -361,13 +361,52 @@ void showCustomerSelect(BuildContext context, WidgetRef ref) {
     context: context,
     builder: (ctx) => Dialog(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 500, maxHeight: 600),
-        child: const CustomerListScreen(isSelectionMode: true),
+        constraints: const BoxConstraints(maxWidth: 500, maxHeight: 640),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header bar with Manage Customers shortcut
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 8, 0),
+              child: Row(
+                children: [
+                  const Icon(Icons.people_rounded, size: 20),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Select Customer',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.pop(ctx); // close dialog
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const CustomerListScreen(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.settings_outlined, size: 16),
+                    label: const Text('Manage'),
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            const Expanded(child: CustomerListScreen(isSelectionMode: true)),
+          ],
+        ),
       ),
     ),
   ).then((selected) {
     if (selected == "walk_in") {
-      // User selected Walk-in explicitly
       debugPrint('🧍 Walk-in selected');
       ref.read(cartProvider.notifier).clearCustomerSelection();
     } else if (selected is Customer) {

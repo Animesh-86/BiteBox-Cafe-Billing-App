@@ -8,6 +8,7 @@ import 'package:hangout_spot/data/repositories/auth_repository.dart';
 import 'package:hangout_spot/logic/locations/location_provider.dart';
 import 'package:hangout_spot/data/providers/theme_provider.dart';
 
+import '../customer/customer_list_screen.dart';
 import 'sections/backup_settings.dart';
 import 'sections/locations_settings.dart';
 import 'sections/loyalty_settings.dart';
@@ -120,6 +121,12 @@ class SettingsScreen extends ConsumerWidget {
     final activeOutletAsync = ref.watch(activeOutletProvider);
 
     final navigationItems = [
+      {
+        "title": "Customers",
+        "icon": Icons.people_rounded,
+        "subtitle": "Add, edit, discount & manage",
+        "screen": const CustomerListScreen(),
+      },
       {
         "title": "Outlets",
         "icon": Icons.place_rounded,
