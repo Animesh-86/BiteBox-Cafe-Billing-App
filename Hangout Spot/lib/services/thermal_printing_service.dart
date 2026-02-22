@@ -145,7 +145,7 @@ class ThermalPrintingService {
       if (customer != null) {
         bytes += generator.text('Customer: ${customer.name}');
       } else {
-        bytes += generator.text('Bill To: Walk-In');
+        bytes += generator.text('Bill To: Walk In');
       }
 
       bytes += generator.hr();
@@ -179,9 +179,9 @@ class ThermalPrintingService {
           styles: const PosStyles(bold: true),
         );
 
-        // Format: Qty: X  @Rs.Price = Rs.Total
+        // Format: Qty: X  Rate: Rs.Price  Total: Rs.Total
         final detailsLine =
-            'Qty: ${item.quantity}  @Rs.${item.price.toStringAsFixed(0)} = Rs.${(item.price * item.quantity).toStringAsFixed(0)}';
+            'Qty: ${item.quantity}  Rate: Rs.${item.price.toStringAsFixed(0)}  Total: Rs.${(item.price * item.quantity).toStringAsFixed(0)}';
         bytes += generator.text(
           detailsLine,
           styles: const PosStyles(
@@ -193,7 +193,7 @@ class ThermalPrintingService {
         // Print discount if any
         if (item.discountAmount > 0) {
           bytes += generator.text(
-            'Discount: -Rs.${item.discountAmount.toStringAsFixed(0)}',
+            'Discount: Rs.${item.discountAmount.toStringAsFixed(0)}',
             styles: const PosStyles(
               fontType: PosFontType.fontB,
               align: PosAlign.right,
@@ -230,7 +230,7 @@ class ThermalPrintingService {
         bytes += generator.row([
           PosColumn(text: 'Order Discount:', width: 6),
           PosColumn(
-            text: '-Rs.${order.discountAmount.toStringAsFixed(0)}',
+            text: 'Rs.${order.discountAmount.toStringAsFixed(0)}',
             width: 6,
             styles: const PosStyles(align: PosAlign.right),
           ),
@@ -239,9 +239,9 @@ class ThermalPrintingService {
 
       if (order.taxAmount > 0) {
         bytes += generator.row([
-          PosColumn(text: 'Tax (GST):', width: 6),
+          PosColumn(text: 'Tax GST:', width: 6),
           PosColumn(
-            text: '+Rs.${order.taxAmount.toStringAsFixed(0)}',
+            text: 'Rs.${order.taxAmount.toStringAsFixed(0)}',
             width: 6,
             styles: const PosStyles(align: PosAlign.right),
           ),
