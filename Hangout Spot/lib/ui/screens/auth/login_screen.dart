@@ -112,6 +112,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Logo
+              Image.asset('assets/logo.png', height: 120, width: 120),
+              const SizedBox(height: 24),
+
+              // App Title
               Text(
                 'Hangout Spot',
                 style: Theme.of(context).textTheme.displaySmall,

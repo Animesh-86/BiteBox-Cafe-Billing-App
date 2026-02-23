@@ -150,8 +150,11 @@ class ItemListTab extends ConsumerWidget {
 
                           if (currentIndex == -1) return;
 
+                          final velocity = details.primaryVelocity;
+                          if (velocity == null) return;
+
                           // Swipe Left -> Next Category
-                          if (details.primaryVelocity! < 0) {
+                          if (velocity < 0) {
                             if (currentIndex < allCats.length - 1) {
                               ref
                                   .read(adminSelectedCategoryProvider.notifier)
@@ -160,7 +163,7 @@ class ItemListTab extends ConsumerWidget {
                             }
                           }
                           // Swipe Right -> Previous Category
-                          else if (details.primaryVelocity! > 0) {
+                          else if (velocity > 0) {
                             if (currentIndex > 0) {
                               ref
                                   .read(adminSelectedCategoryProvider.notifier)

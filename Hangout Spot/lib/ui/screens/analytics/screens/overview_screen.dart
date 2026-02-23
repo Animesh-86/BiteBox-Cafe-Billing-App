@@ -4,6 +4,8 @@ import 'package:hangout_spot/ui/screens/analytics/theme/analytics_theme.dart';
 import 'package:hangout_spot/ui/screens/analytics/providers/analytics_data_provider.dart';
 import 'package:hangout_spot/ui/screens/analytics/utils/date_filter_utils.dart';
 import 'package:hangout_spot/ui/screens/analytics/services/analytics_export_service.dart';
+import 'package:hangout_spot/utils/ui/error_ui.dart';
+import 'package:hangout_spot/utils/exceptions/error_handler.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../widgets/analytics_header.dart';
@@ -224,21 +226,12 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Analytics exported successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        ErrorUI.showSuccess(context, 'Analytics exported successfully!');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Export failed: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        final appError = ErrorHandler.handleExportError(e);
+        ErrorUI.showSnackBar(context, appError);
       }
     }
   }

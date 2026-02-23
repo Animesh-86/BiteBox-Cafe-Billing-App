@@ -1,0 +1,176 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    
+    "analytics": {
+      "$userId": {
+        ".read": "auth != null && auth.uid == $userId",
+        ".write": "auth != null && auth.uid == $userId",
+        ".indexOn": ["sessionDate", "lastUpdated"],
+        
+        "daily": {
+          "$date": {
+            ".validate": "newData.hasChildren(['revenue', 'orderCount', 'lastUpdated'])",
+            "revenue": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "orderCount": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "itemCount": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "hours": {
+              "$hour": {
+                "revenue": {
+                  ".validate": "newData.isNumber() && newData.val() >= 0"
+                },
+                "count": {
+                  ".validate": "newData.isNumber() && newData.val() >= 0"
+                }
+              }
+            },
+            "payments": {
+              "$paymentMode": {
+                ".validate": "newData.isNumber() && newData.val() >= 0"
+              }
+            }
+          }
+        },
+        
+        "monthly": {
+          "$yearMonth": {
+            "revenue": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "orderCount": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            }
+          }
+        }
+      }
+    },
+    
+    "invoiceCounters": {
+      "$userId": {
+        ".read": "auth != null && auth.uid == $userId",
+        ".write": "auth != null && auth.uid == $userId",
+        ".indexOn": ["lastUpdated"],
+        
+        "sessions": {
+          "$sessionId": {
+            ".validate": "newData.hasChildren(['currentNumber', 'lastUpdated'])",
+            "currentNumber": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "startNumber": {
+              ".validate": "newData.isNumber()"
+            },
+            "createdAt": {
+              ".validate": "newData.isNumber()"
+            },
+            "lastUpdated": {
+              ".validate": "newData.isNumber()"
+            }
+          }
+        }
+      }
+    },
+    
+    "kds": {
+      "$userId": {
+        ".read": "auth != null && auth.uid == $userId",
+        ".write": "auth != null && auth.uid == $userId",
+        ".indexOn": ["status", "createdAt", "updatedAt"],
+        
+        "pending": {
+          "$orderId": {
+            ".validate": "newData.hasChildren(['orderId', 'invoiceNumber', 'status', 'createdAt'])",
+            "orderId": {
+              ".validate": "newData.isNumber()"
+            },
+            "invoiceNumber": {
+              ".validate": "newData.isString()"
+            },
+            "status": {
+              ".validate": "newData.isString() && (newData.val() == 'pending' || newData.val() == 'preparing' || newData.val() == 'ready' || newData.val() == 'completed')"
+            },
+            "totalAmount": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "itemCount": {
+              ".validate": "newData.isNumber() && newData.val() > 0"
+            },
+            "createdAt": {
+              ".validate": "newData.isNumber()"
+            },
+            "updatedAt": {
+              ".validate": "newData.isNumber()"
+            }
+          }
+        },
+        
+        "completed": {
+          "$orderId": {
+            ".validate": "newData.hasChildren(['orderId', 'invoiceNumber', 'completedAt'])"
+          }
+        },
+        
+        "history": {
+          "$date": {
+            "$orderId": {
+              ".validate": "newData.exists()"
+            }
+          }
+        }
+      }
+    },
+    
+    "active_carts": {
+      "$userId": {
+        ".read": "auth != null && auth.uid == $userId",
+        ".write": "auth != null && auth.uid == $userId",
+        ".indexOn": ["status", "createdAt", "updatedAt"],
+        
+        "$cartId": {
+          ".validate": "newData.hasChildren(['cartId', 'createdAt', 'status'])",
+          "cartId": {
+            ".validate": "newData.isString()"
+          },
+          "status": {
+            ".validate": "newData.isString() && (newData.val() == 'active' || newData.val() == 'completed' || newData.val() == 'abandoned')"
+          },
+          "totalAmount": {
+            ".validate": "newData.isNumber() && newData.val() >= 0"
+          },
+          "itemCount": {
+            ".validate": "newData.isNumber() && newData.val() >= 0"
+          },
+          "createdAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "updatedAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "items": {
+            "$itemId": {
+              "itemName": {
+                ".validate": "newData.isString()"
+              },
+              "quantity": {
+                ".validate": "newData.isNumber() && newData.val() > 0"
+              },
+              "price": {
+                ".validate": "newData.isNumber() && newData.val() >= 0"
+              },
+              "total": {
+                ".validate": "newData.isNumber() && newData.val() >= 0"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

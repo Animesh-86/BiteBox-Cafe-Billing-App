@@ -9,9 +9,6 @@ import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/settings_shared.dart';
 
-// The manager password for outlet operations
-const String _kOutletPassword = 'admin123';
-
 class LocationsSettingsScreen extends ConsumerStatefulWidget {
   const LocationsSettingsScreen({super.key});
 
@@ -45,98 +42,7 @@ class _LocationsSettingsScreenState
     }
   }
 
-  /// Shows a password dialog. Returns true if the correct password was entered.
-  Future<bool> _verifyPassword(String action) async {
-    final passwordController = TextEditingController();
-    bool obscure = true;
-
-    final result = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          backgroundColor: Theme.of(context).colorScheme.surface,
-          title: Row(
-            children: [
-              Icon(
-                Icons.lock_outline,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(width: 8),
-              const Text('Manager Password'),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Enter password to $action',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withOpacity(0.7),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: passwordController,
-                obscureText: obscure,
-                autofocus: true,
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  border: const OutlineInputBorder(),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      obscure ? Icons.visibility_off : Icons.visibility,
-                    ),
-                    onPressed: () => setDialogState(() => obscure = !obscure),
-                  ),
-                ),
-                onSubmitted: (_) {
-                  Navigator.pop(
-                    ctx,
-                    passwordController.text == _kOutletPassword,
-                  );
-                },
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(ctx, passwordController.text == _kOutletPassword);
-              },
-              child: const Text('Confirm'),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    if (result == false && mounted) {
-      if (passwordController.text.isNotEmpty &&
-          passwordController.text != _kOutletPassword) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Incorrect password'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-
-    return result ?? false;
-  }
-
   void _showAddLocationDialog() async {
-    final ok = await _verifyPassword('add a new outlet');
-    if (!ok) return;
-
     final nameController = TextEditingController();
     final addressController = TextEditingController();
     final phoneController = TextEditingController();
@@ -220,9 +126,6 @@ class _LocationsSettingsScreenState
   }
 
   void _showEditLocationDialog(Location location) async {
-    final ok = await _verifyPassword('edit this outlet');
-    if (!ok) return;
-
     final nameController = TextEditingController(text: location.name);
     final addressController = TextEditingController(text: location.address);
     final phoneController = TextEditingController(text: location.phoneNumber);
@@ -293,9 +196,6 @@ class _LocationsSettingsScreenState
   }
 
   Future<void> _activateOutlet(Location loc) async {
-    final ok = await _verifyPassword('switch to ${loc.name}');
-    if (!ok) return;
-
     final db = ref.read(appDatabaseProvider);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('last_active_outlet_id', loc.id);
@@ -316,9 +216,6 @@ class _LocationsSettingsScreenState
   }
 
   Future<void> _deactivateOutlet(Location loc) async {
-    final ok = await _verifyPassword('deactivate ${loc.name}');
-    if (!ok) return;
-
     final db = ref.read(appDatabaseProvider);
     await (db.update(db.locations)..where((t) => t.id.equals(loc.id))).write(
       const LocationsCompanion(isActive: Value(false)),

@@ -7,6 +7,7 @@ import 'package:hangout_spot/data/repositories/analytics_repository.dart';
 import 'package:hangout_spot/logic/billing/session_provider.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/data/repositories/auth_repository.dart';
+import 'package:hangout_spot/data/providers/realtime_services_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:hangout_spot/logic/locations/location_provider.dart';
 import 'package:hangout_spot/data/repositories/customer_repository.dart';
@@ -458,70 +459,208 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       final cardWidth = isWide
                           ? (constraints.maxWidth - 48) / 4
                           : (constraints.maxWidth - 16) / 2;
+
+                      // Check if we're viewing current session (enables live mode)
+                      final isCurrentSession = _selectedDate == null;
+
                       return Wrap(
                         spacing: 16,
                         runSpacing: 16,
                         children: [
+                          // Total Sales Card (Live or Historical)
                           SizedBox(
                             width: cardWidth,
-                            child: FutureBuilder<double>(
-                              future: analytics.getSessionSales(
-                                startOfDay,
-                                endOfDay,
-                                locationId: currentLocationId,
-                              ),
-                              builder: (context, snapshot) => _StatCard(
-                                title: "Total Sales",
-                                value: snapshot.hasData
-                                    ? snapshot.data!.toStringAsFixed(0)
-                                    : "...",
-                                icon: Icons.currency_rupee,
-                                prefix: "₹",
-                                iconColor: theme.brightness == Brightness.dark
-                                    ? theme.colorScheme.secondary
-                                    : const Color(0xFFEDAD4C),
-                              ),
-                            ),
+                            child: isCurrentSession
+                                ? Consumer(
+                                    builder: (context, ref, child) {
+                                      final revenueAsync = ref.watch(
+                                        liveRevenueProvider,
+                                      );
+                                      return revenueAsync.when(
+                                        data: (revenue) => _StatCard(
+                                          title: "Total Sales",
+                                          value: revenue.toStringAsFixed(0),
+                                          icon: Icons.currency_rupee,
+                                          prefix: "₹",
+                                          iconColor:
+                                              theme.brightness ==
+                                                  Brightness.dark
+                                              ? theme.colorScheme.secondary
+                                              : const Color(0xFFEDAD4C),
+                                          isLive: true,
+                                        ),
+                                        loading: () => _StatCard(
+                                          title: "Total Sales",
+                                          value: "...",
+                                          icon: Icons.currency_rupee,
+                                          prefix: "₹",
+                                          iconColor:
+                                              theme.brightness ==
+                                                  Brightness.dark
+                                              ? theme.colorScheme.secondary
+                                              : const Color(0xFFEDAD4C),
+                                        ),
+                                        error: (_, __) => _StatCard(
+                                          title: "Total Sales",
+                                          value: "0",
+                                          icon: Icons.currency_rupee,
+                                          prefix: "₹",
+                                          iconColor:
+                                              theme.brightness ==
+                                                  Brightness.dark
+                                              ? theme.colorScheme.secondary
+                                              : const Color(0xFFEDAD4C),
+                                        ),
+                                      );
+                                    },
+                                  )
+                                : FutureBuilder<double>(
+                                    future: analytics.getSessionSales(
+                                      startOfDay,
+                                      endOfDay,
+                                      locationId: currentLocationId,
+                                    ),
+                                    builder: (context, snapshot) => _StatCard(
+                                      title: "Total Sales",
+                                      value: snapshot.hasData
+                                          ? snapshot.data!.toStringAsFixed(0)
+                                          : "...",
+                                      icon: Icons.currency_rupee,
+                                      prefix: "₹",
+                                      iconColor:
+                                          theme.brightness == Brightness.dark
+                                          ? theme.colorScheme.secondary
+                                          : const Color(0xFFEDAD4C),
+                                    ),
+                                  ),
                           ),
+
+                          // Orders Card (Live or Historical)
                           SizedBox(
                             width: cardWidth,
-                            child: FutureBuilder<int>(
-                              future: analytics.getSessionOrdersCount(
-                                startOfDay,
-                                endOfDay,
-                                locationId: currentLocationId,
-                              ),
-                              builder: (context, snapshot) => _StatCard(
-                                title: "Orders",
-                                value: snapshot.hasData
-                                    ? "${snapshot.data}"
-                                    : "...",
-                                icon: Icons.receipt_long,
-                                iconColor: theme.brightness == Brightness.dark
-                                    ? theme.colorScheme.primary
-                                    : const Color(0xFF95674D),
-                              ),
-                            ),
+                            child: isCurrentSession
+                                ? Consumer(
+                                    builder: (context, ref, child) {
+                                      final orderCountAsync = ref.watch(
+                                        liveOrderCountProvider,
+                                      );
+                                      return orderCountAsync.when(
+                                        data: (count) => _StatCard(
+                                          title: "Orders",
+                                          value: "$count",
+                                          icon: Icons.receipt_long,
+                                          iconColor:
+                                              theme.brightness ==
+                                                  Brightness.dark
+                                              ? theme.colorScheme.primary
+                                              : const Color(0xFF95674D),
+                                          isLive: true,
+                                        ),
+                                        loading: () => _StatCard(
+                                          title: "Orders",
+                                          value: "...",
+                                          icon: Icons.receipt_long,
+                                          iconColor:
+                                              theme.brightness ==
+                                                  Brightness.dark
+                                              ? theme.colorScheme.primary
+                                              : const Color(0xFF95674D),
+                                        ),
+                                        error: (_, __) => _StatCard(
+                                          title: "Orders",
+                                          value: "0",
+                                          icon: Icons.receipt_long,
+                                          iconColor:
+                                              theme.brightness ==
+                                                  Brightness.dark
+                                              ? theme.colorScheme.primary
+                                              : const Color(0xFF95674D),
+                                        ),
+                                      );
+                                    },
+                                  )
+                                : FutureBuilder<int>(
+                                    future: analytics.getSessionOrdersCount(
+                                      startOfDay,
+                                      endOfDay,
+                                      locationId: currentLocationId,
+                                    ),
+                                    builder: (context, snapshot) => _StatCard(
+                                      title: "Orders",
+                                      value: snapshot.hasData
+                                          ? "${snapshot.data}"
+                                          : "...",
+                                      icon: Icons.receipt_long,
+                                      iconColor:
+                                          theme.brightness == Brightness.dark
+                                          ? theme.colorScheme.primary
+                                          : const Color(0xFF95674D),
+                                    ),
+                                  ),
                           ),
+
+                          // Items Sold Card (Live or Historical)
                           SizedBox(
                             width: cardWidth,
-                            child: FutureBuilder<int>(
-                              future: analytics.getSessionItemsSold(
-                                startOfDay,
-                                endOfDay,
-                                locationId: currentLocationId,
-                              ),
-                              builder: (context, snapshot) => _StatCard(
-                                title: "Items Sold",
-                                value: snapshot.hasData
-                                    ? "${snapshot.data}"
-                                    : "...",
-                                icon: Icons.inventory_2,
-                                iconColor: theme.brightness == Brightness.dark
-                                    ? theme.colorScheme.onSurface
-                                    : const Color(0xFF98664D),
-                              ),
-                            ),
+                            child: isCurrentSession
+                                ? Consumer(
+                                    builder: (context, ref, child) {
+                                      final itemCountAsync = ref.watch(
+                                        liveItemCountProvider,
+                                      );
+                                      return itemCountAsync.when(
+                                        data: (count) => _StatCard(
+                                          title: "Items Sold",
+                                          value: "$count",
+                                          icon: Icons.inventory_2,
+                                          iconColor:
+                                              theme.brightness ==
+                                                  Brightness.dark
+                                              ? theme.colorScheme.onSurface
+                                              : const Color(0xFF98664D),
+                                          isLive: true,
+                                        ),
+                                        loading: () => _StatCard(
+                                          title: "Items Sold",
+                                          value: "...",
+                                          icon: Icons.inventory_2,
+                                          iconColor:
+                                              theme.brightness ==
+                                                  Brightness.dark
+                                              ? theme.colorScheme.onSurface
+                                              : const Color(0xFF98664D),
+                                        ),
+                                        error: (_, __) => _StatCard(
+                                          title: "Items Sold",
+                                          value: "0",
+                                          icon: Icons.inventory_2,
+                                          iconColor:
+                                              theme.brightness ==
+                                                  Brightness.dark
+                                              ? theme.colorScheme.onSurface
+                                              : const Color(0xFF98664D),
+                                        ),
+                                      );
+                                    },
+                                  )
+                                : FutureBuilder<int>(
+                                    future: analytics.getSessionItemsSold(
+                                      startOfDay,
+                                      endOfDay,
+                                      locationId: currentLocationId,
+                                    ),
+                                    builder: (context, snapshot) => _StatCard(
+                                      title: "Items Sold",
+                                      value: snapshot.hasData
+                                          ? "${snapshot.data}"
+                                          : "...",
+                                      icon: Icons.inventory_2,
+                                      iconColor:
+                                          theme.brightness == Brightness.dark
+                                          ? theme.colorScheme.onSurface
+                                          : const Color(0xFF98664D),
+                                    ),
+                                  ),
                           ),
                           SizedBox(
                             width: cardWidth,
@@ -760,6 +899,7 @@ class _StatCard extends StatelessWidget {
   final IconData icon;
   final Color iconColor; // Single color, no gradient
   final String prefix;
+  final bool isLive;
 
   const _StatCard({
     required this.title,
@@ -767,6 +907,7 @@ class _StatCard extends StatelessWidget {
     required this.icon,
     required this.iconColor,
     this.prefix = "",
+    this.isLive = false,
   });
 
   @override
@@ -805,6 +946,44 @@ class _StatCard extends StatelessWidget {
                 ),
                 child: Icon(icon, color: iconColor, size: 24),
               ),
+              if (isLive)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.red.withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'LIVE',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 20),

@@ -165,7 +165,7 @@ class ThermalPrintingService {
 
       // Items Header
       bytes += generator.row([
-        PosColumn(text: 'ITEM', width: 6, styles: const PosStyles(bold: true)),
+        PosColumn(text: 'ITEM', width: 5, styles: const PosStyles(bold: true)),
         PosColumn(
           text: 'QTY',
           width: 2,
@@ -178,31 +178,33 @@ class ThermalPrintingService {
         ),
         PosColumn(
           text: 'TOTAL',
-          width: 2,
+          width: 3,
           styles: const PosStyles(bold: true, align: PosAlign.right),
         ),
       ]);
       bytes += generator.hr();
 
-      // Items - row-based values to avoid clipped rate/total lines
+      // Items - print with wrapping support
       for (var item in items) {
         final itemTotal = (item.price * item.quantity) - item.discountAmount;
 
+        // Print item name with wrapping (allows long names to wrap properly)
+        bytes += generator.text(
+          item.itemName,
+          styles: const PosStyles(bold: true),
+        );
+
+        // Print qty, rate, total in a row
         bytes += generator.row([
-          PosColumn(text: item.itemName, width: 6),
+          PosColumn(text: 'Qty: ${item.quantity}', width: 4),
           PosColumn(
-            text: item.quantity.toString(),
-            width: 2,
+            text: '₹${item.price.toStringAsFixed(0)}',
+            width: 4,
             styles: const PosStyles(align: PosAlign.right),
           ),
           PosColumn(
-            text: item.price.toStringAsFixed(0),
-            width: 2,
-            styles: const PosStyles(align: PosAlign.right),
-          ),
-          PosColumn(
-            text: itemTotal.toStringAsFixed(0),
-            width: 2,
+            text: '₹${itemTotal.toStringAsFixed(0)}',
+            width: 4,
             styles: const PosStyles(align: PosAlign.right),
           ),
         ]);
@@ -213,18 +215,12 @@ class ThermalPrintingService {
           final discountPercent = item.price > 0
               ? (item.discountAmount / item.price * 100)
               : 0.0;
-          bytes += generator.row([
-            PosColumn(
-              text: '  Discount (${discountPercent.toStringAsFixed(0)}%)',
-              width: 8,
-            ),
-            PosColumn(
-              text: '-${item.discountAmount.toStringAsFixed(0)}',
-              width: 4,
-              styles: const PosStyles(align: PosAlign.right),
-            ),
-          ]);
+          bytes += generator.text(
+            '  Discount (${discountPercent.toStringAsFixed(0)}%): -₹${item.discountAmount.toStringAsFixed(0)}',
+            styles: const PosStyles(align: PosAlign.left),
+          );
         }
+        bytes += generator.feed(1);
       }
 
       bytes += generator.hr();

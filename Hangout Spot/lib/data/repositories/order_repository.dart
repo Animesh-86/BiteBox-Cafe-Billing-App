@@ -8,13 +8,22 @@ import 'package:hangout_spot/logic/billing/cart_provider.dart';
 import 'package:hangout_spot/logic/billing/session_provider.dart';
 import 'package:hangout_spot/logic/rewards/reward_provider.dart';
 import 'package:hangout_spot/services/logging_service.dart';
+import 'package:hangout_spot/services/live_analytics_service.dart';
+import 'package:hangout_spot/services/live_invoice_counter_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' hide Order;
 import 'package:firebase_auth/firebase_auth.dart';
 
 class OrderRepository {
   final AppDatabase _db;
+  final LiveAnalyticsService? _liveAnalytics;
+  final LiveInvoiceCounterService? _liveInvoiceCounter;
 
-  OrderRepository(this._db);
+  OrderRepository(
+    this._db, {
+    LiveAnalyticsService? liveAnalytics,
+    LiveInvoiceCounterService? liveInvoiceCounter,
+  }) : _liveAnalytics = liveAnalytics,
+       _liveInvoiceCounter = liveInvoiceCounter;
 
   // Stream of Held/Pending Orders
   Stream<List<Order>> watchPendingOrders({String? locationId}) {
@@ -88,12 +97,35 @@ class OrderRepository {
       invoiceNum = existingOrder?.invoiceNumber;
     }
 
-    // Generate session-based invoice number ONLY IF it doesn't already exist
+    // Generate invoice number based on status
     if (invoiceNum == null) {
-      if (sessionManager != null) {
+      if (status == 'pending') {
+        // For HOLD orders, use temporary invoice number
+        invoiceNum =
+            _liveInvoiceCounter?.generateHoldInvoiceNumber() ??
+            'HOLD-${DateTime.now().millisecondsSinceEpoch}';
+      } else {
+        // For COMPLETED orders, use real sequential invoice number
+        if (sessionManager != null) {
+          invoiceNum = await sessionManager.getNextInvoiceNumber();
+        } else {
+          // Fallback to timestamp-based if no session manager
+          invoiceNum =
+              "INV-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}";
+        }
+      }
+    } else if (status == 'completed' && invoiceNum.startsWith('HOLD-')) {
+      // Converting a HOLD order to COMPLETED - generate real invoice number
+      if (_liveInvoiceCounter != null && sessionManager != null) {
+        final sessionId = sessionManager.getCurrentSessionId();
+        invoiceNum = await _liveInvoiceCounter.convertHoldToRealInvoice(
+          sessionId: sessionId,
+          prefix: '#',
+          oldHoldNumber: invoiceNum,
+        );
+      } else if (sessionManager != null) {
         invoiceNum = await sessionManager.getNextInvoiceNumber();
       } else {
-        // Fallback to timestamp-based if no session manager
         invoiceNum =
             "INV-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}";
       }
@@ -168,7 +200,41 @@ class OrderRepository {
       status,
     ).ignore();
 
+    // Record to live analytics and kitchen display (only for completed orders)
+    if (status == 'completed') {
+      _recordToLiveServices(orderId, invoiceNum).ignore();
+    }
+
     return orderId;
+  }
+
+  /// Record order to Live Analytics and Kitchen Display System
+  Future<void> _recordToLiveServices(String orderId, String invoiceNum) async {
+    try {
+      // Get order with items from database
+      final order = await (_db.select(
+        _db.orders,
+      )..where((t) => t.id.equals(orderId))).getSingleOrNull();
+
+      if (order == null) return;
+
+      // Get order items to count total quantity
+      final items = await (_db.select(
+        _db.orderItems,
+      )..where((t) => t.orderId.equals(orderId))).get();
+
+      final totalItems = items.fold<int>(0, (sum, item) => sum + item.quantity);
+
+      // Record to Live Analytics with item count
+      if (_liveAnalytics != null) {
+        await _liveAnalytics.recordSale(order, itemCount: totalItems);
+        debugPrint(
+          '✅ Recorded to Live Analytics: $invoiceNum (Items: $totalItems)',
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ Failed to record to live services: $e');
+    }
   }
 
   Future<void> _tryImmediatePush(
@@ -464,5 +530,14 @@ class OrderRepository {
 
 final orderRepositoryProvider = Provider<OrderRepository>((ref) {
   final db = ref.watch(appDatabaseProvider);
-  return OrderRepository(db);
+
+  // Initialize Firebase Realtime Database services
+  final liveAnalytics = LiveAnalyticsService();
+  final liveInvoiceCounter = LiveInvoiceCounterService();
+
+  return OrderRepository(
+    db,
+    liveAnalytics: liveAnalytics,
+    liveInvoiceCounter: liveInvoiceCounter,
+  );
 });

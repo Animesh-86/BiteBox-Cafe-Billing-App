@@ -111,11 +111,22 @@ class PdfService {
 
   pw.Widget _buildBillItem(OrderItem item) {
     return pw.Padding(
-      padding: const pw.EdgeInsets.symmetric(vertical: 2),
-      child: pw.Row(
+      padding: const pw.EdgeInsets.symmetric(vertical: 4),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Expanded(child: pw.Text("${item.quantity} x ${item.itemName}")),
-          pw.Text(item.price.toStringAsFixed(2)),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Expanded(
+                child: pw.Text(
+                  '${item.quantity} x ${item.itemName}',
+                  maxLines: 3,
+                ),
+              ),
+              pw.Text(item.price.toStringAsFixed(2)),
+            ],
+          ),
         ],
       ),
     );
@@ -128,13 +139,21 @@ class PdfService {
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
           pw.Text(
-            "${item.quantity} x ${item.itemName}",
+            '${item.quantity} x ${item.itemName}',
+            maxLines: 3,
             style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12),
           ),
           if (item.note != null && item.note!.isNotEmpty)
-            pw.Text(
-              "Note: ${item.note}",
-              style: pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic),
+            pw.Padding(
+              padding: const pw.EdgeInsets.only(top: 4),
+              child: pw.Text(
+                'Note: ${item.note}',
+                maxLines: 2,
+                style: pw.TextStyle(
+                  fontSize: 10,
+                  fontStyle: pw.FontStyle.italic,
+                ),
+              ),
             ),
         ],
       ),
