@@ -682,6 +682,19 @@ class _ActiveSessionsScreenState extends ConsumerState<ActiveSessionsScreen> {
 
     if (result != true || !context.mounted) return;
 
+    final password = passwordController.text.trim();
+    if (password.isEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Password cannot be empty.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
     // Show loading
     showDialog(
       context: context,
@@ -697,7 +710,7 @@ class _ActiveSessionsScreenState extends ConsumerState<ActiveSessionsScreen> {
     );
 
     try {
-      final success = await sessionManager.claimTrust(passwordController.text);
+      final success = await sessionManager.claimTrust(password);
 
       if (context.mounted) {
         Navigator.pop(context); // Hide loading

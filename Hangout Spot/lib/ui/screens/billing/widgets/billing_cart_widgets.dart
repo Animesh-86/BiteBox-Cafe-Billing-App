@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:drift/drift.dart' as drift;
+import 'package:uuid/uuid.dart';
+import 'package:hangout_spot/data/local/db/app_database.dart';
+import 'package:hangout_spot/data/repositories/customer_repository.dart';
 import 'package:hangout_spot/logic/billing/cart_provider.dart';
 import 'package:hangout_spot/logic/rewards/reward_provider.dart';
 import 'package:hangout_spot/ui/screens/billing/widgets/billing_actions.dart';
@@ -116,6 +120,365 @@ class CartItemTile extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class CartCustomerSection extends ConsumerStatefulWidget {
+  final bool compact;
+  const CartCustomerSection({super.key, this.compact = false});
+
+  @override
+  ConsumerState<CartCustomerSection> createState() => _CartCustomerSectionState();
+}
+
+class _CartCustomerSectionState extends ConsumerState<CartCustomerSection> {
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _nameFocus = FocusNode();
+  final _phoneFocus = FocusNode();
+
+  String _query = '';
+  bool _showSuggestions = false;
+
+  bool get _isEditing => _nameFocus.hasFocus || _phoneFocus.hasFocus;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameFocus.addListener(_handleFocusChange);
+    _phoneFocus.addListener(_handleFocusChange);
+
+    final cart = ref.read(cartProvider);
+    _nameController.text = cart.customer?.name ?? '';
+    _phoneController.text = cart.customer?.phone ?? '';
+
+    ref.listen<CartState>(cartProvider, (prev, next) {
+      if (_isEditing) return;
+      final customer = next.customer;
+      _nameController.text = customer?.name ?? '';
+      _phoneController.text = customer?.phone ?? '';
+    });
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
+    _nameFocus.dispose();
+    _phoneFocus.dispose();
+    super.dispose();
+  }
+
+  void _handleFocusChange() {
+    if (!_isEditing && mounted) {
+      setState(() => _showSuggestions = false);
+    }
+  }
+
+  Future<void> _saveOrSelectCustomer() async {
+    final name = _nameController.text.trim();
+    final phone = _phoneController.text.trim();
+    final notifier = ref.read(cartProvider.notifier);
+
+    if (name.isEmpty && phone.isEmpty) {
+      notifier.clearCustomerSelection();
+      if (mounted) setState(() => _showSuggestions = false);
+      return;
+    }
+
+    final repo = ref.read(customerRepositoryProvider);
+    Customer? existing;
+
+    if (phone.isNotEmpty) {
+      existing = await repo.getCustomerByPhone(phone);
+    }
+    existing ??= name.isNotEmpty ? await repo.getCustomerByName(name) : null;
+
+    if (existing != null) {
+      var updated = existing;
+      if (name.isNotEmpty && existing.name != name) {
+        updated = existing.copyWith(name: name);
+        await repo.updateCustomer(updated);
+      }
+      if (phone.isNotEmpty && existing.phone != phone) {
+        updated = updated.copyWith(phone: drift.Value(phone));
+        await repo.updateCustomer(updated);
+      }
+      notifier.setCustomer(updated);
+    } else {
+      final displayName = name.isNotEmpty ? name : phone;
+      try {
+        await repo.addCustomer(
+          CustomersCompanion(
+            id: drift.Value(const Uuid().v4()),
+            name: drift.Value(displayName),
+            phone: drift.Value(phone.isEmpty ? null : phone),
+            discountPercent: const drift.Value(0.0),
+          ),
+        );
+      } catch (_) {
+        // Ignore duplicate insert errors and attempt to fetch the existing one.
+      }
+
+      final created = phone.isNotEmpty
+          ? await repo.getCustomerByPhone(phone)
+          : await repo.getCustomerByName(displayName);
+      if (created != null) {
+        notifier.setCustomer(created);
+      }
+    }
+
+    if (mounted) setState(() => _showSuggestions = false);
+  }
+
+  void _selectCustomer(Customer customer) {
+    _nameController.text = customer.name;
+    _phoneController.text = customer.phone ?? '';
+    ref.read(cartProvider.notifier).setCustomer(customer);
+    setState(() => _showSuggestions = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cart = ref.watch(cartProvider);
+    final repo = ref.read(customerRepositoryProvider);
+    final query = _query.trim();
+
+    final suggestionsStream = query.isEmpty
+        ? Stream.value(<Customer>[])
+        : repo.watchCustomers(query);
+
+    final fieldSpacing = widget.compact ? 8.0 : 12.0;
+
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: billingSurfaceVariant(context, darkOpacity: 0.14),
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: billingShadow(context),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.person_outline, size: 18, color: billingMutedText(context)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Customer',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: billingMutedText(context),
+                  ),
+                ),
+              ),
+              if (cart.customer != null)
+                TextButton(
+                  onPressed: () {
+                    ref.read(cartProvider.notifier).clearCustomerSelection();
+                    _nameController.clear();
+                    _phoneController.clear();
+                    setState(() => _showSuggestions = false);
+                  },
+                  child: const Text('Clear'),
+                ),
+              TextButton.icon(
+                onPressed: () => showCustomerSelect(context, ref),
+                icon: const Icon(Icons.search, size: 16),
+                label: const Text('Browse'),
+                style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (widget.compact)
+            Column(
+              children: [
+                TextField(
+                  controller: _nameController,
+                  focusNode: _nameFocus,
+                  decoration: const InputDecoration(
+                    labelText: 'Name',
+                    border: OutlineInputBorder(),
+                  ),
+                  textInputAction: TextInputAction.next,
+                  onChanged: (value) {
+                    setState(() {
+                      _query = value;
+                      _showSuggestions = value.trim().isNotEmpty;
+                    });
+                  },
+                ),
+                SizedBox(height: fieldSpacing),
+                TextField(
+                  controller: _phoneController,
+                  focusNode: _phoneFocus,
+                  decoration: const InputDecoration(
+                    labelText: 'Phone',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.phone,
+                  textInputAction: TextInputAction.done,
+                  onChanged: (value) {
+                    setState(() {
+                      _query = value;
+                      _showSuggestions = value.trim().isNotEmpty;
+                    });
+                  },
+                  onSubmitted: (_) => _saveOrSelectCustomer(),
+                ),
+              ],
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _nameController,
+                    focusNode: _nameFocus,
+                    decoration: const InputDecoration(
+                      labelText: 'Name',
+                      border: OutlineInputBorder(),
+                    ),
+                    textInputAction: TextInputAction.next,
+                    onChanged: (value) {
+                      setState(() {
+                        _query = value;
+                        _showSuggestions = value.trim().isNotEmpty;
+                      });
+                    },
+                  ),
+                ),
+                SizedBox(width: fieldSpacing),
+                Expanded(
+                  child: TextField(
+                    controller: _phoneController,
+                    focusNode: _phoneFocus,
+                    decoration: const InputDecoration(
+                      labelText: 'Phone',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.phone,
+                    textInputAction: TextInputAction.done,
+                    onChanged: (value) {
+                      setState(() {
+                        _query = value;
+                        _showSuggestions = value.trim().isNotEmpty;
+                      });
+                    },
+                    onSubmitted: (_) => _saveOrSelectCustomer(),
+                  ),
+                ),
+              ],
+            ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              FilledButton.icon(
+                onPressed: _saveOrSelectCustomer,
+                icon: const Icon(Icons.check, size: 16),
+                label: const Text('Use Customer'),
+                style: FilledButton.styleFrom(visualDensity: VisualDensity.compact),
+              ),
+              const SizedBox(width: 8),
+              if (cart.customer != null)
+                Text(
+                  '${cart.customer!.name} (${cart.customer!.totalVisits} visits)',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: billingMutedText(context),
+                  ),
+                ),
+            ],
+          ),
+          if (cart.customer != null) ...[
+            const SizedBox(height: 8),
+            FutureBuilder<bool>(
+              future: ref.watch(isRewardSystemEnabledProvider.future),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData || !snapshot.data!) {
+                  return const SizedBox.shrink();
+                }
+                return Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: ref
+                        .watch(
+                          customerRewardBalanceProvider(cart.customer!.id),
+                        )
+                        .when(
+                          data: (balance) => Text(
+                            '${balance.toInt()} pts',
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: Colors.orange,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          loading: () => Text(
+                            '... pts',
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: Colors.orange,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          error: (_, __) => Text(
+                            '0 pts',
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: Colors.orange,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                  ),
+                );
+              },
+            ),
+          ],
+          StreamBuilder<List<Customer>>(
+            stream: suggestionsStream,
+            builder: (context, snapshot) {
+              final customers = snapshot.data ?? [];
+              if (!_showSuggestions || customers.isEmpty) {
+                return const SizedBox.shrink();
+              }
+
+              final limited = customers.take(6).toList();
+              return Container(
+                margin: const EdgeInsets.only(top: 8),
+                decoration: BoxDecoration(
+                  color: billingSurface(context, darkOpacity: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: billingOutline(context)),
+                ),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemBuilder: (context, index) {
+                    final customer = limited[index];
+                    return ListTile(
+                      dense: true,
+                      title: Text(customer.name),
+                      subtitle: Text(customer.phone ?? 'No phone'),
+                      trailing: Text('${customer.totalVisits} visits'),
+                      onTap: () => _selectCustomer(customer),
+                    );
+                  },
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemCount: limited.length,
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }

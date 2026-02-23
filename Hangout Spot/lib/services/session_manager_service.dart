@@ -385,6 +385,9 @@ class SessionManagerService {
     final user = _auth.currentUser;
     if (user == null || _currentSessionId == null) return false;
 
+    final trimmedPassword = password.trim();
+    if (trimmedPassword.isEmpty) return false;
+
     try {
       // Check claim attempts
       final session = await _firestore
@@ -410,7 +413,7 @@ class SessionManagerService {
       // Re-authenticate with password
       final credential = EmailAuthProvider.credential(
         email: user.email!,
-        password: password,
+        password: trimmedPassword,
       );
 
       await user.reauthenticateWithCredential(credential);

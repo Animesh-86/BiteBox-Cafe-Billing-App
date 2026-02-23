@@ -28,6 +28,22 @@ class CustomerRepository {
     )..where((t) => t.id.equals(id))).getSingleOrNull();
   }
 
+  Future<Customer?> getCustomerByPhone(String phone) {
+    final trimmed = phone.trim();
+    if (trimmed.isEmpty) return Future.value(null);
+    return (_db.select(
+      _db.customers,
+    )..where((t) => t.phone.equals(trimmed))).getSingleOrNull();
+  }
+
+  Future<Customer?> getCustomerByName(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return Future.value(null);
+    return (_db.select(
+      _db.customers,
+    )..where((t) => t.name.equals(trimmed))).getSingleOrNull();
+  }
+
   Future<void> addCustomer(CustomersCompanion customer) async {
     // Check for duplicate phone number before inserting
     if (customer.phone.present && customer.phone.value != null) {

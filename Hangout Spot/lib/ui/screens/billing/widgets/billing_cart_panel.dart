@@ -182,6 +182,12 @@ class _CartPanelState extends ConsumerState<CartPanel> {
           ),
         ),
 
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+          child: CartCustomerSection(compact: false),
+        ),
+        const SizedBox(height: 12),
+
         // Cart Items
         Expanded(
           child: cart.items.isEmpty
