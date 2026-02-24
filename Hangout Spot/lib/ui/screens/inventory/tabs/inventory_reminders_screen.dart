@@ -11,6 +11,9 @@ import 'package:uuid/uuid.dart';
 class InventoryRemindersScreen extends ConsumerWidget {
   const InventoryRemindersScreen({super.key});
 
+  static final Map<String, String> _scheduledTimes = {};
+  static bool _permissionsRequested = false;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final remindersAsync = ref.watch(inventoryRemindersStreamProvider);
@@ -18,6 +21,7 @@ class InventoryRemindersScreen extends ConsumerWidget {
 
     return remindersAsync.when(
       data: (reminders) {
+        _scheduleEnabledTimeReminders(reminders);
         return itemsAsync.when(
           data: (items) {
             return _buildList(context, ref, reminders, items);
@@ -59,10 +63,21 @@ class InventoryRemindersScreen extends ConsumerWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text('Reminders', style: Theme.of(context).textTheme.titleMedium),
-            FilledButton.icon(
-              onPressed: () => _openReminderDialog(context, ref, items, null),
-              icon: const Icon(Icons.add),
-              label: const Text('Add'),
+            Row(
+              children: [
+                TextButton.icon(
+                  onPressed: () => _sendTestNotification(context),
+                  icon: const Icon(Icons.notifications_active_outlined),
+                  label: const Text('Test'),
+                ),
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  onPressed: () =>
+                      _openReminderDialog(context, ref, items, null),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add'),
+                ),
+              ],
             ),
           ],
         ),
@@ -277,6 +292,7 @@ class InventoryRemindersScreen extends ConsumerWidget {
     }
 
     if (reminder.type == 'time' || reminder.type == 'daily_update') {
+      await _ensurePermissions();
       final time = _parseTime(reminder.time);
       await NotificationService.instance.scheduleDaily(
         id: _hashId(reminder.id),
@@ -307,6 +323,7 @@ class InventoryRemindersScreen extends ConsumerWidget {
 
     final repo = ref.read(inventoryRepositoryProvider);
     await repo.upsertReminder(reminder);
+    await _ensurePermissions();
     await NotificationService.instance.scheduleDaily(
       id: _hashId(reminder.id),
       title: reminder.title,
@@ -318,6 +335,47 @@ class InventoryRemindersScreen extends ConsumerWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Daily update reminder enabled.')),
       );
+    }
+  }
+
+  Future<void> _scheduleEnabledTimeReminders(
+    List<InventoryReminder> reminders,
+  ) async {
+    final timeReminders = reminders.where(
+      (r) => r.isEnabled && (r.type == 'time' || r.type == 'daily_update'),
+    );
+
+    await _ensurePermissions();
+
+    for (final reminder in timeReminders) {
+      final key = '${reminder.id}_${reminder.time}';
+      if (_scheduledTimes[reminder.id] == key) continue;
+
+      final time = _parseTime(reminder.time);
+      await NotificationService.instance.scheduleDaily(
+        id: _hashId(reminder.id),
+        title: reminder.title,
+        body: reminder.type == 'daily_update'
+            ? "Please update today's inventory values."
+            : 'Inventory reminder',
+        time: time,
+      );
+
+      _scheduledTimes[reminder.id] = key;
+    }
+  }
+
+  Future<void> _sendTestNotification(BuildContext context) async {
+    await _ensurePermissions();
+    await NotificationService.instance.showNow(
+      id: _hashId('test_${DateTime.now().millisecondsSinceEpoch}'),
+      title: 'Test notification',
+      body: 'If you see this, reminders should work.',
+    );
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Test notification sent.')));
     }
   }
 
@@ -449,6 +507,7 @@ class InventoryRemindersScreen extends ConsumerWidget {
     await repo.upsertReminder(newReminder);
 
     if (type == 'time' || type == 'daily_update') {
+      await _ensurePermissions();
       await NotificationService.instance.scheduleDaily(
         id: _hashId(id),
         title: newReminder.title,
@@ -456,6 +515,12 @@ class InventoryRemindersScreen extends ConsumerWidget {
         time: time,
       );
     }
+  }
+
+  Future<void> _ensurePermissions() async {
+    if (_permissionsRequested) return;
+    _permissionsRequested = true;
+    await NotificationService.instance.requestPermissions();
   }
 
   TimeOfDay _parseTime(String time) {

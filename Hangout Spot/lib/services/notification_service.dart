@@ -16,6 +16,8 @@ class NotificationService {
   static const String _channelDescription =
       'Reminders for inventory updates and low stock alerts.';
 
+  bool _permissionsRequested = false;
+
   Future<void> initialize() async {
     tz.initializeTimeZones();
     tz.setLocalLocation(tz.local);
@@ -23,12 +25,19 @@ class NotificationService {
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const initSettings = InitializationSettings(android: androidInit);
     await _plugin.initialize(initSettings);
+  }
+
+  Future<void> requestPermissions() async {
+    if (_permissionsRequested) return;
 
     final androidPlugin = _plugin
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
         >();
     await androidPlugin?.requestNotificationsPermission();
+    await androidPlugin?.requestExactAlarmsPermission();
+
+    _permissionsRequested = true;
   }
 
   Future<void> cancel(int id) => _plugin.cancel(id);
@@ -88,7 +97,7 @@ class NotificationService {
       body,
       scheduled,
       const NotificationDetails(android: androidDetails),
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents: DateTimeComponents.time,

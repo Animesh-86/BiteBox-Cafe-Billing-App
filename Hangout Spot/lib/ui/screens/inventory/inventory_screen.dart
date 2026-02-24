@@ -82,18 +82,25 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     final itemsAsyncValue = ref.watch(inventoryItemsStreamProvider);
     final remindersAsyncValue = ref.watch(inventoryRemindersStreamProvider);
 
-    // Set up listeners for low stock notifications
-    ref.listen(inventoryItemsStreamProvider, (previous, next) {
+    if (itemsAsyncValue.hasValue && remindersAsyncValue.hasValue) {
       _handleLowStockNotificationsFromAsyncValue(
         itemsAsyncValue,
         remindersAsyncValue,
+      );
+    }
+
+    // Set up listeners for low stock notifications
+    ref.listen(inventoryItemsStreamProvider, (previous, next) {
+      _handleLowStockNotificationsFromAsyncValue(
+        next,
+        ref.read(inventoryRemindersStreamProvider),
       );
     });
 
     ref.listen(inventoryRemindersStreamProvider, (previous, next) {
       _handleLowStockNotificationsFromAsyncValue(
-        itemsAsyncValue,
-        remindersAsyncValue,
+        ref.read(inventoryItemsStreamProvider),
+        next,
       );
     });
 
