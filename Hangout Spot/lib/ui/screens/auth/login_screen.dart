@@ -36,16 +36,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           context: context,
           barrierDismissible: false,
           builder: (c) => const Center(
-            child: Card(
-              child: Padding(
-                padding: EdgeInsets.all(20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text("Restoring Cloud Data..."),
-                  ],
+            child: SafeArea(
+              child: Card(
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 16),
+                      Text("Restoring Cloud Data..."),
+                    ],
+                  ),
                 ),
               ),
             ),

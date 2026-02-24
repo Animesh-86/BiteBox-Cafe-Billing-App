@@ -561,9 +561,11 @@ class _ActiveSessionsScreenState extends ConsumerState<ActiveSessionsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Promote to Trusted'),
-        content: Text(
-          'Promote "${session.deviceName}" to trusted device?\n\n'
-          'Trusted devices can approve new devices and remotely log out other sessions.',
+        content: SafeArea(
+          child: Text(
+            'Promote "${session.deviceName}" to trusted device?\n\n'
+            'Trusted devices can approve new devices and remotely log out other sessions.',
+          ),
         ),
         actions: [
           TextButton(
@@ -627,40 +629,42 @@ class _ActiveSessionsScreenState extends ConsumerState<ActiveSessionsScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
           title: const Text('Claim Trust'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Enter your account password to claim trust for this device.',
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: passwordController,
-                obscureText: obscurePassword,
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  border: const OutlineInputBorder(),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      obscurePassword ? Icons.visibility : Icons.visibility_off,
+          content: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Enter your account password to claim trust for this device.',
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: passwordController,
+                  obscureText: obscurePassword,
+                  decoration: InputDecoration(
+                    labelText: 'Password',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        obscurePassword ? Icons.visibility : Icons.visibility_off,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          obscurePassword = !obscurePassword;
+                        });
+                      },
                     ),
-                    onPressed: () {
-                      setState(() {
-                        obscurePassword = !obscurePassword;
-                      });
-                    },
                   ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Note: Limited to 3 attempts per hour',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
-              ),
-            ],
+                const SizedBox(height: 8),
+                Text(
+                  'Note: Limited to 3 attempts per hour',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -782,9 +786,11 @@ class _ActiveSessionsScreenState extends ConsumerState<ActiveSessionsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Confirm Logout'),
-        content: Text(
-          'Are you sure you want to log out "${session.deviceName}"?\n\n'
-          'This will immediately end the session on that device.',
+        content: SafeArea(
+          child: Text(
+            'Are you sure you want to log out "${session.deviceName}"?\n\n'
+            'This will immediately end the session on that device.',
+          ),
         ),
         actions: [
           TextButton(
@@ -810,38 +816,40 @@ class _ActiveSessionsScreenState extends ConsumerState<ActiveSessionsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Device Trust System'),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildInfoSection(
-                '🟢 Trusted',
-                'Full control over all devices. Can approve new devices and remotely log out sessions. Maximum 3 trusted devices.',
-              ),
-              const SizedBox(height: 12),
-              _buildInfoSection(
-                '🔵 Approved',
-                'Can use the app normally but cannot manage other devices. Can be promoted to trusted.',
-              ),
-              const SizedBox(height: 12),
-              _buildInfoSection(
-                '🟡 Pending',
-                'Awaiting approval from a trusted device. Can use the app but cannot manage sessions.',
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Recovery Options:',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '• Password Claim: Re-authenticate to claim trust\n'
-                '• Multiple Trusted Devices: Up to 3 for redundancy\n'
-                '• Email Recovery: For lost devices (coming soon)',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-            ],
+        content: SafeArea(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildInfoSection(
+                  '🟢 Trusted',
+                  'Full control over all devices. Can approve new devices and remotely log out sessions. Maximum 3 trusted devices.',
+                ),
+                const SizedBox(height: 12),
+                _buildInfoSection(
+                  '🔵 Approved',
+                  'Can use the app normally but cannot manage other devices. Can be promoted to trusted.',
+                ),
+                const SizedBox(height: 12),
+                _buildInfoSection(
+                  '🟡 Pending',
+                  'Awaiting approval from a trusted device. Can use the app but cannot manage sessions.',
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Recovery Options:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '• Password Claim: Re-authenticate to claim trust\n'
+                  '• Multiple Trusted Devices: Up to 3 for redundancy\n'
+                  '• Email Recovery: For lost devices (coming soon)',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
+            ),
           ),
         ),
         actions: [

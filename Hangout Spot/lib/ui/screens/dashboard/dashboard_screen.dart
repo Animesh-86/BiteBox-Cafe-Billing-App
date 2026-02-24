@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -319,40 +318,41 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ),
         ),
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.fromLTRB(
-                24,
-                MediaQuery.of(context).padding.top + kToolbarHeight + 12,
-                24,
-                20,
-              ),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [caramel.withOpacity(0.18), coffee.withOpacity(0.10)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.fromLTRB(
+                  24,
+                  MediaQuery.of(context).padding.top + kToolbarHeight + 12,
+                  24,
+                  20,
                 ),
-                borderRadius: const BorderRadius.vertical(
-                  bottom: Radius.circular(20),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
-                    blurRadius: 20,
-                    offset: const Offset(0, 12),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [caramel.withOpacity(0.18), coffee.withOpacity(0.10)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Builder(
-                    builder: (context) {
-                      final hour = DateTime.now().hour;
+                  borderRadius: const BorderRadius.vertical(
+                    bottom: Radius.circular(20),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 20,
+                      offset: const Offset(0, 12),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Builder(
+                      builder: (context) {
+                        final hour = DateTime.now().hour;
                       String greeting;
                       if (hour < 12) {
                         greeting = 'Good morning';
@@ -587,6 +587,102 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     },
                     loading: () => const SizedBox.shrink(),
                     error: (_, __) => const SizedBox.shrink(),
+                  ),
+                  const SizedBox(height: 8),
+                  FutureBuilder<PlatformSplit>(
+                    future: analytics.getPlatformSplit(
+                      startOfDay,
+                      endOfDay,
+                      locationId: currentLocationId,
+                    ),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) return const SizedBox.shrink();
+                      final split = snapshot.data!;
+                      Widget badge(String label, int count, double total) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: cream,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: coffee.withOpacity(0.2)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                label,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: coffeeDark,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '$count orders · ₹${total.toStringAsFixed(0)}',
+                                style: TextStyle(
+                                  color: coffeeDark.withOpacity(0.75),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+
+                      return Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(top: 4),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: coffee.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Orders by channel',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: coffeeDark,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: badge(
+                                    'Zomato',
+                                    split.counts['Zomato'] ?? 0,
+                                    split.totals['Zomato'] ?? 0,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: badge(
+                                    'Swiggy',
+                                    split.counts['Swiggy'] ?? 0,
+                                    split.totals['Swiggy'] ?? 0,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: badge(
+                                    'Dine-in',
+                                    split.counts['Walk-in'] ?? 0,
+                                    split.totals['Walk-in'] ?? 0,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),

@@ -37,17 +37,19 @@ class _PremiumAnalyticsScreenState
   Widget _getCurrentScreen() {
     switch (_currentSection) {
       case AnalyticsSection.overview:
-        return OverviewScreen(onMenuPressed: _openDrawer);
+        return SafeArea(child: OverviewScreen(onMenuPressed: _openDrawer));
       case AnalyticsSection.trends:
-        return TrendsScreen(onMenuPressed: _openDrawer);
+        return SafeArea(child: TrendsScreen(onMenuPressed: _openDrawer));
       case AnalyticsSection.forecast:
-        return ForecastScreen(onMenuPressed: _openDrawer);
+        return SafeArea(child: ForecastScreen(onMenuPressed: _openDrawer));
       case AnalyticsSection.insights:
-        return InsightsScreen(onMenuPressed: _openDrawer);
+        return SafeArea(child: InsightsScreen(onMenuPressed: _openDrawer));
       case AnalyticsSection.loyalty:
-        return LoyaltyScreen(onMenuPressed: _openDrawer);
+        return SafeArea(child: LoyaltyScreen(onMenuPressed: _openDrawer));
       case AnalyticsSection.outletComparison:
-        return OutletComparisonScreen(onMenuPressed: _openDrawer);
+        return SafeArea(
+          child: OutletComparisonScreen(onMenuPressed: _openDrawer),
+        );
     }
   }
 
@@ -84,9 +86,20 @@ class _PremiumAnalyticsScreenState
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Text('Analytics', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold, color: AnalyticsTheme.primaryText)),
+                  Text(
+                    'Analytics',
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: AnalyticsTheme.primaryText,
+                    ),
+                  ),
                   const SizedBox(height: 4),
-                  Text('Premium Dashboard', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AnalyticsTheme.secondaryText)),
+                  Text(
+                    'Premium Dashboard',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AnalyticsTheme.secondaryText,
+                    ),
+                  ),
                 ],
               ),
             ),

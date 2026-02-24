@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:drift/drift.dart';
 import 'connection.dart';
 import 'menu_seeder.dart';
+import 'package:hangout_spot/data/constants/customer_defaults.dart';
 
 part 'app_database.g.dart';
 
@@ -310,6 +311,21 @@ class AppDatabase extends _$AppDatabase {
 
         // Seed default menu items
         await MenuSeeder.seedDefaultMenu(this);
+
+        // Seed default customers (walk-in, zomato, swiggy)
+        for (final seed in CustomerDefaults.seeded) {
+          await into(customers).insertOnConflictUpdate(
+            CustomersCompanion(
+              id: Value(seed.id),
+              name: Value(seed.name),
+              phone: const Value(null),
+              discountPercent: const Value(0.0),
+              totalVisits: const Value(0),
+              totalSpent: const Value(0.0),
+              lastVisit: const Value(null),
+            ),
+          );
+        }
       },
     );
   }

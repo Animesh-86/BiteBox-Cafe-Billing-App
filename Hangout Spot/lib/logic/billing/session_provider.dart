@@ -308,31 +308,6 @@ class SessionManager {
 
   /// Get all orders for current session
   Stream<List<Order>> watchSessionOrders() {
-    final sessionDate = getCurrentSessionDate();
-    final sessionStart = DateTime(
-      sessionDate.year,
-      sessionDate.month,
-      sessionDate.day,
-      openingHour,
-    );
-
-    DateTime sessionEnd;
-    if (closingHour <= openingHour) {
-      sessionEnd = DateTime(
-        sessionDate.year,
-        sessionDate.month,
-        sessionDate.day,
-        closingHour,
-      ).add(const Duration(days: 1));
-    } else {
-      sessionEnd = DateTime(
-        sessionDate.year,
-        sessionDate.month,
-        sessionDate.day,
-        closingHour,
-      );
-    }
-
     // Show most recent orders (no session cut-off) to avoid empty dashboard edge cases
     return (_db.select(_db.orders)
           ..orderBy([

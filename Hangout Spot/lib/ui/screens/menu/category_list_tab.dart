@@ -148,14 +148,16 @@ class CategoryListTab extends ConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(category == null ? 'Add Category' : 'Edit Category'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(labelText: 'Name'),
-            ),
-          ],
+        content: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: 'Name'),
+              ),
+            ],
+          ),
         ),
         actions: [
           if (category != null)

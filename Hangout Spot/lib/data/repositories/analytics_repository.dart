@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/data/providers/database_provider.dart';
+import 'package:hangout_spot/data/constants/customer_defaults.dart';
 
 class AnalyticsRepository {
   final AppDatabase _db;
@@ -1371,6 +1372,82 @@ class AnalyticsRepository {
       'revenueWithoutDiscount': withoutDisc.read<double?>('revenue') ?? 0.0,
     };
   }
+
+  Future<PlatformSplit> getPlatformSplit(
+    DateTime start,
+    DateTime end, {
+    String? locationId,
+  }) async {
+    final query = _db.select(_db.orders)
+      ..where((t) => t.createdAt.isBiggerOrEqualValue(start))
+      ..where((t) => t.createdAt.isSmallerThanValue(end))
+      ..where((t) => t.status.equals('completed'));
+    if (locationId != null && locationId.trim().isNotEmpty) {
+      query.where((t) => t.locationId.equals(locationId));
+    }
+
+    final rows = await query.get();
+
+    final counts = <String, int>{
+      'Zomato': 0,
+      'Swiggy': 0,
+      'Walk-in': 0,
+      'Other': 0,
+    };
+    final totals = <String, double>{
+      'Zomato': 0,
+      'Swiggy': 0,
+      'Walk-in': 0,
+      'Other': 0,
+    };
+
+    for (final o in rows) {
+      final platform = _platformLabel(o.customerId);
+      counts[platform] = (counts[platform] ?? 0) + 1;
+      totals[platform] = (totals[platform] ?? 0) + o.totalAmount;
+    }
+
+    final onlineCount = (counts['Zomato'] ?? 0) + (counts['Swiggy'] ?? 0);
+    final offlineCount = rows.length - onlineCount;
+    final onlineTotal = (totals['Zomato'] ?? 0) + (totals['Swiggy'] ?? 0);
+    final offlineTotal =
+        rows.fold<double>(0, (s, o) => s + o.totalAmount) - onlineTotal;
+
+    return PlatformSplit(
+      counts: counts,
+      totals: totals,
+      onlineCount: onlineCount,
+      offlineCount: offlineCount,
+      onlineTotal: onlineTotal,
+      offlineTotal: offlineTotal,
+    );
+  }
+
+  String _platformLabel(String? customerId) {
+    if (customerId == null) return 'Walk-in';
+    if (customerId == CustomerDefaults.zomatoId) return 'Zomato';
+    if (customerId == CustomerDefaults.swiggyId) return 'Swiggy';
+    if (customerId == CustomerDefaults.walkInId) return 'Walk-in';
+    return 'Other';
+  }
+}
+
+class PlatformSplit {
+  final Map<String, int> counts;
+  final Map<String, double> totals;
+  final int onlineCount;
+  final int offlineCount;
+  final double onlineTotal;
+  final double offlineTotal;
+
+  PlatformSplit({
+    required this.counts,
+    required this.totals,
+    required this.onlineCount,
+    required this.offlineCount,
+    required this.onlineTotal,
+    required this.offlineTotal,
+  });
 }
 
 final analyticsRepositoryProvider = Provider<AnalyticsRepository>((ref) {

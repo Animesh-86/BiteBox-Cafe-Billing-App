@@ -91,7 +91,7 @@ class ErrorUI {
             Text(errorTitle),
           ],
         ),
-        content: Text(message, style: const TextStyle(fontSize: 14)),
+      content: SafeArea(child: Text(message, style: const TextStyle(fontSize: 14))),
         actions: [
           if (onRetry != null)
             TextButton(

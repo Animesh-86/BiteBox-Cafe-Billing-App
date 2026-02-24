@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/ui/screens/analytics/theme/analytics_theme.dart';
 import 'package:hangout_spot/ui/screens/analytics/providers/analytics_data_provider.dart';
+import 'package:hangout_spot/data/repositories/analytics_repository.dart';
 import 'package:hangout_spot/ui/screens/analytics/utils/date_filter_utils.dart';
 import 'package:hangout_spot/ui/screens/analytics/services/analytics_export_service.dart';
 import 'package:hangout_spot/utils/ui/error_ui.dart';
@@ -10,6 +11,15 @@ import 'package:hangout_spot/data/providers/inventory_providers.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../widgets/analytics_header.dart';
+
+final platformSplitProvider =
+    FutureProvider.family<PlatformSplit, ({DateTime start, DateTime end})>((
+      ref,
+      params,
+    ) {
+      final repo = ref.watch(analyticsRepositoryProvider);
+      return repo.getPlatformSplit(params.start, params.end);
+    });
 
 class OverviewScreen extends ConsumerStatefulWidget {
   final VoidCallback onMenuPressed;
@@ -101,33 +111,34 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
           'Export Date Range',
           style: TextStyle(color: AnalyticsTheme.primaryText),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(
-                Icons.calendar_month,
-                color: AnalyticsTheme.primaryGold,
+        content: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(
+                  Icons.calendar_month,
+                  color: AnalyticsTheme.primaryGold,
+                ),
+                title: const Text(
+                  'This Year',
+                  style: TextStyle(color: AnalyticsTheme.primaryText),
+                ),
+                onTap: () => Navigator.pop(context, DateFilter.thisYear()),
               ),
-              title: const Text(
-                'This Year',
-                style: TextStyle(color: AnalyticsTheme.primaryText),
+              ListTile(
+                leading: const Icon(
+                  Icons.calendar_today,
+                  color: AnalyticsTheme.primaryGold,
+                ),
+                title: const Text(
+                  'This Month',
+                  style: TextStyle(color: AnalyticsTheme.primaryText),
+                ),
+                onTap: () => Navigator.pop(context, DateFilter.thisMonth()),
               ),
-              onTap: () => Navigator.pop(context, DateFilter.thisYear()),
-            ),
-            ListTile(
-              leading: const Icon(
-                Icons.calendar_today,
-                color: AnalyticsTheme.primaryGold,
-              ),
-              title: const Text(
-                'This Month',
-                style: TextStyle(color: AnalyticsTheme.primaryText),
-              ),
-              onTap: () => Navigator.pop(context, DateFilter.thisMonth()),
-            ),
-            ListTile(
-              leading: const Icon(
+              ListTile(
+                leading: const Icon(
                 Icons.date_range,
                 color: AnalyticsTheme.primaryGold,
               ),
@@ -259,6 +270,18 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
           ),
           const SizedBox(height: 16),
           _buildMetricsGrid(data, currencyFormat),
+          const SizedBox(height: 32),
+
+          // Channel performance
+          Text(
+            'Order Channels',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: AnalyticsTheme.primaryText,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildChannelAnalytics(currencyFormat),
           const SizedBox(height: 32),
 
           // Monthly Sales Bar Graph
@@ -573,6 +596,178 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildChannelAnalytics(NumberFormat currencyFormat) {
+    final splitAsync = ref.watch(
+      platformSplitProvider((
+        start: _currentFilter.startDate,
+        end: _currentFilter.endDate,
+      )),
+    );
+
+    Widget tile(String label, int count, double total) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: AnalyticsTheme.glassCard(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                color: AnalyticsTheme.primaryText,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '$count orders',
+              style: TextStyle(color: AnalyticsTheme.secondaryText),
+            ),
+            Text(
+              currencyFormat.format(total),
+              style: const TextStyle(
+                color: AnalyticsTheme.primaryGold,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    Widget onlineOffline(String label, int count, double total, Color color) {
+      return Expanded(
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: AnalyticsTheme.glassCard(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      label == 'Online'
+                          ? Icons.wifi_rounded
+                          : Icons.storefront_rounded,
+                      color: color,
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      color: AnalyticsTheme.primaryText,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                '$count orders',
+                style: TextStyle(color: AnalyticsTheme.secondaryText),
+              ),
+              Text(
+                currencyFormat.format(total),
+                style: const TextStyle(
+                  color: AnalyticsTheme.primaryGold,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return splitAsync.when(
+      data: (split) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Platform comparison',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: AnalyticsTheme.secondaryText,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                SizedBox(
+                  width: 150,
+                  child: tile(
+                    'Zomato',
+                    split.counts['Zomato'] ?? 0,
+                    split.totals['Zomato'] ?? 0,
+                  ),
+                ),
+                SizedBox(
+                  width: 150,
+                  child: tile(
+                    'Swiggy',
+                    split.counts['Swiggy'] ?? 0,
+                    split.totals['Swiggy'] ?? 0,
+                  ),
+                ),
+                SizedBox(
+                  width: 150,
+                  child: tile(
+                    'Dine-in',
+                    split.counts['Walk-in'] ?? 0,
+                    split.totals['Walk-in'] ?? 0,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Online vs offline',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: AnalyticsTheme.secondaryText,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                onlineOffline(
+                  'Online',
+                  split.onlineCount,
+                  split.onlineTotal,
+                  AnalyticsTheme.chartGreen,
+                ),
+                const SizedBox(width: 12),
+                onlineOffline(
+                  'Offline',
+                  split.offlineCount,
+                  split.offlineTotal,
+                  AnalyticsTheme.chartRed,
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+      loading: () => const Center(
+        child: CircularProgressIndicator(color: AnalyticsTheme.primaryGold),
+      ),
+      error: (err, _) => Text(
+        'Channel analytics error: $err',
+        style: const TextStyle(color: Colors.redAccent),
       ),
     );
   }

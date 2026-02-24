@@ -59,35 +59,36 @@ class AnalyticsHeader extends ConsumerWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Select Date Range',
-              style: TextStyle(
-                color: AnalyticsTheme.primaryGold,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _buildFilterOption(context, 'Today', DateFilter.today()),
-                _buildFilterOption(
-                  context,
-                  'Yesterday',
-                  DateFilter.yesterday(),
+      builder: (context) => SafeArea(
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Select Date Range',
+                style: TextStyle(
+                  color: AnalyticsTheme.primaryGold,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
                 ),
-                _buildFilterOption(context, 'This Week', DateFilter.thisWeek()),
-                _buildFilterOption(
-                  context,
-                  'This Month',
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _buildFilterOption(context, 'Today', DateFilter.today()),
+                  _buildFilterOption(
+                    context,
+                    'Yesterday',
+                    DateFilter.yesterday(),
+                  ),
+                  _buildFilterOption(context, 'This Week', DateFilter.thisWeek()),
+                  _buildFilterOption(
+                    context,
+                    'This Month',
                   DateFilter.thisMonth(),
                 ),
                 _buildFilterOption(context, 'This Year', DateFilter.thisYear()),
@@ -188,35 +189,36 @@ class AnalyticsHeader extends ConsumerWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Select Outlet',
-              style: TextStyle(
-                color: AnalyticsTheme.primaryGold,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: currentOutlet == null
-                      ? AnalyticsTheme.primaryGold.withOpacity(0.2)
-                      : AnalyticsTheme.secondaryBeige.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
+      builder: (context) => SafeArea(
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Select Outlet',
+                style: TextStyle(
+                  color: AnalyticsTheme.primaryGold,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
                 ),
-                child: Icon(
-                  Icons.store_mall_directory_rounded,
-                  color: currentOutlet == null
-                      ? AnalyticsTheme.primaryGold
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: currentOutlet == null
+                        ? AnalyticsTheme.primaryGold.withOpacity(0.2)
+                        : AnalyticsTheme.secondaryBeige.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.store_mall_directory_rounded,
+                    color: currentOutlet == null
+                        ? AnalyticsTheme.primaryGold
                       : AnalyticsTheme.secondaryText,
                 ),
               ),

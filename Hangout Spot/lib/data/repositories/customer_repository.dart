@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../local/db/app_database.dart';
 import '../providers/database_provider.dart';
+import 'package:hangout_spot/data/constants/customer_defaults.dart';
 
 class CustomerRepository {
   final AppDatabase _db;
@@ -64,7 +65,34 @@ class CustomerRepository {
   }
 
   Future<void> deleteCustomer(String id) {
+    if (CustomerDefaults.seeded.any((c) => c.id == id)) {
+      throw Exception('Default customers cannot be deleted');
+    }
     return (_db.delete(_db.customers)..where((t) => t.id.equals(id))).go();
+  }
+
+  Future<void> ensureDefaultCustomers() async {
+    for (final seed in CustomerDefaults.seeded) {
+      final existing = await (_db.select(
+        _db.customers,
+      )..where((t) => t.id.equals(seed.id))).getSingleOrNull();
+      if (existing == null) {
+        await _db
+            .into(_db.customers)
+            .insert(
+              CustomersCompanion(
+                id: Value(seed.id),
+                name: Value(seed.name),
+                phone: const Value(null),
+                discountPercent: const Value(0.0),
+                totalVisits: const Value(0),
+                totalSpent: const Value(0.0),
+                lastVisit: const Value(null),
+              ),
+              mode: InsertMode.insertOrReplace,
+            );
+      }
+    }
   }
 
   Future<void> updateVisitStats(String id, double amount) async {

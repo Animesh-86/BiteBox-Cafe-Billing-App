@@ -218,9 +218,11 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
                           context: context,
                           builder: (ctx) => AlertDialog(
                             title: const Text('Logout Confirmation'),
-                            content: const Text(
-                              'Your data will be backed up to the cloud and this device will be cleared.\n\n'
-                              'Are you sure you want to logout?',
+                            content: SafeArea(
+                              child: const Text(
+                                'Your data will be backed up to the cloud and this device will be cleared.\n\n'
+                                'Are you sure you want to logout?',
+                              ),
                             ),
                             actions: [
                               TextButton(
@@ -246,17 +248,19 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
                           showDialog(
                             context: context,
                             barrierDismissible: false,
-                            builder: (c) => const Center(
-                              child: Card(
-                                child: Padding(
-                                  padding: EdgeInsets.all(20),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      CircularProgressIndicator(),
-                                      SizedBox(height: 16),
-                                      Text("Backing up data..."),
-                                    ],
+                            builder: (c) => SafeArea(
+                              child: Center(
+                                child: Card(
+                                  child: Padding(
+                                    padding: EdgeInsets.all(20),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        CircularProgressIndicator(),
+                                        SizedBox(height: 16),
+                                        Text('Backing up data...'),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
@@ -471,40 +475,42 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
                                       controller: confirmController,
                                       autofocus: true,
                                       decoration: const InputDecoration(
-                                        hintText: 'DELETE',
-                                        border: OutlineInputBorder(),
-                                      ),
-                                      onChanged: (_) => setS(() {}),
-                                    ),
-                                  ],
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(ctx, false),
-                                    child: const Text('Cancel'),
-                                  ),
-                                  ElevatedButton(
-                                    onPressed:
-                                        confirmController.text == 'DELETE'
-                                        ? () => Navigator.pop(ctx, true)
-                                        : null,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.red,
-                                      foregroundColor: Colors.white,
-                                    ),
-                                    child: const Text('Confirm Delete'),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                          if (confirm2 != true || !mounted) return;
-
-                          // Step 3: Show progress and execute
-                          showDialog(
-                            context: context,
-                            barrierDismissible: false,
-                            builder: (c) => const Center(
+                                        context: context,
+                                        builder: (ctx) => AlertDialog(
+                                          backgroundColor: Theme.of(
+                                            context,
+                                          ).colorScheme.surface,
+                                          title: Row(
+                                            children: const [
+                                              Icon(Icons.delete_forever, color: Colors.red),
+                                              SizedBox(width: 8),
+                                              Text(
+                                                'Clean All Data?',
+                                                style: TextStyle(color: Colors.red),
+                                              ),
+                                            ],
+                                          ),
+                                          content: SafeArea(
+                                            child: const Text(
+                                              'This will permanently delete all local data from this device.\n\n'
+                                              'Are you sure you want to proceed?',
+                                            ),
+                                          ),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () => Navigator.pop(ctx, false),
+                                              child: const Text('Cancel'),
+                                            ),
+                                            ElevatedButton(
+                                              onPressed: () => Navigator.pop(ctx, true),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: Colors.red,
+                                                foregroundColor: Colors.white,
+                                              ),
+                                              child: const Text('Delete All'),
+                                            ),
+                                          ],
+                                        ),
                               child: Card(
                                 child: Padding(
                                   padding: EdgeInsets.all(24),

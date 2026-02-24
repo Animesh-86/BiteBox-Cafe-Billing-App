@@ -98,16 +98,17 @@ class DataDeletionService {
             Text('Delete All Data?'),
           ],
         ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'This will permanently delete:',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 8),
-            Text('• All local database data'),
+        content: const SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'This will permanently delete:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 8),
+              Text('• All local database data'),
             Text('• All cloud/Firebase data'),
             Text('• Orders, customers, menu items'),
             Text('• Settings and configurations'),
@@ -177,9 +178,11 @@ class DataDeletionService {
                   Text('Data Deleted'),
                 ],
               ),
-              content: const Text(
-                'All data has been successfully deleted.\n\n'
-                'Please restart the app to continue.',
+              content: const SafeArea(
+                child: Text(
+                  'All data has been successfully deleted.\n\n'
+                  'Please restart the app to continue.',
+                ),
               ),
               actions: [
                 ElevatedButton(

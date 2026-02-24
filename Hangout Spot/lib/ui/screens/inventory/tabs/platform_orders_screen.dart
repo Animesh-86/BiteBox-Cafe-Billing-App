@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/data/models/inventory_models.dart';
 import 'package:hangout_spot/data/providers/inventory_providers.dart';
-import 'package:hangout_spot/data/repositories/inventory_repository.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
@@ -108,36 +107,40 @@ class _PlatformOrdersScreenState extends ConsumerState<PlatformOrdersScreen> {
       builder: (_) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
           title: const Text('Add Platform Order'),
-          content: SingleChildScrollView(
-            child: Column(
-              children: [
-                DropdownButtonFormField<String>(
-                  value: platform,
-                  items: const [
-                    DropdownMenuItem(value: 'Swiggy', child: Text('Swiggy')),
-                    DropdownMenuItem(value: 'Zomato', child: Text('Zomato')),
-                    DropdownMenuItem(value: 'Other', child: Text('Other')),
-                  ],
-                  onChanged: (value) =>
-                      setState(() => platform = value ?? 'Other'),
-                  decoration: const InputDecoration(labelText: 'Platform'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: totalController,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
+          content: SafeArea(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  DropdownButtonFormField<String>(
+                    value: platform,
+                    items: const [
+                      DropdownMenuItem(value: 'Swiggy', child: Text('Swiggy')),
+                      DropdownMenuItem(value: 'Zomato', child: Text('Zomato')),
+                      DropdownMenuItem(value: 'Other', child: Text('Other')),
+                    ],
+                    onChanged: (value) =>
+                        setState(() => platform = value ?? 'Other'),
+                    decoration: const InputDecoration(labelText: 'Platform'),
                   ),
-                  decoration: const InputDecoration(labelText: 'Total Amount'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: notesController,
-                  decoration: const InputDecoration(
-                    labelText: 'Notes (optional)',
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: totalController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'Total Amount',
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: notesController,
+                    decoration: const InputDecoration(
+                      labelText: 'Notes (optional)',
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           actions: [

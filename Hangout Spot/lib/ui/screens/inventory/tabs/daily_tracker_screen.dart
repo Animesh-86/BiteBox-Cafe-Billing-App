@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/data/models/inventory_models.dart';
 import 'package:hangout_spot/data/providers/inventory_providers.dart';
-import 'package:hangout_spot/data/repositories/inventory_repository.dart';
 import 'package:hangout_spot/logic/billing/session_provider.dart'
     as billing_session;
 

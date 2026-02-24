@@ -39,19 +39,22 @@ class _CartPanelState extends ConsumerState<CartPanel> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.shopping_cart,
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withOpacity(0.7),
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
+              ),
+              // Footer
+              SafeArea(
+                bottom: true,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: billingSurface(context, darkOpacity: 0.04),
+                    borderRadius: const BorderRadius.vertical(
+                      bottom: Radius.circular(20),
+                    ),
+                    boxShadow: billingShadow(context),
+                  ),
+                  child: SingleChildScrollView(child: const CartFooter()),
+                ),
+              ),
                       Text(
                         'Order',
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold,
@@ -80,8 +83,10 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                               context: context,
                               builder: (ctx) => AlertDialog(
                                 title: const Text('Clear Cart'),
-                                content: const Text(
-                                  'Are you sure you want to clear all items?',
+                                content: SafeArea(
+                                  child: const Text(
+                                    'Are you sure you want to clear all items?',
+                                  ),
                                 ),
                                 actions: [
                                   TextButton(

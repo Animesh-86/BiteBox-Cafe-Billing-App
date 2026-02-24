@@ -24,16 +24,16 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
      try {
        await ref.read(authRepositoryProvider).sendPasswordResetEmail(email);
        if (mounted) {
-         showDialog(context: context, builder: (ctx) => AlertDialog(
-            title: const Text('Email Sent'),
-            content: Text('Password reset link sent to $email'),
-            actions: [
-              TextButton(onPressed: () {
-                 Navigator.pop(ctx);
-                 Navigator.pop(context); // Back to Login
-              }, child: const Text('OK'))
-            ],
-         ));
+        showDialog(context: context, builder: (ctx) => AlertDialog(
+          title: const Text('Email Sent'),
+          content: SafeArea(child: Text('Password reset link sent to $email')),
+          actions: [
+            TextButton(onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.pop(context); // Back to Login
+            }, child: const Text('OK'))
+          ],
+        ));
        }
      } catch (e) {
        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));

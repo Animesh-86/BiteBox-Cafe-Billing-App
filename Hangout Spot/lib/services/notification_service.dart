@@ -20,6 +20,7 @@ class NotificationService {
 
   Future<void> initialize() async {
     tz.initializeTimeZones();
+
     tz.setLocalLocation(tz.local);
 
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -98,6 +99,7 @@ class NotificationService {
       scheduled,
       const NotificationDetails(android: androidDetails),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      androidAllowWhileIdle: true,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents: DateTimeComponents.time,

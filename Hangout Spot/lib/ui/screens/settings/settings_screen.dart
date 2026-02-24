@@ -55,9 +55,10 @@ class _PasswordDialogState extends State<_PasswordDialog> {
           const Text('Manager Access'),
         ],
       ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+      content: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'Enter your account password to open ${widget.action}.',

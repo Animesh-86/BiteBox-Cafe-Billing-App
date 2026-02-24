@@ -3,8 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:hangout_spot/logic/billing/cart_provider.dart';
 import 'package:hangout_spot/logic/billing/session_provider.dart';
-import 'package:hangout_spot/logic/rewards/reward_provider.dart';
-import 'package:hangout_spot/ui/screens/billing/widgets/billing_actions.dart';
 import 'package:hangout_spot/ui/screens/billing/widgets/billing_cart_widgets.dart'; // Added
 import 'package:hangout_spot/ui/screens/billing/widgets/billing_styles.dart';
 
@@ -139,8 +137,10 @@ class _MobileCartModalState extends ConsumerState<MobileCartModal> {
                               context: context,
                               builder: (ctx) => AlertDialog(
                                 title: const Text('Delete Cart'),
-                                content: const Text(
-                                  'Are you sure you want to clear the entire cart?',
+                                content: SafeArea(
+                                  child: const Text(
+                                    'Are you sure you want to clear the entire cart?',
+                                  ),
                                 ),
                                 actions: [
                                   TextButton(
@@ -233,13 +233,16 @@ class _MobileCartModalState extends ConsumerState<MobileCartModal> {
           ),
           duration: const Duration(milliseconds: 150),
           curve: Curves.easeOut,
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: billingSurface(context, darkOpacity: 0.05),
-              boxShadow: billingShadow(context),
+          child: SafeArea(
+            bottom: true,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: billingSurface(context, darkOpacity: 0.05),
+                boxShadow: billingShadow(context),
+              ),
+              child: const CartFooter(),
             ),
-            child: const CartFooter(),
           ),
         ),
       ],

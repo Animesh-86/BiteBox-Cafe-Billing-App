@@ -504,30 +504,31 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
           ),
         ],
       ),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            DropdownButtonFormField<String>(
-              value: _selectedCategoryId,
-              items: widget.categories
-                  .map(
-                    (c) => DropdownMenuItem(value: c.id, child: Text(c.name)),
-                  )
-                  .toList(),
-              onChanged: (v) => setState(() => _selectedCategoryId = v),
-              decoration: InputDecoration(
-                labelText: 'Category',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                filled: true,
-                fillColor: surface,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 12,
-                ),
+      content: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              DropdownButtonFormField<String>(
+                value: _selectedCategoryId,
+                items: widget.categories
+                    .map(
+                      (c) => DropdownMenuItem(value: c.id, child: Text(c.name)),
+                    )
+                    .toList(),
+                onChanged: (v) => setState(() => _selectedCategoryId = v),
+                decoration: InputDecoration(
+                  labelText: 'Category',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  filled: true,
+                  fillColor: surface,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
               ),
               dropdownColor: cream,
               style: const TextStyle(color: Color(0xFF98664D), fontSize: 14),

@@ -38,33 +38,34 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
           'Export Date Range',
           style: TextStyle(color: AnalyticsTheme.primaryText),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(
-                Icons.calendar_month,
-                color: AnalyticsTheme.primaryGold,
+        content: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(
+                  Icons.calendar_month,
+                  color: AnalyticsTheme.primaryGold,
+                ),
+                title: const Text(
+                  'This Year',
+                  style: TextStyle(color: AnalyticsTheme.primaryText),
+                ),
+                onTap: () => Navigator.pop(context, DateFilter.thisYear()),
               ),
-              title: const Text(
-                'This Year',
-                style: TextStyle(color: AnalyticsTheme.primaryText),
+              ListTile(
+                leading: const Icon(
+                  Icons.calendar_today,
+                  color: AnalyticsTheme.primaryGold,
+                ),
+                title: const Text(
+                  'This Month',
+                  style: TextStyle(color: AnalyticsTheme.primaryText),
+                ),
+                onTap: () => Navigator.pop(context, DateFilter.thisMonth()),
               ),
-              onTap: () => Navigator.pop(context, DateFilter.thisYear()),
-            ),
-            ListTile(
-              leading: const Icon(
-                Icons.calendar_today,
-                color: AnalyticsTheme.primaryGold,
-              ),
-              title: const Text(
-                'This Month',
-                style: TextStyle(color: AnalyticsTheme.primaryText),
-              ),
-              onTap: () => Navigator.pop(context, DateFilter.thisMonth()),
-            ),
-            ListTile(
-              leading: const Icon(
+              ListTile(
+                leading: const Icon(
                 Icons.date_range,
                 color: AnalyticsTheme.primaryGold,
               ),

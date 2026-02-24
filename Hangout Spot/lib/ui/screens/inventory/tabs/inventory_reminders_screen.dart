@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/data/models/inventory_models.dart';
 import 'package:hangout_spot/data/providers/inventory_providers.dart';
-import 'package:hangout_spot/data/repositories/inventory_repository.dart';
 import 'package:hangout_spot/logic/billing/session_provider.dart'
     as billing_session;
 import 'package:hangout_spot/services/notification_service.dart';
@@ -19,19 +18,21 @@ class InventoryRemindersScreen extends ConsumerWidget {
     final remindersAsync = ref.watch(inventoryRemindersStreamProvider);
     final itemsAsync = ref.watch(inventoryItemsStreamProvider);
 
-    return remindersAsync.when(
-      data: (reminders) {
-        _scheduleEnabledTimeReminders(reminders);
-        return itemsAsync.when(
-          data: (items) {
-            return _buildList(context, ref, reminders, items);
-          },
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (err, _) => Center(child: Text('Error: $err')),
-        );
-      },
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, _) => Center(child: Text('Error: $err')),
+    return SafeArea(
+      child: remindersAsync.when(
+        data: (reminders) {
+          _scheduleEnabledTimeReminders(reminders);
+          return itemsAsync.when(
+            data: (items) {
+              return _buildList(context, ref, reminders, items);
+            },
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (err, _) => Center(child: Text('Error: $err')),
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, _) => Center(child: Text('Error: $err')),
+      ),
     );
   }
 
@@ -133,8 +134,10 @@ class InventoryRemindersScreen extends ConsumerWidget {
               context: context,
               builder: (_) => AlertDialog(
                 title: const Text('Delete reminder?'),
-                content: const Text(
-                  'This will remove the reminder permanently.',
+                content: SafeArea(
+                  child: const Text(
+                    'This will remove the reminder permanently.',
+                  ),
                 ),
                 actions: [
                   TextButton(

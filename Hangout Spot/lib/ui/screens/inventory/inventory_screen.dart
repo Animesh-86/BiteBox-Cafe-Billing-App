@@ -8,7 +8,6 @@ import 'package:hangout_spot/services/notification_service.dart';
 import 'package:hangout_spot/main.dart';
 import 'tabs/inventory_items_screen.dart';
 import 'tabs/inventory_reminders_screen.dart';
-import 'tabs/platform_orders_screen.dart';
 
 class InventoryScreen extends ConsumerStatefulWidget {
   const InventoryScreen({super.key});
@@ -105,7 +104,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     });
 
     return DefaultTabController(
-      length: 3,
+      length: 2,
       child: Scaffold(
         extendBodyBehindAppBar: true,
         appBar: PreferredSize(
@@ -175,7 +174,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                                     ),
                                     SizedBox(height: 4),
                                     Text(
-                                      'Track stock, alerts, and platform orders',
+                                      'Track stock and alerts',
                                       style: TextStyle(fontSize: 12),
                                     ),
                                   ],
@@ -216,7 +215,6 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                                 tabs: const [
                                   Tab(text: 'Inventory'),
                                   Tab(text: 'Reminders'),
-                                  Tab(text: 'Orders'),
                                 ],
                               ),
                             ),
@@ -232,11 +230,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         ),
         body: const SafeArea(
           child: TabBarView(
-            children: [
-              InventoryItemsScreen(),
-              InventoryRemindersScreen(),
-              PlatformOrdersScreen(),
-            ],
+            children: [InventoryItemsScreen(), InventoryRemindersScreen()],
           ),
         ),
       ),

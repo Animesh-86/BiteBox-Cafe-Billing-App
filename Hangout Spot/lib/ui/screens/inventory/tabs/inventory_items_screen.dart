@@ -44,58 +44,60 @@ class _InventoryItemsScreenState extends ConsumerState<InventoryItemsScreen> {
           if (items.isEmpty) {
             return const Center(
               child: Text('No inventory items yet. Tap + to add.'),
-            );
-          }
+            return Scaffold(
+              body: SafeArea(
+                child: itemsAsync.when(
+                  data: (items) {
+                    final categoryMap = <String, String>{};
+                    for (final i in items) {
+                      final clean = _normalizedCategory(i.category);
+                      categoryMap.putIfAbsent(clean.toLowerCase(), () => clean);
+                    }
 
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
-            children: [
-              _CategoryFilterChips(
-                context,
-                categories: categories,
-                selected: _selectedCategory,
-                onSelected: (value) =>
-                    setState(() => _selectedCategory = value),
+                    final categories = ['All', ...categoryMap.values];
+
+                    final filteredItems = _selectedCategory == 'All'
+                        ? items
+                        : items
+                              .where(
+                                (i) =>
+                                    _normalizedCategory(i.category).toLowerCase() ==
+                                    _selectedCategory.toLowerCase(),
+                              )
+                              .toList();
+
+                    if (items.isEmpty) {
+                      return const Center(
+                        child: Text('No inventory items yet. Tap + to add.'),
+                      );
+                    }
+
+                    return ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+                      children: [
+                        _CategoryFilterChips(
+                          context,
+                          categories: categories,
+                          selected: _selectedCategory,
+                          onSelected: (value) =>
+                              setState(() => _selectedCategory = value),
+                        ),
+                        const SizedBox(height: 12),
+                        _InventoryGrid(
+                          context,
+                          items: filteredItems,
+                          onAdjust: (item, delta) =>
+                              _quickBump(context, ref, item, delta: delta),
+                          onEdit: (item) => _openItemDialog(context, ref, item),
+                        ),
+                      ],
+                    );
+                  },
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (err, _) => Center(child: Text('Error: $err')),
+                ),
               ),
-              const SizedBox(height: 12),
-              _InventoryGrid(
-                context,
-                items: filteredItems,
-                onAdjust: (item, delta) =>
-                    _quickBump(context, ref, item, delta: delta),
-                onEdit: (item) => _openItemDialog(context, ref, item),
-              ),
-            ],
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) {
-          if (err is FirebaseException &&
-              err.code == 'failed-precondition' &&
-              (err.message?.contains('requires an index') ?? false)) {
-            return Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.info_outline, size: 32),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Inventory data needs a Firestore index.',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Ask an admin to create the suggested Firestore index in the console, then restart the app. Index build takes about 1–2 minutes.',
-                  ),
-                  const SizedBox(height: 12),
-                  if (err.message != null) ...[
-                    const Text(
-                      'Console link:',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 4),
+            );
                     SelectableText(
                       err.message!,
                       style: const TextStyle(color: Colors.blueAccent),
@@ -282,51 +284,53 @@ class _InventoryItemsScreenState extends ConsumerState<InventoryItemsScreen> {
       context: context,
       builder: (_) => AlertDialog(
         title: Text(item == null ? 'Add Item' : 'Edit Item'),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: 'Name'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: categoryController,
-                decoration: const InputDecoration(labelText: 'Category'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: unitController,
-                decoration: const InputDecoration(labelText: 'Unit'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: priceController,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
+        content: SafeArea(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: 'Name'),
                 ),
-                decoration: const InputDecoration(
-                  labelText: 'Price (optional)',
+                const SizedBox(height: 10),
+                TextField(
+                  controller: categoryController,
+                  decoration: const InputDecoration(labelText: 'Category'),
                 ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: currentController,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
+                const SizedBox(height: 10),
+                TextField(
+                  controller: unitController,
+                  decoration: const InputDecoration(labelText: 'Unit'),
                 ),
-                decoration: const InputDecoration(labelText: 'Current Qty'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: minController,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
+                const SizedBox(height: 10),
+                TextField(
+                  controller: priceController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Price (optional)',
+                  ),
                 ),
-                decoration: const InputDecoration(labelText: 'Min Qty'),
-              ),
-            ],
+                const SizedBox(height: 10),
+                TextField(
+                  controller: currentController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(labelText: 'Current Qty'),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: minController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(labelText: 'Min Qty'),
+                ),
+              ],
+            ),
           ),
         ),
         actions: [

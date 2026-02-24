@@ -53,36 +53,38 @@ class _LocationsSettingsScreenState
       builder: (ctx) => AlertDialog(
         backgroundColor: Theme.of(context).colorScheme.surface,
         title: const Text('Add Outlet'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Outlet Name *',
-                  hintText: 'e.g., Downtown Branch',
+        content: SafeArea(
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Outlet Name *',
+                    hintText: 'e.g., Downtown Branch',
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: addressController,
-                decoration: const InputDecoration(
-                  labelText: 'Address *',
-                  hintText: 'Full address',
+                const SizedBox(height: 12),
+                TextField(
+                  controller: addressController,
+                  decoration: const InputDecoration(
+                    labelText: 'Address *',
+                    hintText: 'Full address',
+                  ),
+                  maxLines: 2,
                 ),
-                maxLines: 2,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: phoneController,
-                decoration: const InputDecoration(
-                  labelText: 'Phone Number *',
-                  hintText: '+91 XXXXXXXXXX',
+                const SizedBox(height: 12),
+                TextField(
+                  controller: phoneController,
+                  decoration: const InputDecoration(
+                    labelText: 'Phone Number *',
+                    hintText: '+91 XXXXXXXXXX',
+                  ),
+                  keyboardType: TextInputType.phone,
                 ),
-                keyboardType: TextInputType.phone,
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         actions: [

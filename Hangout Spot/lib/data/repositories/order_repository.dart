@@ -14,6 +14,7 @@ import 'package:cloud_firestore/cloud_firestore.dart' hide Order;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hangout_spot/data/repositories/inventory_repository.dart';
 import 'package:hangout_spot/data/providers/inventory_providers.dart';
+import 'package:hangout_spot/data/constants/customer_defaults.dart';
 
 class OrderRepository {
   final AppDatabase _db;
@@ -90,6 +91,7 @@ class OrderRepository {
     String status = 'completed',
     SessionManager? sessionManager,
   }) async {
+    final platformCustomerId = cart.customer?.id ?? CustomerDefaults.walkInId;
     // Determine the order ID first (reuse if editing)
     final orderId = cart.orderId ?? const Uuid().v4();
 
@@ -155,7 +157,7 @@ class OrderRepository {
             OrdersCompanion(
               id: Value(orderId),
               invoiceNumber: Value(invoiceNum!),
-              customerId: Value(cart.customer?.id),
+              customerId: Value(platformCustomerId),
               locationId: Value(activeOutlet.id), // Use active outlet
               subtotal: Value(cart.subtotal),
               discountAmount: Value(cart.totalDiscount),
@@ -237,8 +239,9 @@ class OrderRepository {
   }
 
   Future<void> _decrementInventoryForCart(CartState cart) async {
-    if (_inventoryRepo == null) return;
-    await _inventoryRepo!.ensureDefaultBeverageInventory();
+    final repo = _inventoryRepo;
+    if (repo == null) return;
+    await repo.ensureDefaultBeverageInventory();
     const allowedNames = {
       'coca cola',
       'sprite',
@@ -252,7 +255,7 @@ class OrderRepository {
       final nameKey = ci.item.name.toLowerCase();
       if (!allowedNames.contains(nameKey)) continue;
       try {
-        await _inventoryRepo!.adjustStockByName(
+        await repo.adjustStockByName(
           name: ci.item.name,
           delta: -ci.quantity.toDouble(),
           reason: 'order_sale',

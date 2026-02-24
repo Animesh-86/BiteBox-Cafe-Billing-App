@@ -6,6 +6,7 @@ import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/data/repositories/customer_repository.dart';
 import 'package:hangout_spot/ui/screens/customer/customer_profile_screen.dart';
 import 'package:hangout_spot/logic/rewards/reward_provider.dart';
+import 'package:hangout_spot/data/constants/customer_defaults.dart';
 
 class CustomerListScreen extends ConsumerStatefulWidget {
   final bool isSelectionMode;
@@ -49,13 +50,18 @@ class _CustomerListScreenState extends ConsumerState<CustomerListScreen> {
       ),
       body: customersAsync.when(
         data: (customers) {
+          final visibleCustomers = widget.isSelectionMode
+              ? customers
+                    .where((c) => c.id != CustomerDefaults.walkInId)
+                    .toList()
+              : customers;
           if (customers.isEmpty && !widget.isSelectionMode) {
             return const Center(child: Text("No customers found."));
           }
           return ListView.builder(
             itemCount: widget.isSelectionMode
-                ? customers.length + 1
-                : customers.length,
+                ? visibleCustomers.length + 1
+                : visibleCustomers.length,
             itemBuilder: (context, index) {
               // Add Walk-in option at the top in selection mode
               if (widget.isSelectionMode && index == 0) {
@@ -77,7 +83,7 @@ class _CustomerListScreenState extends ConsumerState<CustomerListScreen> {
                 );
               }
               final customerIndex = widget.isSelectionMode ? index - 1 : index;
-              final customer = customers[customerIndex];
+              final customer = visibleCustomers[customerIndex];
               return ListTile(
                 leading: CircleAvatar(child: Text(customer.name[0])),
                 title: Text(customer.name),
@@ -159,19 +165,20 @@ class _CustomerListScreenState extends ConsumerState<CustomerListScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(customer == null ? 'Add Customer' : 'Edit Customer'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: 'Name'),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: phoneController,
-                decoration: const InputDecoration(labelText: 'Phone'),
-                keyboardType: TextInputType.phone,
+        content: SafeArea(
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: 'Name'),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: phoneController,
+                  decoration: const InputDecoration(labelText: 'Phone'),
+                  keyboardType: TextInputType.phone,
               ),
               const SizedBox(height: 16),
               TextField(
@@ -184,17 +191,18 @@ class _CustomerListScreenState extends ConsumerState<CustomerListScreen> {
         ),
         actions: [
           if (customer != null)
-            TextButton.icon(
-              onPressed: () async {
-                await ref
-                    .read(customerRepositoryProvider)
-                    .deleteCustomer(customer.id);
-                if (context.mounted) Navigator.pop(context);
-              },
-              icon: const Icon(Icons.delete_outline),
-              label: const Text('Delete'),
-              style: TextButton.styleFrom(foregroundColor: Colors.red),
-            ),
+            if (!CustomerDefaults.seeded.any((c) => c.id == customer.id))
+              TextButton.icon(
+                onPressed: () async {
+                  await ref
+                      .read(customerRepositoryProvider)
+                      .deleteCustomer(customer.id);
+                  if (context.mounted) Navigator.pop(context);
+                },
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('Delete'),
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+              ),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
