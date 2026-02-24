@@ -143,6 +143,7 @@ class _MobileLayout extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final screenWidth = MediaQuery.of(context).size.width;
     final sidebarFlex = ref.watch(sidebarFlexProvider);
+    final cart = ref.watch(cartProvider);
 
     // Clamp sidebar flex between 15 and 35
     final constrainedFlex = sidebarFlex.clamp(15.0, 35.0);
@@ -198,17 +199,6 @@ class _MobileLayout extends ConsumerWidget {
           flex: (100 - constrainedFlex.toInt()).clamp(65, 85).toInt(),
           child: Column(
             children: [
-              // Cart Summary at TOP
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: billingSurface(context, darkOpacity: 0.08),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: billingShadow(context),
-                ),
-                child: const CartMobileBottomBar(),
-              ),
-
               // Items Grid (expanded)
               Expanded(
                 child: Container(
@@ -221,6 +211,18 @@ class _MobileLayout extends ConsumerWidget {
                   child: const BillingItemsGrid(),
                 ),
               ),
+
+              // Cart summary only when items exist; anchored at bottom
+              if (cart.items.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.fromLTRB(8, 0, 8, 12),
+                  decoration: BoxDecoration(
+                    color: billingSurface(context, darkOpacity: 0.08),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: billingShadow(context),
+                  ),
+                  child: const CartMobileBottomBar(),
+                ),
             ],
           ),
         ),

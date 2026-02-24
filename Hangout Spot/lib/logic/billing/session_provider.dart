@@ -223,7 +223,9 @@ class SessionManager {
                 ..where(
                   (tbl) => tbl.createdAt.isBiggerOrEqualValue(sessionStart),
                 )
-                ..where((tbl) => tbl.createdAt.isSmallerThanValue(sessionEnd)))
+                ..where(
+                  (tbl) => tbl.createdAt.isSmallerOrEqualValue(sessionEnd),
+                ))
               .get()
               .then((list) => list.length);
 
@@ -236,13 +238,35 @@ class SessionManager {
             .doc(sessionId);
 
         final snapshot = await counterRef.get();
-        if (!snapshot.exists || localCount == 0) {
-          return '#1001';
-        } else {
+        if (snapshot.exists) {
           final currentCount = snapshot.data()?['count'] ?? 1000;
           final nextNumber = currentCount + 1;
           return '#$nextNumber';
         }
+
+        // If Firestore counter missing but we have local orders, derive from local.
+        if (localCount > 0) {
+          return '#${1000 + localCount + 1}';
+        }
+
+        // Fallback to max existing invoice that starts with '#' (covers previous completed orders)
+        final maxInvoice =
+            await (_db.selectOnly(_db.orders)
+                  ..addColumns([_db.orders.invoiceNumber])
+                  ..where(_db.orders.invoiceNumber.like('#%'))
+                  ..orderBy([OrderingTerm.desc(_db.orders.invoiceNumber)])
+                  ..limit(1))
+                .getSingleOrNull();
+
+        if (maxInvoice != null) {
+          final inv = maxInvoice.read(_db.orders.invoiceNumber) ?? '';
+          final digits = int.tryParse(inv.replaceAll(RegExp(r'[^0-9]'), ''));
+          if (digits != null) {
+            return '#${digits + 1}';
+          }
+        }
+
+        return '#1001';
       }
     } catch (e) {
       debugPrint('⚠️ Firestore peek failed, falling back to local: $e');
@@ -309,13 +333,13 @@ class SessionManager {
       );
     }
 
+    // Show most recent orders (no session cut-off) to avoid empty dashboard edge cases
     return (_db.select(_db.orders)
-          ..where((tbl) => tbl.createdAt.isBiggerOrEqualValue(sessionStart))
-          ..where((tbl) => tbl.createdAt.isSmallerThanValue(sessionEnd))
           ..orderBy([
             (t) =>
                 OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc),
-          ]))
+          ])
+          ..limit(20))
         .watch();
   }
 

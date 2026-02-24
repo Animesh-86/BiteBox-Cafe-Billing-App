@@ -192,6 +192,13 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
   }
 
   try {
+    // Immediate feedback so user sees the tap registered
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Printing...")));
+    }
+
     final customer = cart.selectedCustomer;
     final sessionManager = ref.read(sessionManagerProvider);
     final orderId = await ref

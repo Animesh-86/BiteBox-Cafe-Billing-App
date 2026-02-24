@@ -130,7 +130,8 @@ class CartCustomerSection extends ConsumerStatefulWidget {
   const CartCustomerSection({super.key, this.compact = false});
 
   @override
-  ConsumerState<CartCustomerSection> createState() => _CartCustomerSectionState();
+  ConsumerState<CartCustomerSection> createState() =>
+      _CartCustomerSectionState();
 }
 
 class _CartCustomerSectionState extends ConsumerState<CartCustomerSection> {
@@ -138,6 +139,7 @@ class _CartCustomerSectionState extends ConsumerState<CartCustomerSection> {
   final _phoneController = TextEditingController();
   final _nameFocus = FocusNode();
   final _phoneFocus = FocusNode();
+  ProviderSubscription<CartState>? _cartListener;
 
   String _query = '';
   bool _showSuggestions = false;
@@ -154,7 +156,7 @@ class _CartCustomerSectionState extends ConsumerState<CartCustomerSection> {
     _nameController.text = cart.customer?.name ?? '';
     _phoneController.text = cart.customer?.phone ?? '';
 
-    ref.listen<CartState>(cartProvider, (prev, next) {
+    _cartListener = ref.listenManual<CartState>(cartProvider, (prev, next) {
       if (_isEditing) return;
       final customer = next.customer;
       _nameController.text = customer?.name ?? '';
@@ -164,6 +166,7 @@ class _CartCustomerSectionState extends ConsumerState<CartCustomerSection> {
 
   @override
   void dispose() {
+    _cartListener?.close();
     _nameController.dispose();
     _phoneController.dispose();
     _nameFocus.dispose();
@@ -250,7 +253,13 @@ class _CartCustomerSectionState extends ConsumerState<CartCustomerSection> {
         ? Stream.value(<Customer>[])
         : repo.watchCustomers(query);
 
-    final fieldSpacing = widget.compact ? 8.0 : 12.0;
+    final fieldSpacing = widget.compact ? 6.0 : 12.0;
+    InputDecoration _compactDecoration(String label) => InputDecoration(
+      labelText: label,
+      border: const OutlineInputBorder(),
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+    );
 
     return Container(
       padding: const EdgeInsets.all(10),
@@ -264,7 +273,11 @@ class _CartCustomerSectionState extends ConsumerState<CartCustomerSection> {
         children: [
           Row(
             children: [
-              Icon(Icons.person_outline, size: 18, color: billingMutedText(context)),
+              Icon(
+                Icons.person_outline,
+                size: 18,
+                color: billingMutedText(context),
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -288,7 +301,9 @@ class _CartCustomerSectionState extends ConsumerState<CartCustomerSection> {
                 onPressed: () => showCustomerSelect(context, ref),
                 icon: const Icon(Icons.search, size: 16),
                 label: const Text('Browse'),
-                style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                ),
               ),
             ],
           ),
@@ -299,10 +314,8 @@ class _CartCustomerSectionState extends ConsumerState<CartCustomerSection> {
                 TextField(
                   controller: _nameController,
                   focusNode: _nameFocus,
-                  decoration: const InputDecoration(
-                    labelText: 'Name',
-                    border: OutlineInputBorder(),
-                  ),
+                  decoration: _compactDecoration('Name'),
+                  style: Theme.of(context).textTheme.bodySmall,
                   textInputAction: TextInputAction.next,
                   onChanged: (value) {
                     setState(() {
@@ -315,10 +328,8 @@ class _CartCustomerSectionState extends ConsumerState<CartCustomerSection> {
                 TextField(
                   controller: _phoneController,
                   focusNode: _phoneFocus,
-                  decoration: const InputDecoration(
-                    labelText: 'Phone',
-                    border: OutlineInputBorder(),
-                  ),
+                  decoration: _compactDecoration('Phone'),
+                  style: Theme.of(context).textTheme.bodySmall,
                   keyboardType: TextInputType.phone,
                   textInputAction: TextInputAction.done,
                   onChanged: (value) {
@@ -375,74 +386,96 @@ class _CartCustomerSectionState extends ConsumerState<CartCustomerSection> {
             ),
           const SizedBox(height: 8),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               FilledButton.icon(
                 onPressed: _saveOrSelectCustomer,
-                icon: const Icon(Icons.check, size: 16),
+                icon: const Icon(Icons.check, size: 14),
                 label: const Text('Use Customer'),
-                style: FilledButton.styleFrom(visualDensity: VisualDensity.compact),
+                style: FilledButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  minimumSize: const Size(0, 0),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
               ),
               const SizedBox(width: 8),
               if (cart.customer != null)
-                Text(
-                  '${cart.customer!.name} (${cart.customer!.totalVisits} visits)',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: billingMutedText(context),
+                Flexible(
+                  child: Row(
+                    children: [
+                      Text(
+                        '${cart.customer!.name} (${cart.customer!.totalVisits} visits)',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: billingMutedText(context),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(width: 6),
+                      FutureBuilder<bool>(
+                        future: ref.watch(isRewardSystemEnabledProvider.future),
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData || !snapshot.data!) {
+                            return const SizedBox.shrink();
+                          }
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: ref
+                                .watch(
+                                  customerRewardBalanceProvider(
+                                    cart.customer!.id,
+                                  ),
+                                )
+                                .when(
+                                  data: (balance) => Text(
+                                    '${balance.toInt()} pts',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(
+                                          color: Colors.orange,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                  ),
+                                  loading: () => Text(
+                                    '... pts',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(
+                                          color: Colors.orange,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                  ),
+                                  error: (_, __) => Text(
+                                    '0 pts',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(
+                                          color: Colors.orange,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                  ),
+                                ),
+                          );
+                        },
+                      ),
+                    ],
                   ),
                 ),
             ],
           ),
-          if (cart.customer != null) ...[
-            const SizedBox(height: 8),
-            FutureBuilder<bool>(
-              future: ref.watch(isRewardSystemEnabledProvider.future),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData || !snapshot.data!) {
-                  return const SizedBox.shrink();
-                }
-                return Align(
-                  alignment: Alignment.centerLeft,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: ref
-                        .watch(
-                          customerRewardBalanceProvider(cart.customer!.id),
-                        )
-                        .when(
-                          data: (balance) => Text(
-                            '${balance.toInt()} pts',
-                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: Colors.orange,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          loading: () => Text(
-                            '... pts',
-                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: Colors.orange,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          error: (_, __) => Text(
-                            '0 pts',
-                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: Colors.orange,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                  ),
-                );
-              },
-            ),
-          ],
           StreamBuilder<List<Customer>>(
             stream: suggestionsStream,
             builder: (context, snapshot) {
@@ -498,64 +531,9 @@ class CartFooter extends ConsumerWidget {
 
     return Column(
       children: [
-        // Discount Input
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: billingSurfaceVariant(context, darkOpacity: 0.14),
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: billingShadow(context),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.discount, size: 18, color: billingMutedText(context)),
-              const SizedBox(width: 8),
-              Text(
-                'Discount %',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: billingMutedText(context),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  keyboardType: TextInputType.number,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: billingText(context)),
-                  decoration: InputDecoration(
-                    hintText: '0',
-                    hintStyle: TextStyle(
-                      color: billingMutedText(context).withOpacity(0.6),
-                    ),
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: BorderSide(color: billingOutline(context)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: BorderSide(color: billingOutline(context)),
-                    ),
-                  ),
-                  onChanged: (value) {
-                    final percent = double.tryParse(value) ?? 0.0;
-                    final discountAmount = cart.subtotal * (percent / 100);
-                    notifier.setManualDiscount(discountAmount);
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
         // Payment Method
         Container(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             color: billingSurfaceVariant(context, darkOpacity: 0.14),
             borderRadius: BorderRadius.circular(8),
@@ -580,7 +558,7 @@ class CartFooter extends ConsumerWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Wrap(
                 spacing: 8,
                 children: [
@@ -601,7 +579,7 @@ class CartFooter extends ConsumerWidget {
                   ),
                 ],
               ),
-              if (cart.paymentMode == 'Split') const SizedBox(height: 10),
+              if (cart.paymentMode == 'Split') const SizedBox(height: 8),
               if (cart.paymentMode == 'Split')
                 Row(
                   children: [
@@ -620,7 +598,7 @@ class CartFooter extends ConsumerWidget {
                           isDense: true,
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 8,
-                            vertical: 8,
+                            vertical: 6,
                           ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(6),
@@ -654,7 +632,7 @@ class CartFooter extends ConsumerWidget {
                           isDense: true,
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 8,
-                            vertical: 8,
+                            vertical: 6,
                           ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(6),
@@ -673,203 +651,185 @@ class CartFooter extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 12),
-        // Price Breakdown
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: billingSurfaceVariant(context, darkOpacity: 0.12),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Subtotal',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: billingMutedText(context),
-                    ),
-                  ),
-                  Text(
-                    "₹${cart.subtotal.toStringAsFixed(2)}",
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: billingMutedText(context),
-                    ),
-                  ),
-                ],
-              ),
-              if (cart.promoDiscount > 0) const SizedBox(height: 6),
-              if (cart.promoDiscount > 0)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Promo',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: billingMutedText(context),
-                      ),
-                    ),
-                    Text(
-                      "-₹${cart.promoDiscount.toStringAsFixed(2)}",
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall?.copyWith(color: Colors.pinkAccent),
-                    ),
-                  ],
+        // Discount vs Total grid (tightened to avoid overflow)
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: billingShadow(context),
                 ),
-              if (nonPromoDiscount > 0) const SizedBox(height: 6),
-              if (nonPromoDiscount > 0)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Discount',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: billingMutedText(context),
-                      ),
-                    ),
-                    Text(
-                      "-₹${nonPromoDiscount.toStringAsFixed(2)}",
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall?.copyWith(color: Colors.green),
-                    ),
-                  ],
-                ),
-              if (cart.taxAmount > 0) const SizedBox(height: 6),
-              if (cart.taxAmount > 0)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Tax',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: billingMutedText(context),
-                      ),
-                    ),
-                    Text(
-                      "+₹${cart.taxAmount.toStringAsFixed(2)}",
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: billingMutedText(context),
-                      ),
-                    ),
-                  ],
-                ),
-              Divider(
-                height: 16,
-                color: Theme.of(context).colorScheme.outlineVariant,
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Total',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: billingText(context),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    "₹${cart.grandTotal.toStringAsFixed(2)}",
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                ],
-              ),
-              // Show reward points if customer selected
-              if (cart.customer != null) ...[
-                const SizedBox(height: 12),
-                ref
-                    .watch(customerRewardBalanceProvider(cart.customer!.id))
-                    .when(
-                      data: (balance) {
-                        if (balance <= 0) {
-                          return const SizedBox.shrink();
-                        }
-                        return Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: Colors.orange.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: Colors.orange.withOpacity(0.3),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Reward Points',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .labelSmall
-                                        ?.copyWith(color: Colors.orange),
-                                  ),
-                                  Text(
-                                    '${balance.toInt()} points available',
-                                    style: Theme.of(context).textTheme.bodySmall
-                                        ?.copyWith(
-                                          color: billingText(context),
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                  ),
-                                ],
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.discount,
+                          size: 18,
+                          color: Colors.green.shade700,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Discount %',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Colors.green.shade800,
+                                fontWeight: FontWeight.w600,
                               ),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    '₹${(balance * 1.0).toStringAsFixed(2)}',
-                                    style: Theme.of(context).textTheme.bodySmall
-                                        ?.copyWith(
-                                          color: Colors.orange,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                  ),
-                                  if (balance >= MIN_REDEMPTION_POINTS)
-                                    TextButton(
-                                      onPressed: () =>
-                                          showRedemptionDialog(context, ref),
-                                      style: TextButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 2,
-                                        ),
-                                        minimumSize: const Size(0, 0),
-                                        tapTargetSize:
-                                            MaterialTapTargetSize.shrinkWrap,
-                                      ),
-                                      child: Text(
-                                        'Redeem',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .labelSmall
-                                            ?.copyWith(
-                                              color: Colors.orange,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        );
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      keyboardType: TextInputType.number,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: billingText(context),
+                      ),
+                      decoration: InputDecoration(
+                        hintText: '0',
+                        hintStyle: TextStyle(
+                          color: billingMutedText(context).withOpacity(0.6),
+                        ),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
+                        filled: true,
+                        fillColor: Colors.white.withOpacity(0.7),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: Colors.green.shade200),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: Colors.green.shade200),
+                        ),
+                      ),
+                      onChanged: (value) {
+                        final percent = double.tryParse(value) ?? 0.0;
+                        final discountAmount = cart.subtotal * (percent / 100);
+                        notifier.setManualDiscount(discountAmount);
                       },
-                      loading: () => const SizedBox.shrink(),
-                      error: (_, __) => const SizedBox.shrink(),
                     ),
-              ],
-            ],
-          ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Applied: -₹${nonPromoDiscount.toStringAsFixed(2)}',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: Colors.green.shade800,
+                      ),
+                    ),
+                    if (cart.promoDiscount > 0)
+                      Text(
+                        'Promo: -₹${cart.promoDiscount.toStringAsFixed(2)}',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: Colors.green.shade800,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: billingShadow(context),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Subtotal',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: billingMutedText(context)),
+                        ),
+                        Text(
+                          "₹${cart.subtotal.toStringAsFixed(2)}",
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: billingMutedText(context)),
+                        ),
+                      ],
+                    ),
+                    if (cart.taxAmount > 0) const SizedBox(height: 4),
+                    if (cart.taxAmount > 0)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Tax',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: billingMutedText(context)),
+                          ),
+                          Text(
+                            "+₹${cart.taxAmount.toStringAsFixed(2)}",
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: billingMutedText(context)),
+                          ),
+                        ],
+                      ),
+                    const SizedBox(height: 6),
+                    Divider(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Total',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: billingText(context),
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                        Text(
+                          "₹${cart.grandTotal.toStringAsFixed(2)}",
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue.shade700,
+                              ),
+                        ),
+                      ],
+                    ),
+                    if (cart.customer != null) ...[
+                      const SizedBox(height: 8),
+                      ref
+                          .watch(
+                            customerRewardBalanceProvider(cart.customer!.id),
+                          )
+                          .when(
+                            data: (balance) {
+                              if (balance <= 0) return const SizedBox.shrink();
+                              return Text(
+                                'Rewards: ${balance.toInt()} pts',
+                                style: Theme.of(context).textTheme.labelSmall
+                                    ?.copyWith(color: Colors.blue.shade800),
+                              );
+                            },
+                            loading: () => const SizedBox.shrink(),
+                            error: (_, __) => const SizedBox.shrink(),
+                          ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         Row(
           children: [
             Expanded(
@@ -879,7 +839,7 @@ class CartFooter extends ConsumerWidget {
                     : null,
                 style: OutlinedButton.styleFrom(
                   side: BorderSide(color: billingOutline(context)),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
                 ),
                 child: Text(
                   'Hold',
@@ -894,7 +854,7 @@ class CartFooter extends ConsumerWidget {
                     ? () => checkout(context, ref)
                     : null,
                 style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
                   backgroundColor: Theme.of(context).colorScheme.primary,
                 ),
                 child: Text(

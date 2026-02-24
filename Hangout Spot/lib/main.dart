@@ -8,6 +8,7 @@ import 'package:hangout_spot/ui/theme/app_theme.dart';
 import 'package:hangout_spot/ui/screens/splash_screen.dart';
 import 'package:hangout_spot/data/providers/theme_provider.dart';
 import 'package:hangout_spot/ui/utils/responsive_layout.dart';
+import 'package:hangout_spot/services/notification_service.dart';
 
 // Global synchronous access to SharedPreferences for Riverpod providers
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
@@ -30,6 +31,8 @@ void main() async {
       } catch (e) {
         debugPrint("Firebase init failed: $e");
       }
+
+      await NotificationService.instance.initialize();
 
       final prefs = await SharedPreferences.getInstance();
 

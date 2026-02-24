@@ -6,6 +6,7 @@ import 'package:hangout_spot/ui/screens/analytics/utils/date_filter_utils.dart';
 import 'package:hangout_spot/ui/screens/analytics/services/analytics_export_service.dart';
 import 'package:hangout_spot/utils/ui/error_ui.dart';
 import 'package:hangout_spot/utils/exceptions/error_handler.dart';
+import 'package:hangout_spot/data/providers/inventory_providers.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../widgets/analytics_header.dart';
@@ -286,6 +287,24 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
             const SizedBox(height: 32),
           ],
 
+          // Inventory Analytics
+          Text(
+            'Inventory Insights',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: AnalyticsTheme.primaryText,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildInventoryInsights(
+            context,
+            ref,
+            startDate: _currentFilter.startDate,
+            endDate: _currentFilter.endDate,
+            currencyFormat: currencyFormat,
+          ),
+          const SizedBox(height: 32),
+
           // Top Selling Items
           Text(
             'Top Selling Items',
@@ -296,6 +315,98 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
           ),
           const SizedBox(height: 16),
           _buildTopSellingItems(data),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInventoryInsights(
+    BuildContext context,
+    WidgetRef ref, {
+    required DateTime startDate,
+    required DateTime endDate,
+    required NumberFormat currencyFormat,
+  }) {
+    final inventoryAnalytics = ref.watch(
+      inventoryAnalyticsProvider((startDate: startDate, endDate: endDate)),
+    );
+
+    return inventoryAnalytics.when(
+      data: (summary) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: AnalyticsTheme.glassCard(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildInsightRow(
+                label: 'Low stock events',
+                value: '${summary.lowStockEvents}',
+              ),
+              _buildInsightRow(
+                label: 'Top low stock item',
+                value: summary.topLowStockItem ?? 'No data',
+              ),
+              _buildInsightRow(
+                label: 'Most consumed raw ingredient',
+                value: summary.mostConsumedItem ?? 'No data',
+              ),
+              _buildInsightRow(
+                label: 'Restock total',
+                value: summary.restockTotal.toStringAsFixed(1),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Platform breakdown',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AnalyticsTheme.secondaryText,
+                ),
+              ),
+              const SizedBox(height: 8),
+              if (summary.platformBreakdown.isEmpty)
+                Text(
+                  'No platform orders in this range.',
+                  style: TextStyle(color: AnalyticsTheme.secondaryText),
+                )
+              else
+                ...summary.platformBreakdown.entries.map(
+                  (entry) => _buildInsightRow(
+                    label: entry.key,
+                    value: currencyFormat.format(entry.value),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+      loading: () => const Center(
+        child: CircularProgressIndicator(color: AnalyticsTheme.primaryGold),
+      ),
+      error: (err, _) => Text(
+        'Inventory analytics error: $err',
+        style: const TextStyle(color: Colors.redAccent),
+      ),
+    );
+  }
+
+  Widget _buildInsightRow({required String label, required String value}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(color: AnalyticsTheme.secondaryText),
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              color: AnalyticsTheme.primaryText,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );

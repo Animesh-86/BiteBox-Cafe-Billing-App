@@ -190,30 +190,6 @@ class _MobileCartModalState extends ConsumerState<MobileCartModal> {
                   ),
                 ],
               ),
-              if (cart.items.isNotEmpty) const SizedBox(height: 10),
-              if (cart.items.isNotEmpty)
-                Row(
-                  children: [
-                    if (cart.customer != null)
-                      Icon(
-                        Icons.person,
-                        size: 14,
-                        color: billingMutedText(context),
-                      ),
-                    if (cart.customer != null) const SizedBox(width: 4),
-                    if (cart.customer != null)
-                      Expanded(
-                        child: Text(
-                          cart.customer!.name,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: billingMutedText(context)),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                  ],
-                ),
-              // Customer Selection & Rewards Section
               const SizedBox(height: 10),
               CartCustomerSection(compact: true),
             ],
@@ -231,11 +207,16 @@ class _MobileCartModalState extends ConsumerState<MobileCartModal> {
                     ),
                   ),
                 )
-              : ListView.separated(
+              : GridView.builder(
                   controller: widget.scrollController,
                   padding: const EdgeInsets.all(12),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                    childAspectRatio: 1.8,
+                  ),
                   itemCount: cart.items.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     return CartItemTile(
                       item: cart.items[index],
@@ -245,7 +226,7 @@ class _MobileCartModalState extends ConsumerState<MobileCartModal> {
                 ),
         ),
 
-        // Footer
+        // Footer (compact, non-scrollable)
         AnimatedPadding(
           padding: EdgeInsets.only(
             bottom: MediaQuery.viewInsetsOf(context).bottom,
@@ -253,15 +234,12 @@ class _MobileCartModalState extends ConsumerState<MobileCartModal> {
           duration: const Duration(milliseconds: 150),
           curve: Curves.easeOut,
           child: Container(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: billingSurface(context, darkOpacity: 0.05),
               boxShadow: billingShadow(context),
             ),
-            child: const SingleChildScrollView(
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              child: CartFooter(),
-            ),
+            child: const CartFooter(),
           ),
         ),
       ],

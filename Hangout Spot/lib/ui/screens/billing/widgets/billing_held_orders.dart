@@ -124,7 +124,8 @@ class HeldOrdersDialog extends ConsumerWidget {
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 2,
-                          childAspectRatio: 1.0,
+                          // Slightly taller cards to avoid overflow
+                          childAspectRatio: 0.8,
                           crossAxisSpacing: 12,
                           mainAxisSpacing: 12,
                         ),

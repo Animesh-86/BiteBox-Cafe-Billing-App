@@ -12,18 +12,23 @@ import 'package:hangout_spot/services/live_analytics_service.dart';
 import 'package:hangout_spot/services/live_invoice_counter_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' hide Order;
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:hangout_spot/data/repositories/inventory_repository.dart';
+import 'package:hangout_spot/data/providers/inventory_providers.dart';
 
 class OrderRepository {
   final AppDatabase _db;
   final LiveAnalyticsService? _liveAnalytics;
   final LiveInvoiceCounterService? _liveInvoiceCounter;
+  final InventoryRepository? _inventoryRepo;
 
   OrderRepository(
     this._db, {
     LiveAnalyticsService? liveAnalytics,
     LiveInvoiceCounterService? liveInvoiceCounter,
+    InventoryRepository? inventoryRepository,
   }) : _liveAnalytics = liveAnalytics,
-       _liveInvoiceCounter = liveInvoiceCounter;
+       _liveInvoiceCounter = liveInvoiceCounter,
+       _inventoryRepo = inventoryRepository;
 
   // Stream of Held/Pending Orders
   Stream<List<Order>> watchPendingOrders({String? locationId}) {
@@ -115,15 +120,8 @@ class OrderRepository {
         }
       }
     } else if (status == 'completed' && invoiceNum.startsWith('HOLD-')) {
-      // Converting a HOLD order to COMPLETED - generate real invoice number
-      if (_liveInvoiceCounter != null && sessionManager != null) {
-        final sessionId = sessionManager.getCurrentSessionId();
-        invoiceNum = await _liveInvoiceCounter.convertHoldToRealInvoice(
-          sessionId: sessionId,
-          prefix: '#',
-          oldHoldNumber: invoiceNum,
-        );
-      } else if (sessionManager != null) {
+      // Converting a HOLD order to COMPLETED - use the same counter source as UI (Firestore via SessionManager)
+      if (sessionManager != null) {
         invoiceNum = await sessionManager.getNextInvoiceNumber();
       } else {
         invoiceNum =
@@ -202,6 +200,7 @@ class OrderRepository {
 
     // Record to live analytics and kitchen display (only for completed orders)
     if (status == 'completed') {
+      await _decrementInventoryForCart(cart);
       _recordToLiveServices(orderId, invoiceNum).ignore();
     }
 
@@ -234,6 +233,33 @@ class OrderRepository {
       }
     } catch (e) {
       debugPrint('❌ Failed to record to live services: $e');
+    }
+  }
+
+  Future<void> _decrementInventoryForCart(CartState cart) async {
+    if (_inventoryRepo == null) return;
+    await _inventoryRepo!.ensureDefaultBeverageInventory();
+    const allowedNames = {
+      'coca cola',
+      'sprite',
+      'fanta',
+      'thumbs up',
+      'water bottle (small)',
+      'water bottle (large)',
+    };
+    for (final ci in cart.items) {
+      if (ci.quantity <= 0) continue;
+      final nameKey = ci.item.name.toLowerCase();
+      if (!allowedNames.contains(nameKey)) continue;
+      try {
+        await _inventoryRepo!.adjustStockByName(
+          name: ci.item.name,
+          delta: -ci.quantity.toDouble(),
+          reason: 'order_sale',
+        );
+      } catch (e) {
+        debugPrint('⚠️ Inventory adjust skipped for ${ci.item.name}: $e');
+      }
     }
   }
 
@@ -530,6 +556,7 @@ class OrderRepository {
 
 final orderRepositoryProvider = Provider<OrderRepository>((ref) {
   final db = ref.watch(appDatabaseProvider);
+  final inventoryRepo = ref.watch(inventoryRepositoryProvider);
 
   // Initialize Firebase Realtime Database services
   final liveAnalytics = LiveAnalyticsService();
@@ -539,5 +566,6 @@ final orderRepositoryProvider = Provider<OrderRepository>((ref) {
     db,
     liveAnalytics: liveAnalytics,
     liveInvoiceCounter: liveInvoiceCounter,
+    inventoryRepository: inventoryRepo,
   );
 });

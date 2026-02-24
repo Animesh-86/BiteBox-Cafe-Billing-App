@@ -436,7 +436,9 @@ class CartNotifier extends StateNotifier<CartState> {
     _applyState(
       CartState(
         orderId: order.id,
-        invoiceNumber: order.invoiceNumber,
+        // Force UI to show the next real invoice number when resuming a held order
+        // (actual conversion happens in createOrderFromCart when status becomes completed).
+        invoiceNumber: null,
         customer: customer,
         items: details
             .map(

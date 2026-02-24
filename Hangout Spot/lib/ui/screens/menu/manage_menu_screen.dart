@@ -210,9 +210,9 @@ class ManageMenuScreen extends ConsumerWidget {
           ],
         ),
       ),
-      // Floating Action Button at bottom
-      floatingActionButton: Container(
-        margin: const EdgeInsets.only(bottom: 12),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
         child: FloatingActionButton.extended(
           onPressed: () {
             showSmartAddItemDialog(context, ref, selectedCat);
@@ -222,7 +222,11 @@ class ManageMenuScreen extends ConsumerWidget {
             selectedCat == null || selectedCat == 'all'
                 ? 'Add Item'
                 : 'Add to ${_getCategoryName(ref, selectedCat)}',
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+          ),
+          extendedPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 14,
           ),
           backgroundColor: theme.colorScheme.primary,
           elevation: 6,

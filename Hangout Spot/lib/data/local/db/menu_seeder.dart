@@ -6,13 +6,7 @@ import 'app_database.dart';
 class MenuSeeder {
   static Future<void> seedDefaultMenu(AppDatabase db) async {
     final existingCategories = await db.select(db.categories).get();
-
-    if (existingCategories.isNotEmpty) {
-      debugPrint('✅ Menu already seeded. Skipping default seeding.');
-      return;
-    }
-
-    debugPrint('🌱 Seeding Hangout Spot exact menu...');
+    debugPrint('🌱 Seeding menu entries (idempotent)...');
 
     final uuid = const Uuid();
 
@@ -33,27 +27,36 @@ class MenuSeeder {
       {'name': 'Shakes', 'color': 0xFFE91E63}, // Pink
       {'name': 'Mojito & Mocktail', 'color': 0xFF00BCD4}, // Cyan
       {'name': 'SPECIAL COMBO MEALS', 'color': 0xFF4CAF50}, // Green
+      {'name': 'Cold Drink', 'color': 0xFF1976D2}, // Blue darker
+      {'name': 'Water Bottle', 'color': 0xFF90CAF9}, // Light blue
     ];
 
-    final Map<String, String> categoryIds = {};
+    // Cache existing categories and items for idempotent inserts
+    final categoryIds = {
+      for (final cat in existingCategories) cat.name: cat.id,
+    };
+    final existingItems = await db.select(db.items).get();
+    final existingItemNames = existingItems.map((e) => e.name).toSet();
 
-    await db.batch((batch) {
-      for (var i = 0; i < categories.length; i++) {
-        final id = uuid.v4();
-        final name = categories[i]['name'] as String;
-        categoryIds[name] = id;
-
-        batch.insert(
-          db.categories,
-          CategoriesCompanion(
-            id: Value(id),
-            name: Value(name),
-            color: Value(categories[i]['color'] as int),
-            sortOrder: Value(i),
-          ),
-        );
-      }
-    });
+    // Ensure all categories exist
+    var sortIndex = existingCategories.length;
+    for (var i = 0; i < categories.length; i++) {
+      final name = categories[i]['name'] as String;
+      if (categoryIds.containsKey(name)) continue;
+      final id = uuid.v4();
+      categoryIds[name] = id;
+      await db
+          .into(db.categories)
+          .insert(
+            CategoriesCompanion(
+              id: Value(id),
+              name: Value(name),
+              color: Value(categories[i]['color'] as int),
+              sortOrder: Value(sortIndex++),
+            ),
+            mode: InsertMode.insertOrReplace,
+          );
+    }
 
     // --- Define Items ---
     final items = [
@@ -243,25 +246,65 @@ class MenuSeeder {
         'name': 'Tandoori Paneer Pizza + Garlic Bread + Cold Drink (20rs)',
         'price': 229,
       },
+
+      // 🥤 COLD DRINK (bottled)
+      {'category': 'Cold Drink', 'name': 'Coca Cola', 'price': 20},
+      {'category': 'Cold Drink', 'name': 'Sprite', 'price': 20},
+      {'category': 'Cold Drink', 'name': 'Fanta', 'price': 20},
+      {'category': 'Cold Drink', 'name': 'Thumbs Up', 'price': 20},
+
+      // 💧 WATER BOTTLE
+      {'category': 'Water Bottle', 'name': 'Water Bottle (Small)', 'price': 10},
+      {'category': 'Water Bottle', 'name': 'Water Bottle (Large)', 'price': 20},
     ];
 
-    await db.batch((batch) {
-      for (final item in items) {
-        final catId = categoryIds[item['category'] as String];
-        if (catId != null) {
-          batch.insert(
-            db.items,
+    for (final item in items) {
+      final name = item['name'] as String;
+      if (existingItemNames.contains(name)) continue;
+
+      final catId = categoryIds[item['category'] as String];
+      if (catId == null) continue;
+
+      await db
+          .into(db.items)
+          .insert(
             ItemsCompanion(
               id: Value(uuid.v4()),
               categoryId: Value(catId),
-              name: Value(item['name'] as String),
+              name: Value(name),
               price: Value((item['price'] as int).toDouble()),
             ),
+            mode: InsertMode.insertOrReplace,
           );
-        }
-      }
-    });
+      existingItemNames.add(name);
+    }
+
+    // Soft-delete duplicate items (same name + category) while keeping the first
+    await _dedupeItems(db);
 
     debugPrint('🌱 Exact Hangout Spot menu seeded successfully!');
+  }
+}
+
+Future<void> _dedupeItems(AppDatabase db) async {
+  final all = await db.select(db.items).get();
+  final seen = <String, String>{};
+  final dupes = <String>[];
+
+  for (final item in all) {
+    if (item.isDeleted) continue;
+    final key = '${item.categoryId}|${item.name.toLowerCase()}';
+    if (seen.containsKey(key)) {
+      dupes.add(item.id);
+    } else {
+      seen[key] = item.id;
+    }
+  }
+
+  if (dupes.isNotEmpty) {
+    await (db.update(db.items)..where((t) => t.id.isIn(dupes))).write(
+      const ItemsCompanion(isDeleted: Value(true)),
+    );
+    debugPrint('ℹ️ Soft-deleted ${dupes.length} duplicate menu items');
   }
 }

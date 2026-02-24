@@ -8,11 +8,15 @@ import 'package:hangout_spot/logic/billing/session_provider.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/data/repositories/auth_repository.dart';
 import 'package:hangout_spot/data/providers/realtime_services_provider.dart';
+import 'package:hangout_spot/data/models/inventory_models.dart';
+import 'package:hangout_spot/data/providers/inventory_providers.dart';
 import 'package:intl/intl.dart';
 import 'package:hangout_spot/logic/locations/location_provider.dart';
 import 'package:hangout_spot/data/repositories/customer_repository.dart';
 import 'package:hangout_spot/data/repositories/order_repository.dart';
 import 'package:hangout_spot/ui/screens/analytics/providers/analytics_data_provider.dart';
+import 'package:hangout_spot/main.dart';
+import 'package:hangout_spot/services/notification_service.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -23,25 +27,10 @@ class DashboardScreen extends ConsumerStatefulWidget {
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   DateTime? _selectedDate; // Null means 'current session date'
-  late String _quote;
-
-  final List<String> _quotes = [
-    "Life happens, coffee helps.",
-    "Espresso yourself.",
-    "Better latte than never.",
-    "Procaffeinating: The tendency to not start anything until you've had a cup of coffee.",
-    "Coffee: A hug in a mug.",
-    "Love is in the air, and it smells like coffee.",
-    "Stressed, blessed, and coffee obsessed.",
-    "First I drink the coffee, then I do the things.",
-    "Coffee is always a good idea.",
-    "Behind every successful person is a substantial amount of coffee.",
-  ];
 
   @override
   void initState() {
     super.initState();
-    _quote = _quotes[Random().nextInt(_quotes.length)];
   }
 
   Future<void> _pickDate(BuildContext context) async {
@@ -77,6 +66,41 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         _selectedDate = picked;
       });
     }
+  }
+
+  Future<void> _handleLowStockNotifications(List<InventoryItem> items) async {
+    if (items.isEmpty) return;
+
+    final prefs = ref.read(sharedPreferencesProvider);
+    final todayKey = _dateKey(DateTime.now());
+
+    for (final item in items) {
+      if (item.currentQty >= item.minQty) continue;
+
+      final key = 'dash_low_${item.id}_$todayKey';
+      if (prefs.getBool(key) == true) continue;
+
+      await NotificationService.instance.showNow(
+        id: _hashId('dash_${item.id}'),
+        title: 'Low stock: ${item.name}',
+        body:
+            'Only ${_formatQty(item.currentQty)} ${item.unit} left (min ${_formatQty(item.minQty)}).',
+      );
+
+      await prefs.setBool(key, true);
+    }
+  }
+
+  String _dateKey(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  int _hashId(String value) {
+    return value.hashCode & 0x7fffffff;
+  }
+
+  String _formatQty(double value) {
+    return value % 1 == 0 ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
   }
 
   @override
@@ -140,6 +164,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final caramel = isDark
         ? theme.colorScheme.secondary
         : const Color(0xFFEDAD4C);
+
+    final inventoryAsync = ref.watch(inventoryItemsStreamProvider);
+
+    ref.listen(inventoryItemsStreamProvider, (previous, next) async {
+      final items = next.valueOrNull ?? [];
+      await _handleLowStockNotifications(items);
+    });
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -209,7 +240,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                         ),
                                 );
 
-                                // Use address if available, falling back to name
                                 String subtitle =
                                     (location.address ?? '').isNotEmpty
                                     ? location.address!
@@ -320,24 +350,243 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    "Hello, $userName",
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: coffeeDark.withOpacity(0.8),
-                    ),
+                  Builder(
+                    builder: (context) {
+                      final hour = DateTime.now().hour;
+                      String greeting;
+                      if (hour < 12) {
+                        greeting = 'Good morning';
+                      } else if (hour < 17) {
+                        greeting = 'Good afternoon';
+                      } else {
+                        greeting = 'Good evening';
+                      }
+                      return Text(
+                        "$greeting, $userName",
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: coffeeDark.withOpacity(0.8),
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    "\"$_quote\"",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontStyle: FontStyle.italic,
-                      height: 1.4,
-                      color: coffeeDark,
-                      fontWeight: FontWeight.w500,
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: coffee.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(12),
                     ),
+                    child: Consumer(
+                      builder: (context, ref, _) {
+                        final analytics = ref.watch(
+                          analyticsRepositoryProvider,
+                        );
+                        final locationId = ref
+                            .watch(currentLocationIdProvider)
+                            .valueOrNull;
+
+                        // Yesterday range based on session window
+                        final yesterdayDate = currentDate.subtract(
+                          const Duration(days: 1),
+                        );
+                        final yStart = DateTime(
+                          yesterdayDate.year,
+                          yesterdayDate.month,
+                          yesterdayDate.day,
+                          sessionManager.openingHour,
+                        );
+                        final yEndBase = DateTime(
+                          yesterdayDate.year,
+                          yesterdayDate.month,
+                          yesterdayDate.day,
+                          sessionManager.closingHour,
+                        );
+                        final yEnd =
+                            sessionManager.closingHour <=
+                                sessionManager.openingHour
+                            ? yEndBase.add(const Duration(days: 1))
+                            : yEndBase;
+
+                        final analyticsData = ref.watch(
+                          analyticsDataProvider((
+                            startDate: startOfDay,
+                            endDate: endOfDay,
+                            filterName: 'Today',
+                          )),
+                        );
+
+                        return analyticsData.when(
+                          data: (data) {
+                            // Yesterday items sold
+                            return FutureBuilder<int>(
+                              future: analytics.getSessionItemsSold(
+                                yStart,
+                                yEnd,
+                                locationId: locationId,
+                              ),
+                              builder: (context, snapshot) {
+                                final yesterdayItems = snapshot.data ?? 0;
+
+                                // Top seller today
+                                String topSeller = 'No sales yet';
+                                if (data.itemShare.isNotEmpty) {
+                                  final top = data.itemShare.reduce(
+                                    (a, b) => a.quantity >= b.quantity ? a : b,
+                                  );
+                                  topSeller = top.itemName;
+                                }
+
+                                // Weekend lift calculation
+                                double weekendLift = 0;
+                                final weekend = data.dayOfWeekSales
+                                    .where(
+                                      (d) =>
+                                          d.dayOfWeek == 5 || d.dayOfWeek == 6,
+                                    )
+                                    .toList();
+                                final weekday = data.dayOfWeekSales
+                                    .where(
+                                      (d) =>
+                                          d.dayOfWeek >= 0 && d.dayOfWeek <= 4,
+                                    )
+                                    .toList();
+                                if (weekday.isNotEmpty) {
+                                  final weekendAvg = weekend.isNotEmpty
+                                      ? weekend
+                                                .map((d) => d.amount)
+                                                .reduce((a, b) => a + b) /
+                                            weekend.length
+                                      : 0;
+                                  final weekdayAvg =
+                                      weekday
+                                          .map((d) => d.amount)
+                                          .reduce((a, b) => a + b) /
+                                      weekday.length;
+                                  if (weekdayAvg > 0) {
+                                    weekendLift =
+                                        ((weekendAvg - weekdayAvg) /
+                                            weekdayAvg) *
+                                        100;
+                                  }
+                                }
+
+                                final peakText = data.todayPeakForecast != null
+                                    ? "Peak today around ${data.todayPeakForecast!.formattedTime}"
+                                    : "Peak time not predicted yet";
+
+                                final summary =
+                                    "Yesterday $yesterdayItems items · Today's leader: $topSeller · ${peakText.toLowerCase()} · Weekend forecast: ${weekendLift.round()}% above weekdays";
+
+                                return Text(
+                                  summary,
+                                  style: TextStyle(
+                                    color: coffeeDark,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                          loading: () => const SizedBox(
+                            height: 60,
+                            child: Center(
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                          error: (_, __) => Text(
+                            'Insights unavailable',
+                            style: TextStyle(color: coffeeDark),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  inventoryAsync.when(
+                    data: (items) {
+                      final lowStock = items
+                          .where((i) => i.currentQty < i.minQty)
+                          .toList();
+                      if (lowStock.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
+
+                      final preview = lowStock
+                          .take(3)
+                          .map(
+                            (i) =>
+                                '${i.name} (${_formatQty(i.currentQty)}/${_formatQty(i.minQty)} ${i.unit})',
+                          )
+                          .join(' • ');
+                      final remaining = lowStock.length - 3;
+                      final subtitle = remaining > 0
+                          ? '$preview • +$remaining more'
+                          : preview;
+
+                      return Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(top: 8),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: caramel.withOpacity(0.18),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: caramel.withOpacity(0.35)),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: caramel.withOpacity(0.3),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                Icons.warning_rounded,
+                                color: coffeeDark,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Low stock alert',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      color: coffeeDark,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${lowStock.length} item(s) below minimum',
+                                    style: TextStyle(
+                                      color: coffeeDark.withOpacity(0.85),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    subtitle,
+                                    style: TextStyle(
+                                      color: coffeeDark.withOpacity(0.75),
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, __) => const SizedBox.shrink(),
                   ),
                 ],
               ),
