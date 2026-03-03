@@ -151,6 +151,25 @@ class RewardNotifier extends StateNotifier<void> {
     return true;
   }
 
+  /// Cancel a reward redemption, refunding the points
+  Future<bool> cancelReward({
+    required String customerId,
+    required double pointsToRefund,
+    String? description,
+  }) async {
+    // Create a refund transaction (treated as "earn" under the hood)
+    final transaction = RewardTransactionsCompanion(
+      id: Value(const Uuid().v4()),
+      customerId: Value(customerId),
+      type: const Value('earn'),
+      amount: Value(pointsToRefund),
+      description: Value(description ?? 'Refunded $pointsToRefund points'),
+    );
+
+    await _db.into(_db.rewardTransactions).insert(transaction);
+    return true;
+  }
+
   /// Adjust reward points (for admin)
   Future<void> adjustReward({
     required String customerId,

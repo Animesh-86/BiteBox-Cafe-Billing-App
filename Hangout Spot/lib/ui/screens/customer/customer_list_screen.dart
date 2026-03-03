@@ -179,14 +179,15 @@ class _CustomerListScreenState extends ConsumerState<CustomerListScreen> {
                   controller: phoneController,
                   decoration: const InputDecoration(labelText: 'Phone'),
                   keyboardType: TextInputType.phone,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: discountController,
-                decoration: const InputDecoration(labelText: 'Discount %'),
-                keyboardType: TextInputType.number,
-              ),
-            ],
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: discountController,
+                  decoration: const InputDecoration(labelText: 'Discount %'),
+                  keyboardType: TextInputType.number,
+                ),
+              ],
+            ),
           ),
         ),
         actions: [

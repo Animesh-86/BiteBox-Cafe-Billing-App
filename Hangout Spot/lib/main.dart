@@ -64,14 +64,15 @@ class HangoutSpotApp extends ConsumerWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,
       builder: (context, child) {
-        // Globally dynamically adjust all typography to prevent the
-        // application sounding "tiny" on large landscape Tablet/iPads.
+        // Instagram-style responsive text scaling:
+        // • Respects the user's OS accessibility font-size preference
+        // • Clamps to a max of 1.3× so layouts never overflow
+        // • Adds a small boost on tablets for POS readability
+        final effectiveScale = ResponsiveLayout.clampedTextScale(context);
         return MediaQuery(
-          data: MediaQuery.of(context).copyWith(
-            textScaler: TextScaler.linear(
-              ResponsiveLayout.textScaleFactor(context),
-            ),
-          ),
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(effectiveScale)),
           child: child!,
         );
       },

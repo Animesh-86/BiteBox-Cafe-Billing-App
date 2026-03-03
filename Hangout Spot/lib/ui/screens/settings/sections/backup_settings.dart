@@ -475,42 +475,43 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
                                       controller: confirmController,
                                       autofocus: true,
                                       decoration: const InputDecoration(
-                                        context: context,
-                                        builder: (ctx) => AlertDialog(
-                                          backgroundColor: Theme.of(
-                                            context,
-                                          ).colorScheme.surface,
-                                          title: Row(
-                                            children: const [
-                                              Icon(Icons.delete_forever, color: Colors.red),
-                                              SizedBox(width: 8),
-                                              Text(
-                                                'Clean All Data?',
-                                                style: TextStyle(color: Colors.red),
-                                              ),
-                                            ],
-                                          ),
-                                          content: SafeArea(
-                                            child: const Text(
-                                              'This will permanently delete all local data from this device.\n\n'
-                                              'Are you sure you want to proceed?',
-                                            ),
-                                          ),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: () => Navigator.pop(ctx, false),
-                                              child: const Text('Cancel'),
-                                            ),
-                                            ElevatedButton(
-                                              onPressed: () => Navigator.pop(ctx, true),
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor: Colors.red,
-                                                foregroundColor: Colors.white,
-                                              ),
-                                              child: const Text('Delete All'),
-                                            ),
-                                          ],
-                                        ),
+                                        hintText: 'Type DELETE',
+                                        border: OutlineInputBorder(),
+                                      ),
+                                      onChanged: (_) => setS(() {}),
+                                    ),
+                                  ],
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx, false),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed:
+                                        confirmController.text
+                                                .trim()
+                                                .toUpperCase() ==
+                                            'DELETE'
+                                        ? () => Navigator.pop(ctx, true)
+                                        : null,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.red,
+                                      foregroundColor: Colors.white,
+                                    ),
+                                    child: const Text('Delete All'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                          if (confirm2 != true || !mounted) return;
+
+                          // Show progress dialog
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (_) => const Center(
                               child: Card(
                                 child: Padding(
                                   padding: EdgeInsets.all(24),

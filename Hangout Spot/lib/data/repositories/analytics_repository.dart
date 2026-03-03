@@ -1428,7 +1428,7 @@ class AnalyticsRepository {
     if (customerId == CustomerDefaults.zomatoId) return 'Zomato';
     if (customerId == CustomerDefaults.swiggyId) return 'Swiggy';
     if (customerId == CustomerDefaults.walkInId) return 'Walk-in';
-    return 'Other';
+    return 'Walk-in';
   }
 }
 

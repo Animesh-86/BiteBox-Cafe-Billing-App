@@ -39,27 +39,18 @@ class _CartPanelState extends ConsumerState<CartPanel> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ),
-              // Footer
-              SafeArea(
-                bottom: true,
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: billingSurface(context, darkOpacity: 0.04),
-                    borderRadius: const BorderRadius.vertical(
-                      bottom: Radius.circular(20),
-                    ),
-                    boxShadow: billingShadow(context),
-                  ),
-                  child: SingleChildScrollView(child: const CartFooter()),
-                ),
-              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
                       Text(
                         'Order',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
                       ),
                     ],
                   ),
@@ -145,9 +136,13 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                       child: cart.invoiceNumber != null
                           ? Text(
                               cart.invoiceNumber!,
-                              style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
+                                  ),
                             )
                           : FutureBuilder<String>(
                               future: ref
@@ -155,9 +150,13 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                                   .peekNextInvoiceNumber(),
                               builder: (context, snapshot) => Text(
                                 snapshot.data ?? '... ',
-                                style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
+                                style: Theme.of(context).textTheme.labelSmall
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
+                                    ),
                               ),
                             ),
                     ),
@@ -175,8 +174,8 @@ class _CartPanelState extends ConsumerState<CartPanel> {
                       Expanded(
                         child: Text(
                           cart.customer!.name,
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(color: billingMutedText(context),
-                          ),
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(color: billingMutedText(context)),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -199,7 +198,9 @@ class _CartPanelState extends ConsumerState<CartPanel> {
               ? Center(
                   child: Text(
                     'Cart empty',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: billingMutedText(context)),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: billingMutedText(context),
+                    ),
                   ),
                 )
               : ListView.separated(

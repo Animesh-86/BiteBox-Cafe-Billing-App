@@ -158,7 +158,7 @@ class _ForecastScreenState extends ConsumerState<ForecastScreen> {
         crossAxisCount: 2,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
-        childAspectRatio: 1.3,
+        childAspectRatio: 1.15,
       ),
       itemCount: data.itemForecast.length,
       itemBuilder: (context, index) {
@@ -214,15 +214,20 @@ class _ForecastScreenState extends ConsumerState<ForecastScreen> {
                 ],
               ),
               const SizedBox(height: 8),
-              Text(
-                forecast.itemName,
-                style: const TextStyle(
-                  color: AnalyticsTheme.primaryText,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+              Expanded(
+                child: Container(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    forecast.itemName,
+                    style: const TextStyle(
+                      color: AnalyticsTheme.primaryText,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
               ),
               Text(
                 'Expected qty/day',

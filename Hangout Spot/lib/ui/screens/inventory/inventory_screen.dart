@@ -145,21 +145,35 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                           children: [
                             Row(
                               children: [
-                                Container(
-                                  width: 40,
-                                  height: 40,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primary.withOpacity(0.18),
-                                  ),
-                                  child: Icon(
-                                    Icons.inventory_2_rounded,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
-                                  ),
+                                Row(
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.arrow_back_rounded,
+                                      ),
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
+                                      onPressed: () => Navigator.pop(context),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Container(
+                                      width: 40,
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.primary.withOpacity(0.18),
+                                      ),
+                                      child: Icon(
+                                        Icons.inventory_2_rounded,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.primary,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                                 const SizedBox(width: 12),
                                 Column(

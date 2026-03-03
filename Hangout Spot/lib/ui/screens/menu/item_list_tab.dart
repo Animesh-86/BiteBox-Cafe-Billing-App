@@ -529,101 +529,93 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
                     horizontal: 12,
                     vertical: 12,
                   ),
+                ),
+                dropdownColor: cream,
+                style: const TextStyle(color: Color(0xFF98664D), fontSize: 14),
               ),
-              dropdownColor: cream,
-              style: const TextStyle(color: Color(0xFF98664D), fontSize: 14),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _nameController,
-              decoration: InputDecoration(
-                labelText: 'Item Name',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _nameController,
+                decoration: InputDecoration(
+                  labelText: 'Item Name',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  prefixIcon: const Icon(
+                    Icons.restaurant_menu_rounded,
+                    size: 20,
+                  ),
+                  filled: true,
+                  fillColor: surface,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
                 ),
-                prefixIcon: const Icon(Icons.restaurant_menu_rounded, size: 20),
-                filled: true,
-                fillColor: surface,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 12,
-                ),
+                style: const TextStyle(color: Color(0xFF98664D), fontSize: 14),
               ),
-              style: const TextStyle(color: Color(0xFF98664D), fontSize: 14),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _priceController,
-              decoration: InputDecoration(
-                labelText: 'Price',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _priceController,
+                decoration: InputDecoration(
+                  labelText: 'Price',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  prefixIcon: const Icon(
+                    Icons.currency_rupee_rounded,
+                    size: 20,
+                  ),
+                  prefixText: '₹ ',
+                  filled: true,
+                  fillColor: surface,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
                 ),
-                prefixIcon: const Icon(Icons.currency_rupee_rounded, size: 20),
-                prefixText: '₹ ',
-                filled: true,
-                fillColor: surface,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 12,
-                ),
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: Color(0xFF98664D), fontSize: 14),
               ),
-              keyboardType: TextInputType.number,
-              style: const TextStyle(color: Color(0xFF98664D), fontSize: 14),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _discountController,
-              decoration: InputDecoration(
-                labelText: 'Discount Percentage',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _discountController,
+                decoration: InputDecoration(
+                  labelText: 'Discount Percentage',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  prefixIcon: const Icon(Icons.local_offer_rounded, size: 20),
+                  suffixText: '%',
+                  filled: true,
+                  fillColor: surface,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
                 ),
-                prefixIcon: const Icon(Icons.local_offer_rounded, size: 20),
-                suffixText: '%',
-                filled: true,
-                fillColor: surface,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 12,
-                ),
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: Color(0xFF98664D), fontSize: 14),
               ),
-              keyboardType: TextInputType.number,
-              style: const TextStyle(color: Color(0xFF98664D), fontSize: 14),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _imageUrlController,
-              decoration: InputDecoration(
-                labelText: 'Item Image',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _imageUrlController,
+                decoration: InputDecoration(
+                  labelText: 'Item Image',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  prefixIcon: const Icon(Icons.image_outlined, size: 20),
+                  filled: true,
+                  fillColor: surface,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
                 ),
-                prefixIcon: const Icon(Icons.image_outlined, size: 20),
-                filled: true,
-                fillColor: surface,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 12,
-                ),
-              ),
-              readOnly: true,
-              style: const TextStyle(color: Color(0xFF98664D), fontSize: 14),
-              onTap: () async {
-                final result = await FilePicker.platform.pickFiles(
-                  type: FileType.image,
-                );
-                if (result != null && result.files.single.path != null) {
-                  _imageUrlController.text = result.files.single.path!;
-                  if (mounted) setState(() {});
-                }
-              },
-            ),
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: FilledButton.icon(
-                onPressed: () async {
+                readOnly: true,
+                style: const TextStyle(color: Color(0xFF98664D), fontSize: 14),
+                onTap: () async {
                   final result = await FilePicker.platform.pickFiles(
                     type: FileType.image,
                   );
@@ -632,15 +624,30 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
                     if (mounted) setState(() {});
                   }
                 },
-                icon: const Icon(Icons.upload_rounded, size: 18),
-                label: const Text('Upload Image'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: coffee,
-                  foregroundColor: Colors.white,
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: FilledButton.icon(
+                  onPressed: () async {
+                    final result = await FilePicker.platform.pickFiles(
+                      type: FileType.image,
+                    );
+                    if (result != null && result.files.single.path != null) {
+                      _imageUrlController.text = result.files.single.path!;
+                      if (mounted) setState(() {});
+                    }
+                  },
+                  icon: const Icon(Icons.upload_rounded, size: 18),
+                  label: const Text('Upload Image'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: coffee,
+                    foregroundColor: Colors.white,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
       actions: [

@@ -10,6 +10,99 @@ import 'package:hangout_spot/ui/screens/billing/widgets/billing_actions.dart';
 import 'package:hangout_spot/ui/screens/billing/widgets/billing_shared_widgets.dart';
 import 'package:hangout_spot/ui/screens/billing/widgets/billing_styles.dart';
 
+class CartDiscountField extends ConsumerStatefulWidget {
+  final CartState cart;
+  final CartNotifier notifier;
+
+  const CartDiscountField({
+    super.key,
+    required this.cart,
+    required this.notifier,
+  });
+
+  @override
+  ConsumerState<CartDiscountField> createState() => _CartDiscountFieldState();
+}
+
+class _CartDiscountFieldState extends ConsumerState<CartDiscountField> {
+  late TextEditingController _controller;
+  double _lastProcessedPercent = -1.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+    _updateControllerFromCart();
+  }
+
+  @override
+  void didUpdateWidget(CartDiscountField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.cart.manualDiscount != widget.cart.manualDiscount ||
+        oldWidget.cart.subtotal != widget.cart.subtotal) {
+      _updateControllerFromCart();
+    }
+  }
+
+  void _updateControllerFromCart() {
+    final cartPercent =
+        widget.cart.subtotal > 0 && widget.cart.manualDiscount > 0
+        ? (widget.cart.manualDiscount / widget.cart.subtotal) * 100
+        : 0.0;
+
+    // Only update the text field if the value computed from cart differs
+    // from what the user just typed, to avoid interrupting typing or cursor position.
+    final currentTextValue = double.tryParse(_controller.text) ?? 0.0;
+    if ((cartPercent - currentTextValue).abs() > 0.01 &&
+        (cartPercent - _lastProcessedPercent).abs() > 0.01) {
+      final newValue = cartPercent > 0 ? cartPercent.toStringAsFixed(0) : '';
+      if (_controller.text != newValue) {
+        _controller.text = newValue;
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
+      controller: _controller,
+      keyboardType: TextInputType.number,
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+        color: Colors.black87,
+        fontWeight: FontWeight.bold,
+      ),
+      decoration: InputDecoration(
+        hintText: '0',
+        hintStyle: TextStyle(color: Colors.black.withOpacity(0.4)),
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        filled: true,
+        fillColor: Colors.white.withOpacity(0.9),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.green.shade200),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.green.shade200),
+        ),
+      ),
+      onChanged: (value) {
+        final percent = double.tryParse(value) ?? 0.0;
+        _lastProcessedPercent = percent;
+        final discountAmount = widget.cart.subtotal * (percent / 100);
+        widget.notifier.setManualDiscount(discountAmount);
+      },
+    );
+  }
+}
+
 class CartItemTile extends StatelessWidget {
   final CartItem item;
   final CartNotifier notifier;
@@ -524,10 +617,14 @@ class CartFooter extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final cart = ref.watch(cartProvider);
     final notifier = ref.read(cartProvider.notifier);
+    // Note: manual discount represents percentage input, reward is flat rate subtraction.
+    // 'Other' discount represents item-level and customer-level discounts.
     final nonPromoDiscount = (cart.totalDiscount - cart.promoDiscount).clamp(
       0.0,
-      cart.totalDiscount,
+      cart.subtotal,
     );
+    final otherDiscount =
+        nonPromoDiscount - cart.manualDiscount - cart.rewardDiscount;
 
     return Column(
       children: [
@@ -561,6 +658,8 @@ class CartFooter extends ConsumerWidget {
               const SizedBox(height: 6),
               Wrap(
                 spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   PaymentChip(
                     label: 'Cash',
@@ -577,13 +676,9 @@ class CartFooter extends ConsumerWidget {
                     isSelected: cart.paymentMode == 'Split',
                     onTap: () => notifier.setPaymentMode('Split'),
                   ),
-                ],
-              ),
-              if (cart.paymentMode == 'Split') const SizedBox(height: 8),
-              if (cart.paymentMode == 'Split')
-                Row(
-                  children: [
-                    Expanded(
+                  if (cart.paymentMode == 'Split') ...[
+                    SizedBox(
+                      width: 80,
                       child: TextField(
                         keyboardType: TextInputType.number,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -611,15 +706,15 @@ class CartFooter extends ConsumerWidget {
                         },
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
+                    SizedBox(
+                      width: 80,
                       child: TextField(
                         controller: TextEditingController(
                           text: cart.paidUPI > 0
                               ? cart.paidUPI.toStringAsFixed(2)
                               : '',
                         ),
-                        keyboardType: TextInputType.number,
+                        readOnly: true,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: billingText(context),
                         ),
@@ -638,15 +733,11 @@ class CartFooter extends ConsumerWidget {
                             borderRadius: BorderRadius.circular(6),
                           ),
                         ),
-                        onChanged: (value) {
-                          final upi = double.tryParse(value) ?? 0.0;
-                          final cash = cart.grandTotal - upi;
-                          notifier.setPaymentSplit(cash > 0 ? cash : 0, upi);
-                        },
                       ),
                     ),
                   ],
-                ),
+                ],
+              ),
             ],
           ),
         ),
@@ -684,45 +775,22 @@ class CartFooter extends ConsumerWidget {
                       ],
                     ),
                     const SizedBox(height: 6),
-                    TextField(
-                      keyboardType: TextInputType.number,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: billingText(context),
-                      ),
-                      decoration: InputDecoration(
-                        hintText: '0',
-                        hintStyle: TextStyle(
-                          color: billingMutedText(context).withOpacity(0.6),
-                        ),
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 8,
-                        ),
-                        filled: true,
-                        fillColor: Colors.white.withOpacity(0.7),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: Colors.green.shade200),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: Colors.green.shade200),
-                        ),
-                      ),
-                      onChanged: (value) {
-                        final percent = double.tryParse(value) ?? 0.0;
-                        final discountAmount = cart.subtotal * (percent / 100);
-                        notifier.setManualDiscount(discountAmount);
-                      },
-                    ),
+                    CartDiscountField(cart: cart, notifier: notifier),
                     const SizedBox(height: 6),
-                    Text(
-                      'Applied: -₹${nonPromoDiscount.toStringAsFixed(2)}',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: Colors.green.shade800,
+                    if (cart.manualDiscount > 0)
+                      Text(
+                        'Manual: -₹${cart.manualDiscount.toStringAsFixed(2)}',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: Colors.green.shade800,
+                        ),
                       ),
-                    ),
+                    if (otherDiscount > 0)
+                      Text(
+                        'Other: -₹${otherDiscount.toStringAsFixed(2)}',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: Colors.green.shade800,
+                        ),
+                      ),
                     if (cart.promoDiscount > 0)
                       Text(
                         'Promo: -₹${cart.promoDiscount.toStringAsFixed(2)}',
@@ -813,10 +881,43 @@ class CartFooter extends ConsumerWidget {
                           .when(
                             data: (balance) {
                               if (balance <= 0) return const SizedBox.shrink();
-                              return Text(
-                                'Rewards: ${balance.toInt()} pts',
-                                style: Theme.of(context).textTheme.labelSmall
-                                    ?.copyWith(color: Colors.blue.shade800),
+                              return Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Rewards: ${balance.toInt()} pts',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(color: Colors.blue.shade800),
+                                  ),
+                                  InkWell(
+                                    onTap: () {
+                                      if (cart.rewardDiscount > 0) {
+                                        notifier.cancelRewardDiscount();
+                                      } else {
+                                        showRedemptionDialog(context, ref);
+                                      }
+                                    },
+                                    child: Text(
+                                      cart.rewardDiscount > 0
+                                          ? 'Cancel'
+                                          : 'Redeem',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelSmall
+                                          ?.copyWith(
+                                            color: cart.rewardDiscount > 0
+                                                ? Colors.red.shade600
+                                                : Colors.blue.shade800,
+                                            fontWeight: FontWeight.bold,
+                                            decoration:
+                                                TextDecoration.underline,
+                                          ),
+                                    ),
+                                  ),
+                                ],
                               );
                             },
                             loading: () => const SizedBox.shrink(),

@@ -370,15 +370,19 @@ class InventoryRemindersScreen extends ConsumerWidget {
 
   Future<void> _sendTestNotification(BuildContext context) async {
     await _ensurePermissions();
-    await NotificationService.instance.showNow(
+    // Use scheduleTest to test the exact same zonedSchedule path as reminders
+    await NotificationService.instance.scheduleTest(
       id: _hashId('test_${DateTime.now().millisecondsSinceEpoch}'),
-      title: 'Test notification',
-      body: 'If you see this, reminders should work.',
+      title: 'Scheduled test notification',
+      body: 'This used zonedSchedule — reminders should work!',
+      seconds: 10,
     );
     if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Test notification sent.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Scheduled test notification — should appear in ~10s'),
+        ),
+      );
     }
   }
 

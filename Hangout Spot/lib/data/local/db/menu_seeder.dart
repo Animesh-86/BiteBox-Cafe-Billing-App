@@ -5,46 +5,51 @@ import 'app_database.dart';
 
 class MenuSeeder {
   static Future<void> seedDefaultMenu(AppDatabase db) async {
+    // 1. Deduplicate existing categories and items FIRST before checking
+    final catDupeCount = await _dedupeCategories(db);
+    final itemDupeCount = await _dedupeItems(db);
+
     final existingCategories = await db.select(db.categories).get();
-    debugPrint('🌱 Seeding menu entries (idempotent)...');
 
     final uuid = const Uuid();
 
     // --- Define Categories ---
     final categories = [
-      {'name': 'Toast', 'color': 0xFFFFB74D}, // Orange Light
-      {'name': 'Sandwich', 'color': 0xFFFF9800}, // Orange
-      {'name': 'Grilled Sandwich', 'color': 0xFFF57C00}, // Orange Dark
-      {'name': 'Pizza', 'color': 0xFFFFC107}, // Amber
-      {'name': 'Burger', 'color': 0xFFF44336}, // Red
-      {'name': 'Frankie', 'color': 0xFF8D6E63}, // Brown Light
-      {'name': 'French Fries', 'color': 0xFFFFEB3B}, // Yellow
-      {'name': 'Garlic Bread', 'color': 0xFFD4E157}, // Lime
-      {'name': 'Pasta', 'color': 0xFF9C27B0}, // Purple
-      {'name': 'Maggi', 'color': 0xFFFFCA28}, // Amber Light
-      {'name': 'Tea & Coffee', 'color': 0xFF795548}, // Brown
-      {'name': 'Cold Beverages', 'color': 0xFF2196F3}, // Blue
-      {'name': 'Shakes', 'color': 0xFFE91E63}, // Pink
-      {'name': 'Mojito & Mocktail', 'color': 0xFF00BCD4}, // Cyan
-      {'name': 'SPECIAL COMBO MEALS', 'color': 0xFF4CAF50}, // Green
-      {'name': 'Cold Drink', 'color': 0xFF1976D2}, // Blue darker
-      {'name': 'Water Bottle', 'color': 0xFF90CAF9}, // Light blue
+      {'name': 'Toast', 'color': 0xFFFFB74D},
+      {'name': 'Sandwich', 'color': 0xFFFF9800},
+      {'name': 'Grilled Sandwich', 'color': 0xFFF57C00},
+      {'name': 'Pizza', 'color': 0xFFFFC107},
+      {'name': 'Burger', 'color': 0xFFF44336},
+      {'name': 'Frankie', 'color': 0xFF8D6E63},
+      {'name': 'French Fries', 'color': 0xFFFFEB3B},
+      {'name': 'Garlic Bread', 'color': 0xFFD4E157},
+      {'name': 'Pasta', 'color': 0xFF9C27B0},
+      {'name': 'Maggi', 'color': 0xFFFFCA28},
+      {'name': 'Tea & Coffee', 'color': 0xFF795548},
+      {'name': 'Cold Beverages', 'color': 0xFF2196F3},
+      {'name': 'Shakes', 'color': 0xFFE91E63},
+      {'name': 'Mojito & Mocktail', 'color': 0xFF00BCD4},
+      {'name': 'SPECIAL COMBO MEALS', 'color': 0xFF4CAF50},
+      {'name': 'Cold Drink', 'color': 0xFF1976D2},
+      {'name': 'Water Bottle', 'color': 0xFF90CAF9},
     ];
 
-    // Cache existing categories and items for idempotent inserts
-    final categoryIds = {
-      for (final cat in existingCategories) cat.name: cat.id,
+    // Cache existing categories for lookup (case-insensitive)
+    final categoryIds = <String, String>{
+      for (final cat in existingCategories)
+        if (!cat.isDeleted) cat.name.toLowerCase().trim(): cat.id,
     };
-    final existingItems = await db.select(db.items).get();
-    final existingItemNames = existingItems.map((e) => e.name).toSet();
 
     // Ensure all categories exist
     var sortIndex = existingCategories.length;
     for (var i = 0; i < categories.length; i++) {
       final name = categories[i]['name'] as String;
-      if (categoryIds.containsKey(name)) continue;
+      final lowerName = name.toLowerCase().trim();
+
+      if (categoryIds.containsKey(lowerName)) continue;
+
       final id = uuid.v4();
-      categoryIds[name] = id;
+      categoryIds[lowerName] = id;
       await db
           .into(db.categories)
           .insert(
@@ -56,6 +61,14 @@ class MenuSeeder {
             ),
             mode: InsertMode.insertOrReplace,
           );
+    }
+
+    // Build composite key set (categoryId|name) from ALL existing items
+    // (including soft-deleted) to prevent re-inserting anything
+    final existingItems = await db.select(db.items).get();
+    final existingKeys = <String>{};
+    for (final item in existingItems) {
+      existingKeys.add('${item.categoryId}|${item.name.toLowerCase().trim()}');
     }
 
     // --- Define Items ---
@@ -258,12 +271,16 @@ class MenuSeeder {
       {'category': 'Water Bottle', 'name': 'Water Bottle (Large)', 'price': 20},
     ];
 
+    var insertedItems = 0;
     for (final item in items) {
       final name = item['name'] as String;
-      if (existingItemNames.contains(name)) continue;
-
-      final catId = categoryIds[item['category'] as String];
+      final catName = (item['category'] as String).toLowerCase().trim();
+      final catId = categoryIds[catName];
       if (catId == null) continue;
+
+      // Use category+name composite key to prevent cross-category false skips
+      final compositeKey = '$catId|${name.toLowerCase().trim()}';
+      if (existingKeys.contains(compositeKey)) continue;
 
       await db
           .into(db.items)
@@ -276,24 +293,66 @@ class MenuSeeder {
             ),
             mode: InsertMode.insertOrReplace,
           );
-      existingItemNames.add(name);
+      existingKeys.add(compositeKey);
+      insertedItems++;
     }
 
-    // Soft-delete duplicate items (same name + category) while keeping the first
-    await _dedupeItems(db);
-
-    debugPrint('🌱 Exact Hangout Spot menu seeded successfully!');
+    if (insertedItems > 0 || catDupeCount > 0 || itemDupeCount > 0) {
+      debugPrint(
+        '🌱 Menu seed: inserted $insertedItems new items, '
+        'removed $catDupeCount duplicate categories, '
+        'removed $itemDupeCount duplicate items',
+      );
+    } else {
+      debugPrint('✅ Menu already seeded. Skipping default seeding.');
+    }
   }
 }
 
-Future<void> _dedupeItems(AppDatabase db) async {
+/// Consolidates duplicate categories (same case-insensitive name) into a single category.
+/// Re-parents items to the kept category and soft-deletes the duplicates.
+Future<int> _dedupeCategories(AppDatabase db) async {
+  final all = await db.select(db.categories).get();
+  final seen = <String, String>{};
+  final dupes = <String>[];
+
+  // Map lowercase name -> ID of the kept category
+  for (final cat in all) {
+    if (cat.isDeleted) continue;
+
+    final key = cat.name.toLowerCase().trim();
+    if (seen.containsKey(key)) {
+      final keptId = seen[key]!;
+      dupes.add(cat.id);
+
+      // Re-parent all items from this duplicate category to the kept category
+      await (db.update(db.items)..where((t) => t.categoryId.equals(cat.id)))
+          .write(ItemsCompanion(categoryId: Value(keptId)));
+    } else {
+      seen[key] = cat.id;
+    }
+  }
+
+  if (dupes.isNotEmpty) {
+    await (db.update(db.categories)..where((t) => t.id.isIn(dupes))).write(
+      const CategoriesCompanion(isDeleted: Value(true)),
+    );
+    debugPrint(
+      '🧹 Soft-deleted ${dupes.length} duplicate categories and migrated their items.',
+    );
+  }
+  return dupes.length;
+}
+
+/// Soft-deletes duplicate items (same categoryId + name), keeping the first one.
+Future<int> _dedupeItems(AppDatabase db) async {
   final all = await db.select(db.items).get();
   final seen = <String, String>{};
   final dupes = <String>[];
 
   for (final item in all) {
     if (item.isDeleted) continue;
-    final key = '${item.categoryId}|${item.name.toLowerCase()}';
+    final key = '${item.categoryId}|${item.name.toLowerCase().trim()}';
     if (seen.containsKey(key)) {
       dupes.add(item.id);
     } else {
@@ -305,6 +364,7 @@ Future<void> _dedupeItems(AppDatabase db) async {
     await (db.update(db.items)..where((t) => t.id.isIn(dupes))).write(
       const ItemsCompanion(isDeleted: Value(true)),
     );
-    debugPrint('ℹ️ Soft-deleted ${dupes.length} duplicate menu items');
+    debugPrint('🧹 Soft-deleted ${dupes.length} duplicate menu items');
   }
+  return dupes.length;
 }

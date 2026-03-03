@@ -85,54 +85,63 @@ class AnalyticsHeader extends ConsumerWidget {
                     'Yesterday',
                     DateFilter.yesterday(),
                   ),
-                  _buildFilterOption(context, 'This Week', DateFilter.thisWeek()),
+                  _buildFilterOption(
+                    context,
+                    'This Week',
+                    DateFilter.thisWeek(),
+                  ),
                   _buildFilterOption(
                     context,
                     'This Month',
-                  DateFilter.thisMonth(),
-                ),
-                _buildFilterOption(context, 'This Year', DateFilter.thisYear()),
-                _buildFilterOption(
-                  context,
-                  'Last 7 Days',
-                  DateFilter.last7Days(),
-                ),
-                _buildFilterOption(
-                  context,
-                  'Last 30 Days',
-                  DateFilter.last30Days(),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.pop(context);
-                  _selectDateRange(context);
-                },
-                icon: const Icon(
-                  Icons.calendar_month_rounded,
-                  color: Colors.black,
-                ),
-                label: const Text(
-                  'Custom Range',
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.bold,
+                    DateFilter.thisMonth(),
                   ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AnalyticsTheme.primaryGold,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                  _buildFilterOption(
+                    context,
+                    'This Year',
+                    DateFilter.thisYear(),
+                  ),
+                  _buildFilterOption(
+                    context,
+                    'Last 7 Days',
+                    DateFilter.last7Days(),
+                  ),
+                  _buildFilterOption(
+                    context,
+                    'Last 30 Days',
+                    DateFilter.last30Days(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _selectDateRange(context);
+                  },
+                  icon: const Icon(
+                    Icons.calendar_month_rounded,
+                    color: Colors.black,
+                  ),
+                  label: const Text(
+                    'Custom Range',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AnalyticsTheme.primaryGold,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -219,72 +228,21 @@ class AnalyticsHeader extends ConsumerWidget {
                     Icons.store_mall_directory_rounded,
                     color: currentOutlet == null
                         ? AnalyticsTheme.primaryGold
-                      : AnalyticsTheme.secondaryText,
-                ),
-              ),
-              title: Text(
-                'All Outlets',
-                style: TextStyle(
-                  color: currentOutlet == null
-                      ? AnalyticsTheme.primaryGold
-                      : AnalyticsTheme.primaryText,
-                  fontWeight: currentOutlet == null
-                      ? FontWeight.bold
-                      : FontWeight.normal,
-                ),
-              ),
-              trailing: currentOutlet == null
-                  ? const Icon(
-                      Icons.check_circle_rounded,
-                      color: AnalyticsTheme.primaryGold,
-                    )
-                  : null,
-              onTap: () {
-                ref.read(analyticsSelectedOutletProvider.notifier).state = null;
-                Navigator.pop(context);
-              },
-            ),
-            const Divider(color: Colors.white12),
-            ...locations.map(
-              (location) => ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: location.id == currentOutlet?.id
-                        ? AnalyticsTheme.primaryGold.withOpacity(0.2)
-                        : AnalyticsTheme.secondaryBeige.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    Icons.store_rounded,
-                    color: location.id == currentOutlet?.id
-                        ? AnalyticsTheme.primaryGold
                         : AnalyticsTheme.secondaryText,
                   ),
                 ),
                 title: Text(
-                  location.name,
+                  'All Outlets',
                   style: TextStyle(
-                    color: location.id == currentOutlet?.id
+                    color: currentOutlet == null
                         ? AnalyticsTheme.primaryGold
                         : AnalyticsTheme.primaryText,
-                    fontWeight: location.id == currentOutlet?.id
+                    fontWeight: currentOutlet == null
                         ? FontWeight.bold
                         : FontWeight.normal,
                   ),
                 ),
-                subtitle:
-                    location.address != null && location.address!.isNotEmpty
-                    ? Text(
-                        location.address!,
-                        style: TextStyle(
-                          color: AnalyticsTheme.secondaryText,
-                          fontSize: 12,
-                        ),
-                      )
-                    : null,
-                trailing: location.id == currentOutlet?.id
+                trailing: currentOutlet == null
                     ? const Icon(
                         Icons.check_circle_rounded,
                         color: AnalyticsTheme.primaryGold,
@@ -292,12 +250,65 @@ class AnalyticsHeader extends ConsumerWidget {
                     : null,
                 onTap: () {
                   ref.read(analyticsSelectedOutletProvider.notifier).state =
-                      location;
+                      null;
                   Navigator.pop(context);
                 },
               ),
-            ),
-          ],
+              const Divider(color: Colors.white12),
+              ...locations.map(
+                (location) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: location.id == currentOutlet?.id
+                          ? AnalyticsTheme.primaryGold.withOpacity(0.2)
+                          : AnalyticsTheme.secondaryBeige.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.store_rounded,
+                      color: location.id == currentOutlet?.id
+                          ? AnalyticsTheme.primaryGold
+                          : AnalyticsTheme.secondaryText,
+                    ),
+                  ),
+                  title: Text(
+                    location.name,
+                    style: TextStyle(
+                      color: location.id == currentOutlet?.id
+                          ? AnalyticsTheme.primaryGold
+                          : AnalyticsTheme.primaryText,
+                      fontWeight: location.id == currentOutlet?.id
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                    ),
+                  ),
+                  subtitle:
+                      location.address != null && location.address!.isNotEmpty
+                      ? Text(
+                          location.address!,
+                          style: TextStyle(
+                            color: AnalyticsTheme.secondaryText,
+                            fontSize: 12,
+                          ),
+                        )
+                      : null,
+                  trailing: location.id == currentOutlet?.id
+                      ? const Icon(
+                          Icons.check_circle_rounded,
+                          color: AnalyticsTheme.primaryGold,
+                        )
+                      : null,
+                  onTap: () {
+                    ref.read(analyticsSelectedOutletProvider.notifier).state =
+                        location;
+                    Navigator.pop(context);
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

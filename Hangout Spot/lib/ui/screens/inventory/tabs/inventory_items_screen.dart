@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/data/models/inventory_models.dart';
@@ -44,72 +43,32 @@ class _InventoryItemsScreenState extends ConsumerState<InventoryItemsScreen> {
           if (items.isEmpty) {
             return const Center(
               child: Text('No inventory items yet. Tap + to add.'),
-            return Scaffold(
-              body: SafeArea(
-                child: itemsAsync.when(
-                  data: (items) {
-                    final categoryMap = <String, String>{};
-                    for (final i in items) {
-                      final clean = _normalizedCategory(i.category);
-                      categoryMap.putIfAbsent(clean.toLowerCase(), () => clean);
-                    }
-
-                    final categories = ['All', ...categoryMap.values];
-
-                    final filteredItems = _selectedCategory == 'All'
-                        ? items
-                        : items
-                              .where(
-                                (i) =>
-                                    _normalizedCategory(i.category).toLowerCase() ==
-                                    _selectedCategory.toLowerCase(),
-                              )
-                              .toList();
-
-                    if (items.isEmpty) {
-                      return const Center(
-                        child: Text('No inventory items yet. Tap + to add.'),
-                      );
-                    }
-
-                    return ListView(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
-                      children: [
-                        _CategoryFilterChips(
-                          context,
-                          categories: categories,
-                          selected: _selectedCategory,
-                          onSelected: (value) =>
-                              setState(() => _selectedCategory = value),
-                        ),
-                        const SizedBox(height: 12),
-                        _InventoryGrid(
-                          context,
-                          items: filteredItems,
-                          onAdjust: (item, delta) =>
-                              _quickBump(context, ref, item, delta: delta),
-                          onEdit: (item) => _openItemDialog(context, ref, item),
-                        ),
-                      ],
-                    );
-                  },
-                  loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (err, _) => Center(child: Text('Error: $err')),
-                ),
-              ),
-            );
-                    SelectableText(
-                      err.message!,
-                      style: const TextStyle(color: Colors.blueAccent),
-                    ),
-                  ],
-                ],
-              ),
             );
           }
 
-          return Center(child: Text('Error: $err'));
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+            children: [
+              _CategoryFilterChips(
+                context,
+                categories: categories,
+                selected: _selectedCategory,
+                onSelected: (value) =>
+                    setState(() => _selectedCategory = value),
+              ),
+              const SizedBox(height: 12),
+              _InventoryGrid(
+                context,
+                items: filteredItems,
+                onAdjust: (item, delta) =>
+                    _quickBump(context, ref, item, delta: delta),
+                onEdit: (item) => _openItemDialog(context, ref, item),
+              ),
+            ],
+          );
         },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, _) => Center(child: Text('Error: $err')),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _openItemDialog(context, ref, null),

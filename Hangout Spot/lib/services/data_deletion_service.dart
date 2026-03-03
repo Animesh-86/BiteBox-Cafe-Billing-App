@@ -109,17 +109,21 @@ class DataDeletionService {
               ),
               SizedBox(height: 8),
               Text('• All local database data'),
-            Text('• All cloud/Firebase data'),
-            Text('• Orders, customers, menu items'),
-            Text('• Settings and configurations'),
-            SizedBox(height: 16),
-            Text(
-              '⚠️ This action CANNOT be undone!',
-              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 8),
-            Text('The app will need to be restarted after deletion.'),
-          ],
+              Text('• All cloud/Firebase data'),
+              Text('• Orders, customers, menu items'),
+              Text('• Settings and configurations'),
+              SizedBox(height: 16),
+              Text(
+                '⚠️ This action CANNOT be undone!',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text('The app will need to be restarted after deletion.'),
+            ],
+          ),
         ),
         actions: [
           TextButton(

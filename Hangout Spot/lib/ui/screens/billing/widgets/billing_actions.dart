@@ -498,7 +498,7 @@ Future<void> showRedemptionDialog(BuildContext context, WidgetRef ref) async {
             final discountAmount = (pointsToRedeem * redemptionRate);
 
             // Update cart with redemption
-            ref.read(cartProvider.notifier).applyManualDiscount(discountAmount);
+            ref.read(cartProvider.notifier).applyRewardDiscount(discountAmount);
 
             // Record redemption transaction
             await ref

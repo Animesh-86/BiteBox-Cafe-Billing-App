@@ -64,6 +64,7 @@ class CartState {
   final double paidUPI;
   final double manualDiscount;
   final double promoDiscount;
+  final double rewardDiscount;
   final bool canUndo;
   final bool canRedo;
 
@@ -77,6 +78,7 @@ class CartState {
     this.paidUPI = 0.0,
     this.manualDiscount = 0.0,
     this.promoDiscount = 0.0,
+    this.rewardDiscount = 0.0,
     this.canUndo = false,
     this.canRedo = false,
   });
@@ -97,7 +99,11 @@ class CartState {
         ? (afterItemDiscount * (customer!.discountPercent / 100))
         : 0.0;
     final rawDiscount =
-        itemDiscounts + custDiscount + manualDiscount + promoDiscount;
+        itemDiscounts +
+        custDiscount +
+        manualDiscount +
+        promoDiscount +
+        rewardDiscount;
     return rawDiscount.clamp(0.0, subtotal);
   }
 
@@ -119,6 +125,7 @@ class CartState {
     double? paidUPI,
     double? manualDiscount,
     double? promoDiscount,
+    double? rewardDiscount,
     bool? canUndo,
     bool? canRedo,
   }) {
@@ -132,6 +139,7 @@ class CartState {
       paidUPI: paidUPI ?? this.paidUPI,
       manualDiscount: manualDiscount ?? this.manualDiscount,
       promoDiscount: promoDiscount ?? this.promoDiscount,
+      rewardDiscount: rewardDiscount ?? this.rewardDiscount,
       canUndo: canUndo ?? this.canUndo,
       canRedo: canRedo ?? this.canRedo,
     );
@@ -147,6 +155,7 @@ class CartState {
     'paidUPI': paidUPI,
     'manualDiscount': manualDiscount,
     'promoDiscount': promoDiscount,
+    'rewardDiscount': rewardDiscount,
   };
 
   factory CartState.fromJson(Map<String, dynamic> json) {
@@ -166,6 +175,7 @@ class CartState {
       paidUPI: (json['paidUPI'] ?? 0.0).toDouble(),
       manualDiscount: (json['manualDiscount'] ?? 0.0).toDouble(),
       promoDiscount: (json['promoDiscount'] ?? 0.0).toDouble(),
+      rewardDiscount: (json['rewardDiscount'] ?? 0.0).toDouble(),
     );
   }
 }
@@ -363,6 +373,7 @@ class CartNotifier extends StateNotifier<CartState> {
         paidUPI: state.paidUPI,
         manualDiscount: state.manualDiscount,
         promoDiscount: state.promoDiscount,
+        rewardDiscount: state.rewardDiscount,
         canUndo: state.canUndo,
         canRedo: state.canRedo,
       ),
@@ -417,7 +428,11 @@ class CartNotifier extends StateNotifier<CartState> {
         : 0.0;
     final maxManual = math.max(
       0.0,
-      state.subtotal - itemDiscounts - custDiscount - state.promoDiscount,
+      state.subtotal -
+          itemDiscounts -
+          custDiscount -
+          state.promoDiscount -
+          state.rewardDiscount,
     );
 
     final nextManual = discount.clamp(0.0, maxManual);
@@ -455,7 +470,7 @@ class CartNotifier extends StateNotifier<CartState> {
     );
   }
 
-  void applyManualDiscount(double discountAmount) {
+  void applyRewardDiscount(double discountAmount) {
     final itemDiscounts = state.items.fold(
       0.0,
       (sum, item) => sum + item.discountAmount,
@@ -464,16 +479,24 @@ class CartNotifier extends StateNotifier<CartState> {
     final custDiscount = state.customer != null
         ? (afterItemDiscount * (state.customer!.discountPercent / 100))
         : 0.0;
-    final maxManual = math.max(
+    final maxReward = math.max(
       0.0,
-      state.subtotal - itemDiscounts - custDiscount - state.promoDiscount,
+      state.subtotal -
+          itemDiscounts -
+          custDiscount -
+          state.promoDiscount -
+          state.manualDiscount,
     );
 
-    final nextManual = (state.manualDiscount + discountAmount).clamp(
+    final nextReward = (state.rewardDiscount + discountAmount).clamp(
       0.0,
-      maxManual,
+      maxReward,
     );
-    _applyState(state.copyWith(manualDiscount: nextManual));
+    _applyState(state.copyWith(rewardDiscount: nextReward));
+  }
+
+  void cancelRewardDiscount() {
+    _applyState(state.copyWith(rewardDiscount: 0.0));
   }
 
   void setPromoDiscount(double discount) {

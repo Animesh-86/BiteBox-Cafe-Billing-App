@@ -4,7 +4,6 @@ import 'package:hangout_spot/ui/screens/analytics/premium_analytics_screen.dart'
 import 'package:hangout_spot/ui/screens/menu/manage_menu_screen.dart';
 import 'package:hangout_spot/ui/screens/billing/billing_screen.dart';
 import 'package:hangout_spot/ui/screens/settings/settings_screen.dart';
-import 'package:hangout_spot/ui/screens/inventory/inventory_screen.dart';
 import 'package:hangout_spot/ui/widgets/sidebar_navigation.dart';
 import 'package:animations/animations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -77,11 +76,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                   selectedIcon: Icon(Icons.restaurant_menu),
                   label: 'Menu',
                 ),
-                NavigationDestination(
-                  icon: Icon(Icons.inventory_2_outlined),
-                  selectedIcon: Icon(Icons.inventory_2_rounded),
-                  label: 'Inventory',
-                ),
+
                 NavigationDestination(
                   icon: Icon(Icons.analytics_outlined),
                   selectedIcon: Icon(Icons.analytics),
@@ -106,10 +101,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       case 2:
         return const ManageMenuScreen();
       case 3:
-        return const InventoryScreen();
-      case 4:
         return const PremiumAnalyticsScreen();
-      case 5:
+      case 4:
         return const SettingsScreen();
       default:
         return const DashboardScreen();

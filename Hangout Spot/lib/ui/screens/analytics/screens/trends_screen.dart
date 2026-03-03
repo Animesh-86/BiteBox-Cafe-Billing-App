@@ -66,70 +66,71 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
               ),
               ListTile(
                 leading: const Icon(
-                Icons.date_range,
-                color: AnalyticsTheme.primaryGold,
-              ),
-              title: const Text(
-                'This Week',
-                style: TextStyle(color: AnalyticsTheme.primaryText),
-              ),
-              onTap: () => Navigator.pop(context, DateFilter.thisWeek()),
-            ),
-            ListTile(
-              leading: const Icon(
-                Icons.event,
-                color: AnalyticsTheme.primaryGold,
-              ),
-              title: const Text(
-                'Custom Range',
-                style: TextStyle(color: AnalyticsTheme.primaryText),
-              ),
-              onTap: () async {
-                Navigator.pop(context);
-                final picked = await showDateRangePicker(
-                  context: context,
-                  firstDate: DateTime(2020),
-                  lastDate: DateTime.now(),
-                  initialDateRange: DateTimeRange(
-                    start: _startDate,
-                    end: _endDate,
-                  ),
-                  builder: (context, child) {
-                    return Theme(
-                      data: ThemeData.dark().copyWith(
-                        colorScheme: const ColorScheme.dark(
-                          primary: AnalyticsTheme.primaryGold,
-                          surface: AnalyticsTheme.cardBackground,
-                        ),
-                      ),
-                      child: child!,
-                    );
-                  },
-                );
-                if (picked != null) {
-                  _performExport(DateFilter.custom(picked.start, picked.end));
-                }
-              },
-            ),
-            ListTile(
-              leading: const Icon(
-                Icons.highlight,
-                color: AnalyticsTheme.primaryGold,
-              ),
-              title: const Text(
-                'Current Selection',
-                style: TextStyle(color: AnalyticsTheme.primaryText),
-              ),
-              subtitle: Text(
-                '${DateFormat('dd MMM yyyy').format(_startDate)} - ${DateFormat('dd MMM yyyy').format(_endDate)}',
-                style: TextStyle(
-                  color: AnalyticsTheme.secondaryText,
-                  fontSize: 12,
+                  Icons.date_range,
+                  color: AnalyticsTheme.primaryGold,
                 ),
+                title: const Text(
+                  'This Week',
+                  style: TextStyle(color: AnalyticsTheme.primaryText),
+                ),
+                onTap: () => Navigator.pop(context, DateFilter.thisWeek()),
               ),
-              onTap: () => Navigator.pop(context, _dateFilter),
-            ),
-          ],
+              ListTile(
+                leading: const Icon(
+                  Icons.event,
+                  color: AnalyticsTheme.primaryGold,
+                ),
+                title: const Text(
+                  'Custom Range',
+                  style: TextStyle(color: AnalyticsTheme.primaryText),
+                ),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final picked = await showDateRangePicker(
+                    context: context,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime.now(),
+                    initialDateRange: DateTimeRange(
+                      start: _startDate,
+                      end: _endDate,
+                    ),
+                    builder: (context, child) {
+                      return Theme(
+                        data: ThemeData.dark().copyWith(
+                          colorScheme: const ColorScheme.dark(
+                            primary: AnalyticsTheme.primaryGold,
+                            surface: AnalyticsTheme.cardBackground,
+                          ),
+                        ),
+                        child: child!,
+                      );
+                    },
+                  );
+                  if (picked != null) {
+                    _performExport(DateFilter.custom(picked.start, picked.end));
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(
+                  Icons.highlight,
+                  color: AnalyticsTheme.primaryGold,
+                ),
+                title: const Text(
+                  'Current Selection',
+                  style: TextStyle(color: AnalyticsTheme.primaryText),
+                ),
+                subtitle: Text(
+                  '${DateFormat('dd MMM yyyy').format(_startDate)} - ${DateFormat('dd MMM yyyy').format(_endDate)}',
+                  style: TextStyle(
+                    color: AnalyticsTheme.secondaryText,
+                    fontSize: 12,
+                  ),
+                ),
+                onTap: () => Navigator.pop(context, _dateFilter),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
