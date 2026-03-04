@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../local/db/app_database.dart';
 import '../providers/database_provider.dart';
 import 'package:hangout_spot/data/constants/customer_defaults.dart';
+import 'package:hangout_spot/data/repositories/sync_repository.dart';
 
 class CustomerRepository {
   final AppDatabase _db;
@@ -45,7 +46,10 @@ class CustomerRepository {
     )..where((t) => t.name.equals(trimmed))).getSingleOrNull();
   }
 
-  Future<void> addCustomer(CustomersCompanion customer) async {
+  Future<void> addCustomer(
+    CustomersCompanion customer, {
+    SyncRepository? syncRepo,
+  }) async {
     // Check for duplicate phone number before inserting
     if (customer.phone.present && customer.phone.value != null) {
       final phoneValue = customer.phone.value!;
@@ -58,17 +62,26 @@ class CustomerRepository {
       }
     }
     await _db.into(_db.customers).insert(customer);
+    // Trigger non-blocking sync
+    syncRepo?.backupData();
   }
 
-  Future<void> updateCustomer(Customer customer) {
-    return _db.update(_db.customers).replace(customer);
+  Future<void> updateCustomer(
+    Customer customer, {
+    SyncRepository? syncRepo,
+  }) async {
+    await _db.update(_db.customers).replace(customer);
+    // Trigger non-blocking sync
+    syncRepo?.backupData();
   }
 
-  Future<void> deleteCustomer(String id) {
+  Future<void> deleteCustomer(String id, {SyncRepository? syncRepo}) async {
     if (CustomerDefaults.seeded.any((c) => c.id == id)) {
       throw Exception('Default customers cannot be deleted');
     }
-    return (_db.delete(_db.customers)..where((t) => t.id.equals(id))).go();
+    await (_db.delete(_db.customers)..where((t) => t.id.equals(id))).go();
+    // Trigger non-blocking sync
+    syncRepo?.backupData();
   }
 
   Future<void> ensureDefaultCustomers() async {
@@ -95,7 +108,11 @@ class CustomerRepository {
     }
   }
 
-  Future<void> updateVisitStats(String id, double amount) async {
+  Future<void> updateVisitStats(
+    String id,
+    double amount, {
+    SyncRepository? syncRepo,
+  }) async {
     // Transaction to update connection stats safely
     await _db.transaction(() async {
       final customer = await (_db.select(
@@ -114,6 +131,8 @@ class CustomerRepository {
             ),
           );
     });
+    // Trigger non-blocking sync
+    syncRepo?.backupData();
   }
 }
 

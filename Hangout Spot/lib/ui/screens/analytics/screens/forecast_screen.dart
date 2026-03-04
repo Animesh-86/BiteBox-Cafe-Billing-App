@@ -113,12 +113,18 @@ class _ForecastScreenState extends ConsumerState<ForecastScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: AnalyticsTheme.primaryGold,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          color: AnalyticsTheme.primaryGold,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -128,6 +134,8 @@ class _ForecastScreenState extends ConsumerState<ForecastScreen> {
                         color: AnalyticsTheme.secondaryText,
                         fontSize: 13,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -348,6 +356,8 @@ class _ForecastScreenState extends ConsumerState<ForecastScreen> {
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -356,6 +366,8 @@ class _ForecastScreenState extends ConsumerState<ForecastScreen> {
                         color: AnalyticsTheme.secondaryText,
                         fontSize: 13,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),

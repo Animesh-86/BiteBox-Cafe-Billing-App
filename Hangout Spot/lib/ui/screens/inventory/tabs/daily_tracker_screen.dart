@@ -158,12 +158,12 @@ class _DailyTrackerScreenState extends ConsumerState<DailyTrackerScreen> {
 
   Future<void> _saveDaily(DateTime date) async {
     final repo = ref.read(inventoryRepositoryProvider);
-    final values = <String, double>{};
+    final values = <String, String>{};
 
     for (final entry in _controllers.entries) {
-      final value = double.tryParse(entry.value.text.trim());
-      if (value != null) {
-        values[entry.key] = value;
+      final text = entry.value.text.trim();
+      if (text.isNotEmpty) {
+        values[entry.key] = text;
       }
     }
 

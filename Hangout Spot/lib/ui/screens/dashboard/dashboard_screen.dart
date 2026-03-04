@@ -8,6 +8,7 @@ import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/data/providers/realtime_services_provider.dart';
 import 'package:hangout_spot/data/models/inventory_models.dart';
 import 'package:hangout_spot/data/providers/inventory_providers.dart';
+import 'package:hangout_spot/data/repositories/sync_repository.dart';
 import 'package:intl/intl.dart';
 import 'package:hangout_spot/logic/locations/location_provider.dart';
 import 'package:hangout_spot/data/repositories/customer_repository.dart';
@@ -29,6 +30,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    NotificationService.instance.requestPermissions();
   }
 
   Future<void> _pickDate(BuildContext context) async {
@@ -1007,6 +1009,96 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                   return Container(
                                     margin: const EdgeInsets.only(bottom: 1),
                                     child: ListTile(
+                                      onTap: isCancelled
+                                          ? null
+                                          : () async {
+                                              final confirm = await showDialog<bool>(
+                                                context: context,
+                                                builder: (_) => AlertDialog(
+                                                  title: Text(
+                                                    'Order #${order.invoiceNumber}',
+                                                  ),
+                                                  content: Column(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Text(
+                                                        'Time: $timeAgo\nCustomer: $customerDisplay',
+                                                        style: const TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(height: 8),
+                                                      Text(
+                                                        'Items: $itemsDisplay',
+                                                      ),
+                                                      const SizedBox(
+                                                        height: 16,
+                                                      ),
+                                                      const Text(
+                                                        'Are you sure you want to cancel this order?',
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  actions: [
+                                                    TextButton(
+                                                      onPressed: () =>
+                                                          Navigator.pop(
+                                                            context,
+                                                            false,
+                                                          ),
+                                                      child: const Text('Back'),
+                                                    ),
+                                                    FilledButton(
+                                                      style:
+                                                          FilledButton.styleFrom(
+                                                            backgroundColor:
+                                                                Colors.red,
+                                                            foregroundColor:
+                                                                Colors.white,
+                                                          ),
+                                                      onPressed: () =>
+                                                          Navigator.pop(
+                                                            context,
+                                                            true,
+                                                          ),
+                                                      child: const Text(
+                                                        'Cancel Order',
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+
+                                              if (confirm == true) {
+                                                final syncRepo = ref.read(
+                                                  syncRepositoryProvider,
+                                                );
+                                                await ref
+                                                    .read(
+                                                      orderRepositoryProvider,
+                                                    )
+                                                    .cancelOrder(
+                                                      order.id,
+                                                      syncRepo: syncRepo,
+                                                    );
+                                                if (context.mounted) {
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text(
+                                                        'Order cancelled successfully.',
+                                                      ),
+                                                    ),
+                                                  );
+                                                }
+                                              }
+                                            },
                                       contentPadding:
                                           const EdgeInsets.symmetric(
                                             horizontal: 20,

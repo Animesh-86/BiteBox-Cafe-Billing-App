@@ -129,34 +129,36 @@ class InventoryRemindersScreen extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Icon(Icons.delete_outline, color: Colors.red.shade400),
       ),
-      confirmDismiss: (_) async {
-        return await showDialog<bool>(
-              context: context,
-              builder: (_) => AlertDialog(
-                title: const Text('Delete reminder?'),
-                content: SafeArea(
-                  child: const Text(
-                    'This will remove the reminder permanently.',
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context, false),
-                    child: const Text('Cancel'),
-                  ),
-                  FilledButton(
-                    onPressed: () => Navigator.pop(context, true),
-                    child: const Text('Delete'),
-                  ),
-                ],
-              ),
-            ) ??
-            false;
-      },
       onDismissed: (_) async {
         final repo = ref.read(inventoryRepositoryProvider);
         await repo.deleteReminder(reminder.id);
         await NotificationService.instance.cancel(_hashId(reminder.id));
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Reminder deleted'),
+              action: SnackBarAction(
+                label: 'Undo',
+                onPressed: () async {
+                  await repo.upsertReminder(reminder);
+                  if (reminder.isEnabled &&
+                      (reminder.type == 'time' ||
+                          reminder.type == 'daily_update')) {
+                    final time = _parseTime(reminder.time);
+                    await NotificationService.instance.scheduleDaily(
+                      id: _hashId(reminder.id),
+                      title: reminder.title,
+                      body: 'Inventory reminder',
+                      time: time,
+                    );
+                  }
+                },
+              ),
+            ),
+          );
+        }
       },
       child: _buildReminderTile(context, ref, reminder, items),
     );

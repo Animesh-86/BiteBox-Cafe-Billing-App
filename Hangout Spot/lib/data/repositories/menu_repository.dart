@@ -1,12 +1,19 @@
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
+
 import '../local/db/app_database.dart';
 import '../providers/database_provider.dart';
 
+import 'package:hangout_spot/data/models/inventory_models.dart';
+import 'package:hangout_spot/data/repositories/inventory_repository.dart';
+import 'package:hangout_spot/data/providers/inventory_providers.dart';
+
 class MenuRepository {
   final AppDatabase _db;
+  final InventoryRepository _inventoryRepo;
 
-  MenuRepository(this._db);
+  MenuRepository(this._db, this._inventoryRepo);
 
   // Categories
   Stream<List<Category>> watchCategories() {
@@ -47,18 +54,82 @@ class MenuRepository {
     )..where((tbl) => tbl.isDeleted.equals(false))).watch();
   }
 
-  Future<void> addItem(ItemsCompanion item) {
-    return _db.into(_db.items).insert(item, mode: InsertMode.insertOrReplace);
+  Future<void> addItem(ItemsCompanion item, {String? categoryName}) async {
+    await _db.into(_db.items).insert(item, mode: InsertMode.insertOrReplace);
+
+    // Auto-sync specific beverages to Inventory mapping
+    if (categoryName != null) {
+      final name = categoryName.toLowerCase();
+      if (name == 'cold drink' || name == 'water bottle') {
+        try {
+          // Push a default mock instance into Firebase to keep both spaces synchronized
+          await _inventoryRepo.addItem(
+            InventoryItem(
+              id: const Uuid().v4(),
+              name: item.name.value,
+              category: categoryName,
+              unit: 'piece',
+              currentQty: 0,
+              minQty: 0,
+            ),
+          );
+        } catch (_) {}
+      }
+    }
   }
 
-  Future<void> updateItem(Item item) {
-    return _db.update(_db.items).replace(item);
+  Future<void> updateItem(Item item, {String? categoryName}) async {
+    await _db.update(_db.items).replace(item);
+
+    // Auto-sync specific beverages to Inventory mapping
+    if (categoryName != null) {
+      final name = categoryName.toLowerCase();
+      if (name == 'cold drink' || name == 'water bottle') {
+        try {
+          // Assume the user is just editing the definition of the beverage.
+          // Note: Full syncing here implies the Inventory name also edits if it matches by an ID.
+          // Since they don't share identical relational row IDs, we enforce a unidirectional sync on Add/Delete for simplicity.
+        } catch (_) {}
+      }
+    }
   }
 
-  Future<void> deleteItem(String id) {
-    return (_db.update(_db.items)..where((t) => t.id.equals(id))).write(
+  Future<void> deleteItem(String id) async {
+    // Look up the item first to check its category
+    final itemOrNull = await (_db.select(
+      _db.items,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
+
+    await (_db.update(_db.items)..where((t) => t.id.equals(id))).write(
       const ItemsCompanion(isDeleted: Value(true)),
     );
+
+    // Cross-sync deletes to the Inventory module for gateways
+    if (itemOrNull != null) {
+      final catId = itemOrNull.categoryId;
+      final catOrNull = await (_db.select(
+        _db.categories,
+      )..where((t) => t.id.equals(catId))).getSingleOrNull();
+      if (catOrNull != null) {
+        final catName = catOrNull.name.toLowerCase();
+        if (catName == 'cold drink' || catName == 'water bottle') {
+          try {
+            // Because Drift IDs don't match Firebase IDs directly (we use uuid for drift, but firestore generate its own doc id if not specified),
+            // We must filter by name.
+            final itemsSnapshot = await _inventoryRepo.watchItems().first;
+            final targetItem = itemsSnapshot
+                .where(
+                  (i) => i.name.toLowerCase() == itemOrNull.name.toLowerCase(),
+                )
+                .firstOrNull;
+
+            if (targetItem != null) {
+              await _inventoryRepo.deleteItem(targetItem.id);
+            }
+          } catch (_) {}
+        }
+      }
+    }
   }
 
   Future<bool> hasCategories() async {
@@ -69,7 +140,8 @@ class MenuRepository {
 
 final menuRepositoryProvider = Provider<MenuRepository>((ref) {
   final db = ref.watch(appDatabaseProvider);
-  return MenuRepository(db);
+  final inventoryRepo = ref.watch(inventoryRepositoryProvider);
+  return MenuRepository(db, inventoryRepo);
 });
 
 final categoriesStreamProvider = StreamProvider((ref) {

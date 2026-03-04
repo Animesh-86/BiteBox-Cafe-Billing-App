@@ -7,6 +7,7 @@ import 'package:hangout_spot/data/repositories/customer_repository.dart';
 import 'package:hangout_spot/ui/screens/customer/customer_profile_screen.dart';
 import 'package:hangout_spot/logic/rewards/reward_provider.dart';
 import 'package:hangout_spot/data/constants/customer_defaults.dart';
+import 'package:hangout_spot/data/repositories/sync_repository.dart';
 
 class CustomerListScreen extends ConsumerStatefulWidget {
   final bool isSelectionMode;
@@ -195,9 +196,10 @@ class _CustomerListScreenState extends ConsumerState<CustomerListScreen> {
             if (!CustomerDefaults.seeded.any((c) => c.id == customer.id))
               TextButton.icon(
                 onPressed: () async {
+                  final syncRepo = ref.read(syncRepositoryProvider);
                   await ref
                       .read(customerRepositoryProvider)
-                      .deleteCustomer(customer.id);
+                      .deleteCustomer(customer.id, syncRepo: syncRepo);
                   if (context.mounted) Navigator.pop(context);
                 },
                 icon: const Icon(Icons.delete_outline),
@@ -212,6 +214,7 @@ class _CustomerListScreenState extends ConsumerState<CustomerListScreen> {
             onPressed: () {
               if (nameController.text.isNotEmpty) {
                 final repo = ref.read(customerRepositoryProvider);
+                final syncRepo = ref.read(syncRepositoryProvider);
                 if (customer == null) {
                   repo.addCustomer(
                     CustomersCompanion(
@@ -226,6 +229,7 @@ class _CustomerListScreenState extends ConsumerState<CustomerListScreen> {
                         double.tryParse(discountController.text) ?? 0.0,
                       ),
                     ),
+                    syncRepo: syncRepo,
                   );
                 } else {
                   repo.updateCustomer(
@@ -239,6 +243,7 @@ class _CustomerListScreenState extends ConsumerState<CustomerListScreen> {
                       discountPercent:
                           double.tryParse(discountController.text) ?? 0.0,
                     ),
+                    syncRepo: syncRepo,
                   );
                 }
                 Navigator.pop(context);

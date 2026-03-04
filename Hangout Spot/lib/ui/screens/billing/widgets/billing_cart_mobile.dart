@@ -12,25 +12,32 @@ class CartMobileBottomBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cart = ref.watch(cartProvider);
+    final currentTheme = Theme.of(context);
 
     return InkWell(
       onTap: () {
         showModalBottomSheet(
           context: context,
           isScrollControlled: true,
+          useSafeArea: true,
           backgroundColor: Colors.transparent,
-          builder: (_) => DraggableScrollableSheet(
-            initialChildSize: 0.85,
-            minChildSize: 0.5,
-            maxChildSize: 0.95,
-            builder: (_, controller) => Container(
-              decoration: BoxDecoration(
-                color: Theme.of(context).scaffoldBackgroundColor,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(20),
+          builder: (_) => Theme(
+            data: currentTheme,
+            child: SafeArea(
+              child: DraggableScrollableSheet(
+                initialChildSize: 0.85,
+                minChildSize: 0.5,
+                maxChildSize: 0.95,
+                builder: (_, controller) => Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(20),
+                    ),
+                  ),
+                  child: MobileCartModal(scrollController: controller),
                 ),
               ),
-              child: MobileCartModal(scrollController: controller),
             ),
           ),
         );

@@ -437,6 +437,8 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -445,6 +447,8 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                         color: AnalyticsTheme.secondaryText,
                         fontSize: 12,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -606,12 +610,18 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: AnalyticsTheme.primaryGold,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          color: AnalyticsTheme.primaryGold,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -621,6 +631,8 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                         color: AnalyticsTheme.secondaryText,
                         fontSize: 13,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -680,6 +692,8 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                     color: AnalyticsTheme.primaryText,
                     fontSize: 14,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               Container(
@@ -745,6 +759,8 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -753,6 +769,8 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                     color: AnalyticsTheme.secondaryText,
                     fontSize: 12,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -792,6 +810,8 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -800,6 +820,8 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                     color: AnalyticsTheme.secondaryText,
                     fontSize: 12,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),

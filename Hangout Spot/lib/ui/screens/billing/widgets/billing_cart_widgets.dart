@@ -4,6 +4,7 @@ import 'package:drift/drift.dart' as drift;
 import 'package:uuid/uuid.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/data/repositories/customer_repository.dart';
+import 'package:hangout_spot/data/repositories/sync_repository.dart';
 import 'package:hangout_spot/logic/billing/cart_provider.dart';
 import 'package:hangout_spot/logic/rewards/reward_provider.dart';
 import 'package:hangout_spot/ui/screens/billing/widgets/billing_actions.dart';
@@ -285,6 +286,7 @@ class _CartCustomerSectionState extends ConsumerState<CartCustomerSection> {
     }
 
     final repo = ref.read(customerRepositoryProvider);
+    final syncRepo = ref.read(syncRepositoryProvider);
     Customer? existing;
 
     if (phone.isNotEmpty) {
@@ -296,11 +298,11 @@ class _CartCustomerSectionState extends ConsumerState<CartCustomerSection> {
       var updated = existing;
       if (name.isNotEmpty && existing.name != name) {
         updated = existing.copyWith(name: name);
-        await repo.updateCustomer(updated);
+        await repo.updateCustomer(updated, syncRepo: syncRepo);
       }
       if (phone.isNotEmpty && existing.phone != phone) {
         updated = updated.copyWith(phone: drift.Value(phone));
-        await repo.updateCustomer(updated);
+        await repo.updateCustomer(updated, syncRepo: syncRepo);
       }
       notifier.setCustomer(updated);
     } else {
@@ -313,6 +315,7 @@ class _CartCustomerSectionState extends ConsumerState<CartCustomerSection> {
             phone: drift.Value(phone.isEmpty ? null : phone),
             discountPercent: const drift.Value(0.0),
           ),
+          syncRepo: syncRepo,
         );
       } catch (_) {
         // Ignore duplicate insert errors and attempt to fetch the existing one.

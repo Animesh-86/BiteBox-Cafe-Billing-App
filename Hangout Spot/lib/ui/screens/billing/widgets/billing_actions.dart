@@ -70,10 +70,23 @@ Future<void> printKot(BuildContext context, WidgetRef ref) async {
         )
         .toList();
 
-    // 1. Try Thermal Print
+    // Close the Cart modal if on a mobile view BEFORE printing blocks
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("KOT sent to printer")));
+
+      if (MediaQuery.of(context).size.width <= 900 &&
+          Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+    }
+
+    // 1. Try Thermal Print in Background (Non-blocking)
     try {
       final activeOutlet = await ref.read(activeOutletProvider.future);
-      await ref
+      // Fire and forget printing so UI returns immediately
+      ref
           .read(thermalPrintingServiceProvider)
           .printKot(
             order,
@@ -84,27 +97,18 @@ Future<void> printKot(BuildContext context, WidgetRef ref) async {
     } catch (e) {
       debugPrint("Thermal print failed: $e");
       if (context.mounted) {
+        String errorMsg = e.toString();
+        if (errorMsg.contains('PlatformException') ||
+            errorMsg.contains('socket might closed')) {
+          errorMsg =
+              'Printer connection failed. Please check device pairing and power.';
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Printing failed: $e"),
+            content: Text("Printing failed: $errorMsg"),
             backgroundColor: Colors.red,
           ),
         );
-      }
-    }
-
-    // 2. Fallback/Parallel PDF Print (Optional, keeping existing behavior)
-    // await ref.read(printingServiceProvider).printKot(order, items);
-
-    if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("KOT sent to printer")));
-
-      // Close the Cart modal if on a mobile view
-      if (MediaQuery.of(context).size.width <= 900 &&
-          Navigator.canPop(context)) {
-        Navigator.pop(context);
       }
     }
   } catch (e) {
@@ -246,7 +250,21 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
         )
         .toList();
 
-    // AUTO-PRINT THERMAL BILL
+    // CLEAR CART AND CLOSE UI IMMEDIATELY
+    ref.read(cartProvider.notifier).clearCart();
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Order completed!")));
+
+      // Close the Cart modal if on a mobile view
+      if (MediaQuery.of(context).size.width <= 900 &&
+          Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+    }
+
+    // AUTO-PRINT THERMAL BILL IN BACKGROUND
     try {
       final activeOutlet = await ref.read(activeOutletProvider.future);
 
@@ -262,7 +280,8 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
         }
       }
 
-      await ref
+      // Fire and forget print command
+      ref
           .read(thermalPrintingServiceProvider)
           .printBill(
             order,
@@ -277,25 +296,19 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
     } catch (e) {
       debugPrint("Thermal print failed: $e");
       if (context.mounted) {
+        String errorMsg = e.toString();
+        if (errorMsg.contains('PlatformException') ||
+            errorMsg.contains('socket might closed') ||
+            errorMsg.contains("type 'Null' is not a subtype")) {
+          errorMsg =
+              'Printer connection failed. Please check device pairing and power.';
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Printing failed: $e"),
+            content: Text("Printing failed: $errorMsg"),
             backgroundColor: Colors.red,
           ),
         );
-      }
-    }
-
-    ref.read(cartProvider.notifier).clearCart();
-    if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Order completed!")));
-
-      // Close the Cart modal if on a mobile view
-      if (MediaQuery.of(context).size.width <= 900 &&
-          Navigator.canPop(context)) {
-        Navigator.pop(context);
       }
     }
 

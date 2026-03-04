@@ -82,25 +82,20 @@ class InventoryRepository {
     final itemRef = _itemsRef().doc(itemId);
     final movementRef = _movementsRef().doc();
 
-    await _firestore.runTransaction((tx) async {
-      final snapshot = await tx.get(itemRef);
-      final current = _toDouble(snapshot.data()?['currentQty']);
-      final next = current + delta;
-      if (next < 0) {
-        throw StateError('Insufficient stock');
-      }
+    final batch = _firestore.batch();
+    batch.set(itemRef, {
+      'currentQty': FieldValue.increment(delta),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
 
-      tx.update(itemRef, {
-        'currentQty': next,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-      tx.set(movementRef, {
-        'itemId': itemId,
-        'delta': delta,
-        'reason': reason,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+    batch.set(movementRef, {
+      'itemId': itemId,
+      'delta': delta,
+      'reason': reason,
+      'createdAt': FieldValue.serverTimestamp(),
     });
+
+    await batch.commit();
   }
 
   Future<InventoryItem?> findItemByName(String name) async {
@@ -206,56 +201,53 @@ class InventoryRepository {
         'name': 'Coca Cola',
         'category': 'Cold Drink',
         'unit': 'pcs',
-        'currentQty': 50.0,
-        'minQty': 10.0,
+        'currentQty': 0.0,
+        'minQty': 0.0,
         'price': 20.0,
       },
       {
         'name': 'Sprite',
         'category': 'Cold Drink',
         'unit': 'pcs',
-        'currentQty': 50.0,
-        'minQty': 10.0,
+        'currentQty': 0.0,
+        'minQty': 0.0,
         'price': 20.0,
       },
       {
         'name': 'Fanta',
         'category': 'Cold Drink',
         'unit': 'pcs',
-        'currentQty': 50.0,
-        'minQty': 10.0,
+        'currentQty': 0.0,
+        'minQty': 0.0,
         'price': 20.0,
       },
       {
         'name': 'Thumbs Up',
         'category': 'Cold Drink',
         'unit': 'pcs',
-        'currentQty': 50.0,
-        'minQty': 10.0,
+        'currentQty': 0.0,
+        'minQty': 0.0,
         'price': 20.0,
       },
       {
         'name': 'Water Bottle (Small)',
         'category': 'Water Bottle',
         'unit': 'pcs',
-        'currentQty': 80.0,
-        'minQty': 20.0,
+        'currentQty': 0.0,
+        'minQty': 0.0,
         'price': 10.0,
       },
       {
         'name': 'Water Bottle (Large)',
         'category': 'Water Bottle',
         'unit': 'pcs',
-        'currentQty': 60.0,
-        'minQty': 15.0,
+        'currentQty': 0.0,
+        'minQty': 0.0,
         'price': 20.0,
       },
     ];
 
     for (final item in defaults) {
-      final existing = await findItemByName(item['name'] as String);
-      if (existing != null) continue;
-
       final id = _slugify(item['name'] as String);
       await _itemsRef().doc(id).set({
         'name': item['name'],
@@ -266,7 +258,7 @@ class InventoryRepository {
         'price': item['price'],
         'isActive': true,
         'updatedAt': FieldValue.serverTimestamp(),
-      });
+      }, SetOptions(merge: true));
     }
   }
 
@@ -296,7 +288,8 @@ class InventoryRepository {
       for (final entry in daily.items.entries) {
         final item = items[entry.key];
         if (item == null) continue;
-        if (entry.value < item.minQty) {
+        final val = double.tryParse(entry.value);
+        if (val != null && val < item.minQty) {
           lowStockCounts[entry.key] = (lowStockCounts[entry.key] ?? 0) + 1;
           totalLowStockEvents += 1;
         }

@@ -13,6 +13,7 @@ import 'package:hangout_spot/services/live_invoice_counter_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' hide Order;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hangout_spot/data/repositories/inventory_repository.dart';
+import 'package:hangout_spot/data/repositories/sync_repository.dart';
 import 'package:hangout_spot/data/providers/inventory_providers.dart';
 import 'package:hangout_spot/data/constants/customer_defaults.dart';
 
@@ -90,6 +91,7 @@ class OrderRepository {
     CartState cart, {
     String status = 'completed',
     SessionManager? sessionManager,
+    SyncRepository? syncRepo,
   }) async {
     final platformCustomerId = cart.customer?.id ?? CustomerDefaults.walkInId;
     // Determine the order ID first (reuse if editing)
@@ -206,6 +208,11 @@ class OrderRepository {
       _recordToLiveServices(orderId, invoiceNum).ignore();
     }
 
+    // Wait a brief moment to ensure local DB transactions fully commit
+    Future.delayed(const Duration(milliseconds: 500), () {
+      syncRepo?.backupData();
+    });
+
     return orderId;
   }
 
@@ -236,6 +243,45 @@ class OrderRepository {
     } catch (e) {
       debugPrint('❌ Failed to record to live services: $e');
     }
+  }
+
+  Future<void> markOrderAsPaid(
+    String orderId,
+    String paymentMode, {
+    SyncRepository? syncRepo,
+  }) async {
+    await _db.transaction(() async {
+      final order = await (_db.select(
+        _db.orders,
+      )..where((t) => t.id.equals(orderId))).getSingleOrNull();
+
+      if (order == null) return;
+
+      // Get order items to count total quantity
+      final items = await (_db.select(
+        _db.orderItems,
+      )..where((t) => t.orderId.equals(orderId))).get();
+
+      final totalItems = items.fold<int>(0, (sum, item) => sum + item.quantity);
+
+      await (_db.update(_db.orders)..where((t) => t.id.equals(orderId))).write(
+        OrdersCompanion(
+          status: const Value('completed'),
+          paymentMode: Value(paymentMode),
+          isSynced: const Value(false), // Mark unsynced to push payment update
+        ),
+      );
+
+      // Record to Live Analytics with item count
+      if (_liveAnalytics != null) {
+        await _liveAnalytics.recordSale(order, itemCount: totalItems);
+        debugPrint(
+          '✅ Recorded to Live Analytics: ${order.invoiceNumber} (Items: $totalItems)',
+        );
+      }
+    });
+
+    syncRepo?.backupData();
   }
 
   Future<void> _decrementInventoryForCart(CartState cart) async {
@@ -361,35 +407,44 @@ class OrderRepository {
   }
 
   // Soft Delete strategy: Cancel instead of Delete
-  Future<void> voidOrder(String orderId) async {
-    await (_db.update(_db.orders)..where((t) => t.id.equals(orderId))).write(
-      const OrdersCompanion(
-        status: Value('cancelled'),
-        isSynced: Value(
-          false,
-        ), // Mark unsynced so it pushes to cloud on next sync
-      ),
-    );
+  Future<void> cancelOrder(String orderId, {SyncRepository? syncRepo}) async {
+    await _db.transaction(() async {
+      await (_db.update(_db.orders)..where((t) => t.id.equals(orderId))).write(
+        const OrdersCompanion(
+          status: Value('cancelled'),
+          isSynced: Value(
+            false,
+          ), // Mark unsynced so it pushes to cloud on next sync
+        ),
+      );
 
-    // Attempt immediate push of cancellation
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        // For array removal/update, it is tricky with just arrayUnion.
-        // We might need to rely on the background SyncRepository for robust updates
-        // or read-modify-write here.
-        // For now, let's mark it locally. The RealTimeListener on OTHER devices
-        // won't see the cancellation instantly unless we handle it,
-        // but they definitely won't see a "Missing Number".
+      // Attempt immediate push of cancellation
+      try {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          // For array removal/update, it is tricky with just arrayUnion.
+          // We might need to rely on the background SyncRepository for robust updates
+          // or read-modify-write here.
+          // For now, let's mark it locally. The RealTimeListener on OTHER devices
+          // won't see the cancellation instantly unless we handle it,
+          // but they definitely won't see a "Missing Number".
 
-        // To notify others INSTANTLY, we would need to push the updated order.
-        // But dealing with `list` updates for a specific item in Firestore is hard.
-        // We will rely on BackupSync for full consistency of edits.
-        // The critical part (Creation Numbering) is handled by `createOrder`.
+          // To notify others INSTANTLY, we would need to push the updated order.
+          // But dealing with `list` updates for a specific item in Firestore is hard.
+          // We will rely on BackupSync for full consistency of edits.
+          // The critical part (Creation Numbering) is handled by `createOrder`.
+        }
+      } catch (e) {
+        print(e);
       }
-    } catch (e) {
-      print(e);
-    }
+    });
+
+    syncRepo?.backupData();
+  }
+
+  Future<void> revertOrderItems(String orderId) async {
+    // TODO: Implement logic to revert inventory for a cancelled order
+    // This would involve fetching order items and calling inventoryRepo.adjustStockByName with positive delta
   }
 
   // Deprecated: Hard delete is removed to preserve invoice sequence
@@ -399,9 +454,12 @@ class OrderRepository {
   Future<void> processRewardForOrder(
     String orderId,
     double orderAmount,
-    String? customerId,
-  ) async {
-    if (customerId == null || customerId.isEmpty) {
+    String? customerId, {
+    SyncRepository? syncRepo,
+  }) async {
+    if (customerId == null ||
+        customerId.isEmpty ||
+        customerId == CustomerDefaults.walkInId) {
       return; // No reward for anonymous orders
     }
 
@@ -427,40 +485,66 @@ class OrderRepository {
     final pointsEarned = orderAmount * rate;
 
     if (pointsEarned > 0) {
-      // Insert reward transaction
-      await _db
-          .into(_db.rewardTransactions)
-          .insert(
-            RewardTransactionsCompanion(
-              id: Value(const Uuid().v4()),
-              customerId: Value(customerId),
-              type: const Value('earn'),
-              amount: Value(pointsEarned),
-              orderId: Value(orderId),
-              description: Value('Earned from order #$orderId'),
-            ),
-          );
+      await _db.transaction(() async {
+        final order = await (_db.select(
+          _db.orders,
+        )..where((t) => t.id.equals(orderId))).getSingleOrNull();
+        if (order == null) return;
+
+        // Insert reward transaction
+        await _db
+            .into(_db.rewardTransactions)
+            .insert(
+              RewardTransactionsCompanion(
+                id: Value(const Uuid().v4()),
+                customerId: Value(customerId),
+                type: const Value('earn'),
+                amount: Value(pointsEarned),
+                orderId: Value(orderId),
+                description: Value('Earned from Order #${order.invoiceNumber}'),
+              ),
+            );
+      });
     }
+    // We don't need a syncRepo call here because processRewardForOrder is always called immediately after createOrderFromCart, which already has one
   }
 
   // Update customer visit count and total spent
   Future<void> updateCustomerStats(
     String customerId,
-    double orderAmount,
-  ) async {
-    try {
-      final customer = await _db.customers.select().get();
-      final cust = customer.firstWhere((c) => c.id == customerId);
+    double orderAmount, {
+    SyncRepository? syncRepo,
+  }) async {
+    if (customerId == CustomerDefaults.walkInId)
+      return; // No stats for walk-in customer
 
-      await (_db.update(
-        _db.customers,
-      )..where((t) => t.id.equals(customerId))).write(
-        CustomersCompanion(
-          totalVisits: Value(cust.totalVisits + 1),
-          totalSpent: Value(cust.totalSpent + orderAmount),
-          lastVisit: Value(DateTime.now()),
-        ),
-      );
+    try {
+      await _db.transaction(() async {
+        final customer = await (_db.select(
+          _db.customers,
+        )..where((t) => t.id.equals(customerId))).getSingleOrNull();
+
+        if (customer == null) {
+          LoggingService.logError(
+            'Customer not found for stats update',
+            Exception('Customer not found'),
+          );
+          return;
+        }
+
+        await (_db.update(
+          _db.customers,
+        )..where((t) => t.id.equals(customerId))).write(
+          CustomersCompanion(
+            totalVisits: Value(customer.totalVisits + 1),
+            totalSpent: Value(customer.totalSpent + orderAmount),
+            lastVisit: Value(DateTime.now()),
+          ),
+        );
+      });
+
+      // Trigger non-blocking cloud backup
+      syncRepo?.backupData();
     } catch (e) {
       // Customer not found, skip update
       LoggingService.logError('Error updating customer stats', e);

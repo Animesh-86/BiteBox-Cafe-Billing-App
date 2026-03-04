@@ -7,6 +7,7 @@ import 'package:hangout_spot/logic/billing/cart_provider.dart';
 import 'package:hangout_spot/logic/locations/location_provider.dart';
 import 'package:hangout_spot/ui/screens/billing/widgets/billing_cart_mobile.dart';
 import 'package:hangout_spot/ui/screens/billing/widgets/billing_styles.dart';
+import 'package:hangout_spot/data/repositories/sync_repository.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
 class HeldOrdersButton extends ConsumerWidget {
@@ -303,9 +304,15 @@ class HeldOrdersDialog extends ConsumerWidget {
                                     );
 
                                     if (confirm == true) {
+                                      final syncRepo = ref.read(
+                                        syncRepositoryProvider,
+                                      );
                                       await ref
                                           .read(orderRepositoryProvider)
-                                          .voidOrder(order.id);
+                                          .cancelOrder(
+                                            order.id,
+                                            syncRepo: syncRepo,
+                                          );
                                     }
                                   },
                                   child: Container(

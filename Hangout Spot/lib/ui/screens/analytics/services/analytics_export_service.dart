@@ -3,6 +3,8 @@ import 'package:excel/excel.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:hangout_spot/ui/screens/analytics/providers/analytics_data_provider.dart';
+import 'package:hangout_spot/data/local/db/app_database.dart';
+import 'package:drift/drift.dart' as drift;
 import 'package:intl/intl.dart';
 
 class AnalyticsExportService {
@@ -10,6 +12,7 @@ class AnalyticsExportService {
     AnalyticsData data, {
     required DateTime startDate,
     required DateTime endDate,
+    AppDatabase? db,
   }) async {
     // Check if there's any data to export
     if (data.totalOrders == 0 &&
@@ -42,6 +45,12 @@ class AnalyticsExportService {
 
     // Create Customer Analysis sheet
     _createCustomerAnalysisSheet(excel, data);
+
+    // Create Raw Ledgers if Database is provided
+    if (db != null) {
+      await _createRawOrdersSheet(excel, db, startDate, endDate);
+      await _createRawOrderItemsSheet(excel, db, startDate, endDate);
+    }
 
     // Save and share
     final directory = await getApplicationDocumentsDirectory();
@@ -258,7 +267,109 @@ class AnalyticsExportService {
       final cell = sheet.cell(
         CellIndex.indexByColumnRow(columnIndex: i, rowIndex: rowIndex),
       );
-      cell.value = TextCellValue(values[i].toString());
+      cell.value = TextCellValue(values[i]?.toString() ?? '');
+    }
+  }
+
+  static Future<void> _createRawOrdersSheet(
+    Excel excel,
+    AppDatabase db,
+    DateTime start,
+    DateTime end,
+  ) async {
+    var sheet = excel['Raw Orders Ledger'];
+
+    // Header
+    _addRow(sheet, 0, [
+      'Order ID',
+      'Invoice Number',
+      'Customer ID',
+      'Location ID',
+      'Subtotal',
+      'Discount Amount',
+      'Tax Amount',
+      'Total Amount',
+      'Payment Mode',
+      'Paid Cash',
+      'Paid UPI',
+      'Status',
+      'Created At',
+      'Is Synced',
+    ]);
+
+    // Query Data
+    final orders =
+        await (db.select(db.orders)
+              ..where((t) => t.createdAt.isBetweenValues(start, end))
+              ..orderBy([
+                (t) => drift.OrderingTerm(
+                  expression: t.createdAt,
+                  mode: drift.OrderingMode.desc,
+                ),
+              ]))
+            .get();
+
+    int row = 1;
+    for (var order in orders) {
+      _addRow(sheet, row++, [
+        order.id,
+        order.invoiceNumber,
+        order.customerId,
+        order.locationId,
+        order.subtotal,
+        order.discountAmount,
+        order.taxAmount,
+        order.totalAmount,
+        order.paymentMode,
+        order.paidCash,
+        order.paidUPI,
+        order.status,
+        order.createdAt.toIso8601String(),
+        order.isSynced,
+      ]);
+    }
+  }
+
+  static Future<void> _createRawOrderItemsSheet(
+    Excel excel,
+    AppDatabase db,
+    DateTime start,
+    DateTime end,
+  ) async {
+    var sheet = excel['Raw Order Items Ledger'];
+
+    // Header
+    _addRow(sheet, 0, [
+      'Item ID (Row)',
+      'Order ID (Parent)',
+      'Product ID',
+      'Item Name',
+      'Price',
+      'Quantity',
+      'Discount Amount',
+      'Note',
+    ]);
+
+    // Since we need to join against orders to filter by date span
+    final query = db.select(db.orderItems).join([
+      drift.innerJoin(db.orders, db.orders.id.equalsExp(db.orderItems.orderId)),
+    ])..where(db.orders.createdAt.isBetweenValues(start, end));
+
+    final rows = await query.get();
+
+    int row = 1;
+    for (var result in rows) {
+      final orderItem = result.readTable(db.orderItems);
+      _addRow(sheet, row++, [
+        orderItem.id,
+        orderItem.orderId,
+        orderItem.itemId,
+        orderItem.itemName,
+        orderItem.price,
+        orderItem.quantity,
+        orderItem.discountAmount,
+        orderItem.note,
+      ]);
     }
   }
 }

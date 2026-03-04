@@ -50,12 +50,36 @@ class InventoryItem {
       'updatedAt': FieldValue.serverTimestamp(),
     };
   }
+
+  InventoryItem copyWith({
+    String? id,
+    String? name,
+    String? category,
+    String? unit,
+    double? currentQty,
+    double? minQty,
+    double? price,
+    bool? isActive,
+    DateTime? updatedAt,
+  }) {
+    return InventoryItem(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      category: category ?? this.category,
+      unit: unit ?? this.unit,
+      currentQty: currentQty ?? this.currentQty,
+      minQty: minQty ?? this.minQty,
+      price: price ?? this.price,
+      isActive: isActive ?? this.isActive,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
 }
 
 class DailyInventory {
   final String id;
   final DateTime date;
-  final Map<String, double> items;
+  final Map<String, String> items;
   final DateTime? updatedAt;
 
   DailyInventory({
@@ -68,9 +92,9 @@ class DailyInventory {
   factory DailyInventory.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? {};
     final itemsRaw = (data['items'] as Map<String, dynamic>?) ?? {};
-    final items = <String, double>{};
+    final items = <String, String>{};
     for (final entry in itemsRaw.entries) {
-      items[entry.key] = _toDouble(entry.value);
+      items[entry.key] = entry.value.toString();
     }
 
     return DailyInventory(
