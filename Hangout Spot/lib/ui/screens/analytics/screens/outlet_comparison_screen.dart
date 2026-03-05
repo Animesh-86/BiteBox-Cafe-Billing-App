@@ -16,16 +16,16 @@ class OutletComparisonScreen extends ConsumerWidget {
             child: Container(
               padding: const EdgeInsets.all(32),
               margin: const EdgeInsets.all(16),
-              decoration: AnalyticsTheme.glassCard(),
+              decoration: AnalyticsTheme.glassCard(context),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
                     padding: const EdgeInsets.all(16),
-                    decoration: AnalyticsTheme.iconContainer(),
-                    child: const Icon(
+                    decoration: AnalyticsTheme.iconContainer(context),
+                    child: Icon(
                       Icons.store_rounded,
-                      color: AnalyticsTheme.primaryGold,
+                      color: AnalyticsTheme.primaryGold(context),
                       size: 48,
                     ),
                   ),
@@ -34,14 +34,14 @@ class OutletComparisonScreen extends ConsumerWidget {
                     'Outlet Comparison',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: AnalyticsTheme.primaryText,
+                      color: AnalyticsTheme.primaryText(context),
                     ),
                   ),
                   const SizedBox(height: 12),
                   Text(
                     'Compare performance across multiple outlets',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AnalyticsTheme.secondaryText,
+                      color: AnalyticsTheme.secondaryText(context),
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -52,13 +52,13 @@ class OutletComparisonScreen extends ConsumerWidget {
                       vertical: 12,
                     ),
                     decoration: BoxDecoration(
-                      color: AnalyticsTheme.primaryGold.withOpacity(0.2),
+                      color: AnalyticsTheme.primaryGold(context).withOpacity(0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Coming Soon',
                       style: TextStyle(
-                        color: AnalyticsTheme.primaryGold,
+                        color: AnalyticsTheme.primaryGold(context),
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
                       ),
@@ -77,16 +77,16 @@ class OutletComparisonScreen extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AnalyticsTheme.cardBackground,
+        color: AnalyticsTheme.cardBackground(context),
         border: Border(
-          bottom: BorderSide(color: AnalyticsTheme.borderColor, width: 1),
+          bottom: BorderSide(color: AnalyticsTheme.borderColor(context), width: 1),
         ),
       ),
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.menu_rounded),
-            color: AnalyticsTheme.primaryGold,
+            icon: Icon(Icons.menu_rounded),
+            color: AnalyticsTheme.primaryGold(context),
             onPressed: onMenuPressed,
           ),
           Expanded(
@@ -94,7 +94,7 @@ class OutletComparisonScreen extends ConsumerWidget {
               'Outlet Comparison',
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: AnalyticsTheme.primaryText,
+                color: AnalyticsTheme.primaryText(context),
               ),
               textAlign: TextAlign.center,
             ),

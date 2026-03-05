@@ -1,3 +1,4 @@
+import 'package:hangout_spot/utils/log_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/data/repositories/auth_repository.dart';
@@ -62,12 +63,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           if (resetCompleted) {
             await prefs.setBool('factory_reset_completed', false);
             await prefs.remove('last_sync_app_version');
-            debugPrint('🧹 Factory reset detected - skipping restore on login');
+            logDebug('🧹 Factory reset detected - skipping restore on login');
             throw Exception('Factory reset - skip restore');
           }
           final skipAutoRestore = prefs.getBool('skip_auto_restore') ?? false;
           if (skipAutoRestore) {
-            debugPrint('⏭️ Auto-restore disabled until manual restore');
+            logDebug('⏭️ Auto-restore disabled until manual restore');
             throw Exception('Auto-restore disabled');
           }
           await ref.read(syncRepositoryProvider).restoreData();
@@ -79,9 +80,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           // Mark as synced for this app version
           await prefs.setString('last_sync_app_version', '1.0.0');
 
-          debugPrint('✅ Login sync completed, real-time listener started');
+          logDebug('✅ Login sync completed, real-time listener started');
         } catch (e) {
-          debugPrint("Restore failed (might be fresh user): $e");
+          logDebug("Restore failed (might be fresh user): $e");
           // Choose to continue even if restore fails?
           // Yes, because it might be a new user with no data.
         }

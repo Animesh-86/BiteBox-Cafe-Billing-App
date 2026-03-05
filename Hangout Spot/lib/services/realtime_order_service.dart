@@ -1,3 +1,4 @@
+import 'package:hangout_spot/utils/log_utils.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart' hide Order;
 import 'package:firebase_auth/firebase_auth.dart';
@@ -5,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/data/providers/database_provider.dart';
+import 'package:hangout_spot/data/providers/realtime_services_provider.dart';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
@@ -13,13 +15,18 @@ class RealTimeOrderService {
   final AppDatabase _db;
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
+  final VoidCallback? _onRemoteOrderSynced;
 
-  StreamSubscription? _orderSubscription;
   StreamSubscription? _individualOrdersSubscription;
 
-  RealTimeOrderService(this._db, this._auth, this._firestore);
+  RealTimeOrderService(
+    this._db,
+    this._auth,
+    this._firestore, {
+    VoidCallback? onRemoteOrderSynced,
+  }) : _onRemoteOrderSynced = onRemoteOrderSynced;
 
-  // Start listening to orders collection (both legacy array and new subcollection)
+  // Start listening to orders collection (individual document subcollection)
   void startListening() {
     final user = _auth.currentUser;
     if (user == null) return;
@@ -27,10 +34,10 @@ class RealTimeOrderService {
     // Cancel existing subscriptions if any
     stopListening();
 
-    debugPrint('🎧 Starting Real-Time Order Listeners...');
+    logDebug('🎧 Starting Real-Time Order Listener...');
 
     try {
-      // Listen to individual order documents (NEW - better for multi-device)
+      // Listen to individual order documents (scalable, multi-device safe)
       final individualOrdersRef = _firestore
           .collection('cafes')
           .doc(user.uid)
@@ -38,81 +45,48 @@ class RealTimeOrderService {
           .snapshots();
 
       _individualOrdersSubscription = individualOrdersRef.listen(
-        (snapshot) {
+        (snapshot) async {
+          bool anyChanges = false;
           for (var change in snapshot.docChanges) {
             if (change.type == DocumentChangeType.added ||
                 change.type == DocumentChangeType.modified) {
-              _processSingleOrder(change.doc.data()!);
+              final changed = await _processSingleOrder(change.doc.data()!);
+              if (changed) anyChanges = true;
             }
           }
-        },
-        onError: (e) {
-          debugPrint('❌ Error in Individual Orders Listener: $e');
-        },
-      );
-
-      // Listen to legacy array-based structure (backward compatibility)
-      final ordersRef = _firestore
-          .collection('cafes')
-          .doc(user.uid)
-          .collection('data')
-          .doc('orders')
-          .snapshots();
-
-      _orderSubscription = ordersRef.listen(
-        (snapshot) {
-          if (snapshot.exists && snapshot.data() != null) {
-            _processSnapshot(snapshot.data()!);
+          // Notify analytics providers once per batch
+          if (anyChanges) {
+            _onRemoteOrderSynced?.call();
           }
         },
         onError: (e) {
-          debugPrint('❌ Error in Legacy Order Listener: $e');
+          logDebug('❌ Error in Order Listener: $e');
         },
       );
     } catch (e) {
-      debugPrint('❌ Failed to start listeners: $e');
+      logDebug('❌ Failed to start listeners: $e');
     }
   }
 
   void stopListening() {
-    _orderSubscription?.cancel();
-    _orderSubscription = null;
     _individualOrdersSubscription?.cancel();
     _individualOrdersSubscription = null;
   }
 
-  Future<void> _processSnapshot(Map<String, dynamic> data) async {
-    try {
-      final List<dynamic> ordersList = data['list'] ?? [];
-      if (ordersList.isEmpty) return;
-
-      debugPrint('📥 Received ${ordersList.length} orders from Cloud (Legacy)');
-
-      // Process orders in background to verify against local DB
-      // We only want to INSERT new orders or UPDATE modified ones
-      // We do NOT delete local orders based on sync to prevent data loss
-
-      await _db.transaction(() async {
-        for (var orderMap in ordersList) {
-          await _syncSingleOrder(orderMap);
-        }
-      });
-    } catch (e) {
-      debugPrint('❌ Error processing real-time snapshot: $e');
-    }
-  }
-
   // Process individual order document (better conflict resolution)
-  Future<void> _processSingleOrder(Map<String, dynamic> orderMap) async {
+  // Returns true if local DB was updated.
+  Future<bool> _processSingleOrder(Map<String, dynamic> orderMap) async {
     try {
-      await _syncSingleOrder(orderMap);
+      return await _syncSingleOrder(orderMap);
     } catch (e) {
-      debugPrint('❌ Error processing single order: $e');
+      logDebug('❌ Error processing single order: $e');
+      return false;
     }
   }
 
-  // Unified sync logic with timestamp-based conflict resolution
-  Future<void> _syncSingleOrder(Map<String, dynamic> orderMap) async {
+  // Unified sync logic with timestamp-based conflict resolution.
+  // Returns true if local DB was modified.
+  Future<bool> _syncSingleOrder(Map<String, dynamic> orderMap) async {
     try {
       final cloudOrder = Order.fromJson(orderMap);
 
@@ -123,13 +97,14 @@ class RealTimeOrderService {
 
       if (localOrder == null) {
         // New Order - Insert
-        debugPrint('🆕 New Order received: ${cloudOrder.invoiceNumber}');
+        logDebug('🆕 New Order received: ${cloudOrder.invoiceNumber}');
         await _db
             .into(_db.orders)
             .insert(cloudOrder, mode: InsertMode.insertOrReplace);
 
         // Restore orderItems if available
         await _restoreOrderItems(cloudOrder.id, orderMap);
+        return true;
       } else {
         // Existing Order - Use timestamp to resolve conflicts
         final cloudModified = orderMap['lastModified'];
@@ -150,28 +125,28 @@ class RealTimeOrderService {
                 localOrder.status != cloudOrder.status ||
                 localOrder.paymentMode != cloudOrder.paymentMode;
             if (shouldUpdate) {
-              debugPrint(
+              logDebug(
                 '🔄 Updating Order (no timestamp): ${cloudOrder.invoiceNumber}',
               );
-            }
-            if (shouldUpdate) {
               await _db.update(_db.orders).replace(cloudOrder);
             }
-            return;
+            return shouldUpdate;
           }
 
           // Cloud is newer, update local
           if (cloudTime.isAfter(localModified)) {
-            debugPrint(
+            logDebug(
               '🔄 Updating Order (cloud newer): ${cloudOrder.invoiceNumber}',
             );
             await _db.update(_db.orders).replace(cloudOrder);
             // Update orderItems as well
             await _restoreOrderItems(cloudOrder.id, orderMap);
+            return true;
           } else {
-            debugPrint(
+            logDebug(
               '⏭️ Skipping update (local newer): ${cloudOrder.invoiceNumber}',
             );
+            return false;
           }
         } else {
           // No timestamp, fall back to field comparison
@@ -179,17 +154,19 @@ class RealTimeOrderService {
               localOrder.status != cloudOrder.status ||
               localOrder.paymentMode != cloudOrder.paymentMode;
           if (shouldUpdate) {
-            debugPrint(
+            logDebug(
               '🔄 Updating Order (field changed): ${cloudOrder.invoiceNumber}',
             );
             await _db.update(_db.orders).replace(cloudOrder);
             // Update orderItems as well
             await _restoreOrderItems(cloudOrder.id, orderMap);
           }
+          return shouldUpdate;
         }
       }
     } catch (e) {
-      debugPrint('❌ Error syncing order: $e');
+      logDebug('❌ Error syncing order: $e');
+      return false;
     }
   }
 
@@ -201,7 +178,7 @@ class RealTimeOrderService {
     try {
       final itemsData = orderMap['items'] as List<dynamic>?;
       if (itemsData == null || itemsData.isEmpty) {
-        debugPrint('⚠️ No items data in cloud order: $orderId');
+        logDebug('⚠️ No items data in cloud order: $orderId');
         return;
       }
 
@@ -231,9 +208,9 @@ class RealTimeOrderService {
             );
       }
 
-      debugPrint('✅ Restored ${itemsData.length} items for order: $orderId');
+      logDebug('✅ Restored ${itemsData.length} items for order: $orderId');
     } catch (e) {
-      debugPrint('❌ Error restoring orderItems: $e');
+      logDebug('❌ Error restoring orderItems: $e');
     }
   }
 }
@@ -243,5 +220,10 @@ final realTimeOrderServiceProvider = Provider<RealTimeOrderService>((ref) {
     ref.watch(appDatabaseProvider),
     FirebaseAuth.instance,
     FirebaseFirestore.instance,
+    onRemoteOrderSynced: () {
+      // Bump the generation counter so analytics providers auto-refresh
+      ref.read(remoteSyncGenerationProvider.notifier).state++;
+      logDebug('📊 Remote sync generation bumped → analytics will refresh');
+    },
   );
 });

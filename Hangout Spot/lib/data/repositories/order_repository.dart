@@ -1,5 +1,5 @@
+import 'package:hangout_spot/utils/log_utils.dart';
 import 'package:drift/drift.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
@@ -13,6 +13,7 @@ import 'package:hangout_spot/services/live_invoice_counter_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' hide Order;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hangout_spot/data/repositories/inventory_repository.dart';
+import 'package:hangout_spot/data/repositories/customer_repository.dart';
 import 'package:hangout_spot/data/repositories/sync_repository.dart';
 import 'package:hangout_spot/data/providers/inventory_providers.dart';
 import 'package:hangout_spot/data/constants/customer_defaults.dart';
@@ -118,18 +119,18 @@ class OrderRepository {
         if (sessionManager != null) {
           invoiceNum = await sessionManager.getNextInvoiceNumber();
         } else {
-          // Fallback to timestamp-based if no session manager
+          // Fallback: unique but non-sequential (avoids collision via UUID suffix)
           invoiceNum =
-              "INV-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}";
+              "INV-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}-${const Uuid().v4().substring(0, 4)}";
         }
       }
     } else if (status == 'completed' && invoiceNum.startsWith('HOLD-')) {
-      // Converting a HOLD order to COMPLETED - use the same counter source as UI (Firestore via SessionManager)
+      // Converting a HOLD order to COMPLETED
       if (sessionManager != null) {
         invoiceNum = await sessionManager.getNextInvoiceNumber();
       } else {
         invoiceNum =
-            "INV-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}";
+            "INV-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}-${const Uuid().v4().substring(0, 4)}";
       }
     }
 
@@ -208,10 +209,8 @@ class OrderRepository {
       _recordToLiveServices(orderId, invoiceNum).ignore();
     }
 
-    // Wait a brief moment to ensure local DB transactions fully commit
-    Future.delayed(const Duration(milliseconds: 500), () {
-      syncRepo?.backupData();
-    });
+    // NOTE: Orders are pushed individually via _tryImmediatePush.
+    // Full backupData() is handled by AutoSyncService on a schedule.
 
     return orderId;
   }
@@ -236,12 +235,12 @@ class OrderRepository {
       // Record to Live Analytics with item count
       if (_liveAnalytics != null) {
         await _liveAnalytics.recordSale(order, itemCount: totalItems);
-        debugPrint(
+        logDebug(
           '✅ Recorded to Live Analytics: $invoiceNum (Items: $totalItems)',
         );
       }
     } catch (e) {
-      debugPrint('❌ Failed to record to live services: $e');
+      logDebug('❌ Failed to record to live services: $e');
     }
   }
 
@@ -275,13 +274,14 @@ class OrderRepository {
       // Record to Live Analytics with item count
       if (_liveAnalytics != null) {
         await _liveAnalytics.recordSale(order, itemCount: totalItems);
-        debugPrint(
+        logDebug(
           '✅ Recorded to Live Analytics: ${order.invoiceNumber} (Items: $totalItems)',
         );
       }
     });
 
-    syncRepo?.backupData();
+    // Push the payment update to Firestore immediately
+    _tryPushOrderUpdate(orderId).ignore();
   }
 
   Future<void> _decrementInventoryForCart(CartState cart) async {
@@ -307,7 +307,7 @@ class OrderRepository {
           reason: 'order_sale',
         );
       } catch (e) {
-        debugPrint('⚠️ Inventory adjust skipped for ${ci.item.name}: $e');
+        logDebug('⚠️ Inventory adjust skipped for ${ci.item.name}: $e');
       }
     }
   }
@@ -355,7 +355,7 @@ class OrderRepository {
           'items': itemsData, // Include items in the order data
         };
 
-        // Push as individual order document (better for multi-device sync)
+        // Push as individual order document (scalable for multi-device sync)
         await FirebaseFirestore.instance
             .collection('cafes')
             .doc(user.uid)
@@ -363,51 +363,93 @@ class OrderRepository {
             .doc(orderId)
             .set(orderData, SetOptions(merge: true));
 
-        final orderDataArray = Map<String, dynamic>.from(orderData);
-        orderDataArray['lastModified'] = DateTime.now().toIso8601String();
-
-        // Also update the legacy array-based structure for backward compatibility
-        await FirebaseFirestore.instance
-            .collection('cafes')
-            .doc(user.uid)
-            .collection('data')
-            .doc('orders')
-            .set({
-              'list': FieldValue.arrayUnion([orderDataArray]),
-              'lastUpdated': FieldValue.serverTimestamp(),
-            }, SetOptions(merge: true));
-
-        // Push orderItems to separate collection for manual restore support
-        for (final itemData in itemsData) {
-          final itemWithOrderId = Map<String, dynamic>.from(itemData);
-          itemWithOrderId['orderId'] = orderId;
-          itemWithOrderId['id'] = const Uuid()
-              .v4(); // Generate unique ID for orderItem
-
-          await FirebaseFirestore.instance
-              .collection('cafes')
-              .doc(user.uid)
-              .collection('data')
-              .doc('order_items')
-              .set({
-                'list': FieldValue.arrayUnion([itemWithOrderId]),
-                'lastUpdated': FieldValue.serverTimestamp(),
-              }, SetOptions(merge: true));
-        }
-
         // Mark as synced locally
         await (_db.update(_db.orders)..where((t) => t.id.equals(orderId)))
             .write(const OrdersCompanion(isSynced: Value(true)));
 
-        debugPrint('✅ Order pushed to Firestore: $invoiceNum');
+        logDebug('✅ Order pushed to Firestore: $invoiceNum');
       }
     } catch (e) {
-      debugPrint("⚠️ Immediate Push failed (will be retried later): $e");
+      logDebug("⚠️ Immediate Push failed (will be retried later): $e");
+    }
+  }
+
+  /// Push a single order update (status change, payment change) to Firestore.
+  /// Used for cancel/markAsPaid so changes sync without a full backup.
+  Future<void> _tryPushOrderUpdate(String orderId) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final order = await (_db.select(
+        _db.orders,
+      )..where((t) => t.id.equals(orderId))).getSingleOrNull();
+      if (order == null) return;
+
+      // Fetch order items to include in the document
+      final items = await getOrderItems(orderId);
+      final itemsData = items
+          .map(
+            (oi) => {
+              'itemId': oi.itemId,
+              'itemName': oi.itemName,
+              'price': oi.price,
+              'quantity': oi.quantity,
+              'note': oi.note,
+              'discountAmount': oi.discountAmount,
+            },
+          )
+          .toList();
+
+      final orderData = {
+        'id': order.id,
+        'invoiceNumber': order.invoiceNumber,
+        'customerId': order.customerId,
+        'locationId': order.locationId,
+        'subtotal': order.subtotal,
+        'discountAmount': order.discountAmount,
+        'taxAmount': order.taxAmount,
+        'totalAmount': order.totalAmount,
+        'paymentMode': order.paymentMode,
+        'paidCash': order.paidCash,
+        'paidUPI': order.paidUPI,
+        'status': order.status,
+        'createdAt': order.createdAt.toIso8601String(),
+        'isSynced': true,
+        'lastModified': FieldValue.serverTimestamp(),
+        'items': itemsData,
+      };
+
+      await FirebaseFirestore.instance
+          .collection('cafes')
+          .doc(user.uid)
+          .collection('orders')
+          .doc(orderId)
+          .set(orderData, SetOptions(merge: true));
+
+      await (_db.update(_db.orders)..where((t) => t.id.equals(orderId))).write(
+        const OrdersCompanion(isSynced: Value(true)),
+      );
+
+      logDebug('✅ Order update pushed: ${order.invoiceNumber}');
+    } catch (e) {
+      logDebug('⚠️ Order update push failed (will retry): $e');
     }
   }
 
   // Soft Delete strategy: Cancel instead of Delete
-  Future<void> cancelOrder(String orderId, {SyncRepository? syncRepo}) async {
+  Future<void> cancelOrder(
+    String orderId, {
+    SyncRepository? syncRepo,
+    CustomerRepository? customerRepo,
+  }) async {
+    // We need the order details before we cancel it to properly revert its impacts
+    final order = await (_db.select(
+      _db.orders,
+    )..where((t) => t.id.equals(orderId))).getSingleOrNull();
+    final items = await getOrderItems(orderId);
+    final itemCount = items.fold<int>(0, (sum, item) => sum + item.quantity);
+
     await _db.transaction(() async {
       await (_db.update(_db.orders)..where((t) => t.id.equals(orderId))).write(
         const OrdersCompanion(
@@ -417,29 +459,31 @@ class OrderRepository {
           ), // Mark unsynced so it pushes to cloud on next sync
         ),
       );
-
-      // Attempt immediate push of cancellation
-      try {
-        final user = FirebaseAuth.instance.currentUser;
-        if (user != null) {
-          // For array removal/update, it is tricky with just arrayUnion.
-          // We might need to rely on the background SyncRepository for robust updates
-          // or read-modify-write here.
-          // For now, let's mark it locally. The RealTimeListener on OTHER devices
-          // won't see the cancellation instantly unless we handle it,
-          // but they definitely won't see a "Missing Number".
-
-          // To notify others INSTANTLY, we would need to push the updated order.
-          // But dealing with `list` updates for a specific item in Firestore is hard.
-          // We will rely on BackupSync for full consistency of edits.
-          // The critical part (Creation Numbering) is handled by `createOrder`.
-        }
-      } catch (e) {
-        print(e);
-      }
     });
 
-    syncRepo?.backupData();
+    // Attempt immediate push of cancellation outside of database transaction
+    // to prevent Firebase Realtime Database thread locks from hanging SQLite.
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        // Revert analytics
+        if (order != null) {
+          await _liveAnalytics?.revertSale(order, itemCount: itemCount);
+          if (customerRepo != null && order.customerId != null) {
+            await customerRepo.revertVisitStats(
+              order.customerId!,
+              order.totalAmount,
+              syncRepo: syncRepo,
+            );
+          }
+        }
+      }
+    } catch (e) {
+      logDebug('Failed to push live order cancellation bounds: $e');
+    }
+
+    // Push the cancellation to Firestore immediately
+    _tryPushOrderUpdate(orderId).ignore();
   }
 
   Future<void> revertOrderItems(String orderId) async {
@@ -543,8 +587,7 @@ class OrderRepository {
         );
       });
 
-      // Trigger non-blocking cloud backup
-      syncRepo?.backupData();
+      // NOTE: Customer stats sync handled by AutoSyncService schedule
     } catch (e) {
       // Customer not found, skip update
       LoggingService.logError('Error updating customer stats', e);
@@ -557,7 +600,7 @@ class OrderRepository {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        debugPrint('⚠️ Not logged in, skipping unsynced orders sync');
+        logDebug('⚠️ Not logged in, skipping unsynced orders sync');
         return 0;
       }
 
@@ -571,13 +614,28 @@ class OrderRepository {
         return 0;
       }
 
-      debugPrint(
+      logDebug(
         '🔄 Retrying sync for ${unsyncedOrders.length} unsynced orders...',
       );
 
       int successCount = 0;
       for (var order in unsyncedOrders) {
         try {
+          // Fetch order items to include in the document
+          final orderItems = await getOrderItems(order.id);
+          final itemsData = orderItems
+              .map(
+                (oi) => {
+                  'itemId': oi.itemId,
+                  'itemName': oi.itemName,
+                  'price': oi.price,
+                  'quantity': oi.quantity,
+                  'note': oi.note,
+                  'discountAmount': oi.discountAmount,
+                },
+              )
+              .toList();
+
           final orderData = {
             'id': order.id,
             'invoiceNumber': order.invoiceNumber,
@@ -594,9 +652,10 @@ class OrderRepository {
             'createdAt': order.createdAt.toIso8601String(),
             'isSynced': true,
             'lastModified': FieldValue.serverTimestamp(),
+            'items': itemsData,
           };
 
-          // Push as individual document (preferred)
+          // Push as individual document only (no legacy array)
           await FirebaseFirestore.instance
               .collection('cafes')
               .doc(user.uid)
@@ -604,38 +663,24 @@ class OrderRepository {
               .doc(order.id)
               .set(orderData, SetOptions(merge: true));
 
-          final orderDataArray = Map<String, dynamic>.from(orderData);
-          orderDataArray['lastModified'] = DateTime.now().toIso8601String();
-
-          // Also update legacy array structure
-          await FirebaseFirestore.instance
-              .collection('cafes')
-              .doc(user.uid)
-              .collection('data')
-              .doc('orders')
-              .set({
-                'list': FieldValue.arrayUnion([orderDataArray]),
-                'lastUpdated': FieldValue.serverTimestamp(),
-              }, SetOptions(merge: true));
-
           // Mark as synced in local DB
           await (_db.update(_db.orders)..where((t) => t.id.equals(order.id)))
               .write(const OrdersCompanion(isSynced: Value(true)));
 
           successCount++;
-          debugPrint('✅ Synced order: ${order.invoiceNumber}');
+          logDebug('✅ Synced order: ${order.invoiceNumber}');
         } catch (e) {
-          debugPrint('❌ Failed to sync order ${order.invoiceNumber}: $e');
+          logDebug('❌ Failed to sync order ${order.invoiceNumber}: $e');
           // Continue with next order
         }
       }
 
-      debugPrint(
+      logDebug(
         '✅ Successfully synced $successCount/${unsyncedOrders.length} orders',
       );
       return successCount;
     } catch (e) {
-      debugPrint('❌ Error in syncUnsyncedOrders: $e');
+      logDebug('❌ Error in syncUnsyncedOrders: $e');
       return 0;
     }
   }

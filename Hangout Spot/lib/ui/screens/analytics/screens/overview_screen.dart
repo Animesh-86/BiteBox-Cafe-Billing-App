@@ -8,6 +8,7 @@ import 'package:hangout_spot/ui/screens/analytics/services/analytics_export_serv
 import 'package:hangout_spot/utils/ui/error_ui.dart';
 import 'package:hangout_spot/utils/exceptions/error_handler.dart';
 import 'package:hangout_spot/data/providers/database_provider.dart';
+import 'package:hangout_spot/data/providers/realtime_services_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../widgets/analytics_header.dart';
@@ -17,6 +18,7 @@ final platformSplitProvider =
       ref,
       params,
     ) {
+      ref.watch(remoteSyncGenerationProvider); // auto-refresh on remote sync
       final repo = ref.watch(analyticsRepositoryProvider);
       return repo.getPlatformSplit(params.start, params.end);
     });
@@ -60,9 +62,9 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
         Expanded(
           child: analyticsData.when(
             data: (data) => _buildContent(data),
-            loading: () => const Center(
+            loading: () => Center(
               child: CircularProgressIndicator(
-                color: AnalyticsTheme.primaryGold,
+                color: AnalyticsTheme.primaryGold(context),
               ),
             ),
             error: (error, stack) => Center(
@@ -79,10 +81,10 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
                     const SizedBox(height: 16),
                     Text(
                       'Error loading analytics',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: AnalyticsTheme.onAccentText(context),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -106,56 +108,56 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
     final selectedFilter = await showDialog<DateFilter>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AnalyticsTheme.cardBackground,
-        title: const Text(
+        backgroundColor: AnalyticsTheme.cardBackground(context),
+        title: Text(
           'Export Date Range',
-          style: TextStyle(color: AnalyticsTheme.primaryText),
+          style: TextStyle(color: AnalyticsTheme.primaryText(context)),
         ),
         content: SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.calendar_month,
-                  color: AnalyticsTheme.primaryGold,
+                  color: AnalyticsTheme.primaryGold(context),
                 ),
-                title: const Text(
+                title: Text(
                   'This Year',
-                  style: TextStyle(color: AnalyticsTheme.primaryText),
+                  style: TextStyle(color: AnalyticsTheme.primaryText(context)),
                 ),
                 onTap: () => Navigator.pop(context, DateFilter.thisYear()),
               ),
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.calendar_today,
-                  color: AnalyticsTheme.primaryGold,
+                  color: AnalyticsTheme.primaryGold(context),
                 ),
-                title: const Text(
+                title: Text(
                   'This Month',
-                  style: TextStyle(color: AnalyticsTheme.primaryText),
+                  style: TextStyle(color: AnalyticsTheme.primaryText(context)),
                 ),
                 onTap: () => Navigator.pop(context, DateFilter.thisMonth()),
               ),
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.date_range,
-                  color: AnalyticsTheme.primaryGold,
+                  color: AnalyticsTheme.primaryGold(context),
                 ),
-                title: const Text(
+                title: Text(
                   'This Week',
-                  style: TextStyle(color: AnalyticsTheme.primaryText),
+                  style: TextStyle(color: AnalyticsTheme.primaryText(context)),
                 ),
                 onTap: () => Navigator.pop(context, DateFilter.thisWeek()),
               ),
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.event,
-                  color: AnalyticsTheme.primaryGold,
+                  color: AnalyticsTheme.primaryGold(context),
                 ),
-                title: const Text(
+                title: Text(
                   'Custom Range',
-                  style: TextStyle(color: AnalyticsTheme.primaryText),
+                  style: TextStyle(color: AnalyticsTheme.primaryText(context)),
                 ),
                 onTap: () async {
                   Navigator.pop(context);
@@ -169,10 +171,10 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
                     ),
                     builder: (context, child) {
                       return Theme(
-                        data: ThemeData.dark().copyWith(
-                          colorScheme: const ColorScheme.dark(
-                            primary: AnalyticsTheme.primaryGold,
-                            surface: AnalyticsTheme.cardBackground,
+                        data: Theme.of(context).copyWith(
+                          colorScheme: Theme.of(context).colorScheme.copyWith(
+                            primary: AnalyticsTheme.primaryGold(context),
+                            surface: AnalyticsTheme.cardBackground(context),
                           ),
                         ),
                         child: child!,
@@ -185,18 +187,18 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
                 },
               ),
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.highlight,
-                  color: AnalyticsTheme.primaryGold,
+                  color: AnalyticsTheme.primaryGold(context),
                 ),
-                title: const Text(
+                title: Text(
                   'Current Selection',
-                  style: TextStyle(color: AnalyticsTheme.primaryText),
+                  style: TextStyle(color: AnalyticsTheme.primaryText(context)),
                 ),
                 subtitle: Text(
                   '${DateFormat('dd MMM yyyy').format(_currentFilter.startDate)} - ${DateFormat('dd MMM yyyy').format(_currentFilter.endDate)}',
                   style: TextStyle(
-                    color: AnalyticsTheme.secondaryText,
+                    color: AnalyticsTheme.secondaryText(context),
                     fontSize: 12,
                   ),
                 ),
@@ -208,9 +210,9 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text(
+            child: Text(
               'Cancel',
-              style: TextStyle(color: AnalyticsTheme.primaryGold),
+              style: TextStyle(color: AnalyticsTheme.primaryGold(context)),
             ),
           ),
         ],
@@ -269,19 +271,26 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
             'Key Metrics',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.bold,
-              color: AnalyticsTheme.primaryText,
+              color: AnalyticsTheme.primaryText(context),
             ),
           ),
           const SizedBox(height: 16),
           _buildMetricsGrid(data, currencyFormat),
           const SizedBox(height: 32),
 
+          // Cancelled Orders
+          if (data.cancelledOrdersCount > 0) ...[
+            _buildCancelledOrdersCard(data, currencyFormat),
+            const SizedBox(height: 24),
+          ] else
+            const SizedBox(height: 8),
+
           // Channel performance
           Text(
             'Order Channels',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.bold,
-              color: AnalyticsTheme.primaryText,
+              color: AnalyticsTheme.primaryText(context),
             ),
           ),
           const SizedBox(height: 16),
@@ -293,7 +302,7 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
             'Monthly Sales Trend',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.bold,
-              color: AnalyticsTheme.primaryText,
+              color: AnalyticsTheme.primaryText(context),
             ),
           ),
           const SizedBox(height: 16),
@@ -306,7 +315,7 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
               'Category Performance',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: AnalyticsTheme.primaryText,
+                color: AnalyticsTheme.primaryText(context),
               ),
             ),
             const SizedBox(height: 16),
@@ -319,7 +328,7 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
             'Top Selling Items',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.bold,
-              color: AnalyticsTheme.primaryText,
+              color: AnalyticsTheme.primaryText(context),
             ),
           ),
           const SizedBox(height: 16),
@@ -332,7 +341,7 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
   Widget _buildSmartBrief(AnalyticsData data) {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: AnalyticsTheme.glassCard(),
+      decoration: AnalyticsTheme.glassCard(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -340,10 +349,10 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
-                decoration: AnalyticsTheme.iconContainer(),
-                child: const Icon(
+                decoration: AnalyticsTheme.iconContainer(context),
+                child: Icon(
                   Icons.lightbulb_rounded,
-                  color: AnalyticsTheme.primaryGold,
+                  color: AnalyticsTheme.primaryGold(context),
                   size: 24,
                 ),
               ),
@@ -352,7 +361,7 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
                 'Smart Brief',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: AnalyticsTheme.primaryText,
+                  color: AnalyticsTheme.primaryText(context),
                 ),
               ),
             ],
@@ -360,8 +369,8 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
           const SizedBox(height: 16),
           Text(
             data.smartBrief,
-            style: const TextStyle(
-              color: AnalyticsTheme.primaryText,
+            style: TextStyle(
+              color: AnalyticsTheme.primaryText(context),
               fontSize: 14,
               height: 1.5,
             ),
@@ -408,6 +417,84 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
     );
   }
 
+  Widget _buildCancelledOrdersCard(
+    AnalyticsData data,
+    NumberFormat currencyFormat,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AnalyticsTheme.chartRed.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AnalyticsTheme.chartRed.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AnalyticsTheme.chartRed.withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.cancel_outlined,
+                  color: AnalyticsTheme.chartRed,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Cancelled Orders',
+                    style: TextStyle(
+                      color: AnalyticsTheme.chartRed,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${data.cancelledOrdersCount} voided transactions',
+                    style: TextStyle(
+                      color: AnalyticsTheme.primaryText(context).withOpacity(0.7),
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '-${currencyFormat.format(data.cancelledRevenue)}',
+                style: TextStyle(
+                  color: AnalyticsTheme.chartRed,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'lost revenue',
+                style: TextStyle(
+                  color: AnalyticsTheme.primaryText(context).withOpacity(0.5),
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildMetricCard({
     required IconData icon,
     required String title,
@@ -418,7 +505,7 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
 
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: AnalyticsTheme.glassCard(),
+      decoration: AnalyticsTheme.glassCard(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -427,8 +514,8 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
-                decoration: AnalyticsTheme.iconContainer(),
-                child: Icon(icon, color: AnalyticsTheme.primaryGold, size: 20),
+                decoration: AnalyticsTheme.iconContainer(context),
+                child: Icon(icon, color: AnalyticsTheme.primaryGold(context), size: 20),
               ),
               const Spacer(),
               Container(
@@ -474,17 +561,17 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
             children: [
               Text(
                 value,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: AnalyticsTheme.primaryGold,
+                  color: AnalyticsTheme.primaryGold(context),
                 ),
               ),
               const SizedBox(height: 4),
               Text(
                 title,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AnalyticsTheme.secondaryText,
+                  color: AnalyticsTheme.secondaryText(context),
                 ),
               ),
             ],
@@ -505,26 +592,26 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
     Widget tile(String label, int count, double total) {
       return Container(
         padding: const EdgeInsets.all(12),
-        decoration: AnalyticsTheme.glassCard(),
+        decoration: AnalyticsTheme.glassCard(context),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               label,
-              style: const TextStyle(
-                color: AnalyticsTheme.primaryText,
+              style: TextStyle(
+                color: AnalyticsTheme.primaryText(context),
                 fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(height: 6),
             Text(
               '$count orders',
-              style: TextStyle(color: AnalyticsTheme.secondaryText),
+              style: TextStyle(color: AnalyticsTheme.secondaryText(context)),
             ),
             Text(
               currencyFormat.format(total),
-              style: const TextStyle(
-                color: AnalyticsTheme.primaryGold,
+              style: TextStyle(
+                color: AnalyticsTheme.primaryGold(context),
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -537,7 +624,7 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
       return Expanded(
         child: Container(
           padding: const EdgeInsets.all(14),
-          decoration: AnalyticsTheme.glassCard(),
+          decoration: AnalyticsTheme.glassCard(context),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -560,8 +647,8 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
                   const SizedBox(width: 10),
                   Text(
                     label,
-                    style: const TextStyle(
-                      color: AnalyticsTheme.primaryText,
+                    style: TextStyle(
+                      color: AnalyticsTheme.primaryText(context),
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -570,12 +657,12 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
               const SizedBox(height: 10),
               Text(
                 '$count orders',
-                style: TextStyle(color: AnalyticsTheme.secondaryText),
+                style: TextStyle(color: AnalyticsTheme.secondaryText(context)),
               ),
               Text(
                 currencyFormat.format(total),
-                style: const TextStyle(
-                  color: AnalyticsTheme.primaryGold,
+                style: TextStyle(
+                  color: AnalyticsTheme.primaryGold(context),
                   fontWeight: FontWeight.w800,
                   fontSize: 16,
                 ),
@@ -594,32 +681,29 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
             Text(
               'Platform comparison',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AnalyticsTheme.secondaryText,
+                color: AnalyticsTheme.secondaryText(context),
               ),
             ),
             const SizedBox(height: 10),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
+            Row(
               children: [
-                SizedBox(
-                  width: 150,
+                Expanded(
                   child: tile(
                     'Zomato',
                     split.counts['Zomato'] ?? 0,
                     split.totals['Zomato'] ?? 0,
                   ),
                 ),
-                SizedBox(
-                  width: 150,
+                const SizedBox(width: 10),
+                Expanded(
                   child: tile(
                     'Swiggy',
                     split.counts['Swiggy'] ?? 0,
                     split.totals['Swiggy'] ?? 0,
                   ),
                 ),
-                SizedBox(
-                  width: 150,
+                const SizedBox(width: 10),
+                Expanded(
                   child: tile(
                     'Dine-in',
                     split.counts['Walk-in'] ?? 0,
@@ -632,7 +716,7 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
             Text(
               'Online vs offline',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AnalyticsTheme.secondaryText,
+                color: AnalyticsTheme.secondaryText(context),
               ),
             ),
             const SizedBox(height: 10),
@@ -656,8 +740,8 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
           ],
         );
       },
-      loading: () => const Center(
-        child: CircularProgressIndicator(color: AnalyticsTheme.primaryGold),
+      loading: () => Center(
+        child: CircularProgressIndicator(color: AnalyticsTheme.primaryGold(context)),
       ),
       error: (err, _) => Text(
         'Channel analytics error: $err',
@@ -677,7 +761,7 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
 
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: AnalyticsTheme.glassCard(),
+      decoration: AnalyticsTheme.glassCard(context),
       child: Column(
         children: data.itemShare.take(5).toList().asMap().entries.map((entry) {
           final index = entry.key;
@@ -691,14 +775,14 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
-                    color: AnalyticsTheme.primaryGold.withOpacity(0.2),
+                    color: AnalyticsTheme.primaryGold(context).withOpacity(0.2),
                     shape: BoxShape.circle,
                   ),
                   child: Center(
                     child: Text(
                       '${index + 1}',
-                      style: const TextStyle(
-                        color: AnalyticsTheme.primaryGold,
+                      style: TextStyle(
+                        color: AnalyticsTheme.primaryGold(context),
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
                       ),
@@ -709,8 +793,8 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
                 Expanded(
                   child: Text(
                     item.itemName,
-                    style: const TextStyle(
-                      color: AnalyticsTheme.primaryText,
+                    style: TextStyle(
+                      color: AnalyticsTheme.primaryText(context),
                       fontSize: 14,
                     ),
                   ),
@@ -726,7 +810,7 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
                   ),
                   child: Text(
                     '${item.quantity}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AnalyticsTheme.chartBlue,
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
@@ -748,35 +832,35 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
   }) {
     return Container(
       padding: const EdgeInsets.all(32),
-      decoration: AnalyticsTheme.glassCard(),
+      decoration: AnalyticsTheme.glassCard(context),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: AnalyticsTheme.primaryGold.withOpacity(0.1),
+              color: AnalyticsTheme.primaryGold(context).withOpacity(0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
               icon,
               size: 48,
-              color: AnalyticsTheme.primaryGold.withOpacity(0.5),
+              color: AnalyticsTheme.primaryGold(context).withOpacity(0.5),
             ),
           ),
           const SizedBox(height: 16),
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: AnalyticsTheme.primaryText,
+              color: AnalyticsTheme.primaryText(context),
             ),
           ),
           const SizedBox(height: 8),
           Text(
             subtitle,
-            style: TextStyle(fontSize: 14, color: AnalyticsTheme.secondaryText),
+            style: TextStyle(fontSize: 14, color: AnalyticsTheme.secondaryText(context)),
             textAlign: TextAlign.center,
           ),
         ],
@@ -796,7 +880,7 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
     return Container(
       height: 300,
       padding: const EdgeInsets.all(20),
-      decoration: AnalyticsTheme.glassCard(),
+      decoration: AnalyticsTheme.glassCard(context),
       child: BarChart(
         BarChartData(
           alignment: BarChartAlignment.spaceAround,
@@ -819,8 +903,8 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
                 final amount = rod.toY;
                 return BarTooltipItem(
                   '$displayMonth\n₹${amount.toStringAsFixed(0)}',
-                  const TextStyle(
-                    color: Colors.white,
+                  TextStyle(
+                    color: AnalyticsTheme.onAccentText(context),
                     fontWeight: FontWeight.bold,
                   ),
                 );
@@ -850,14 +934,14 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
                         child: Text(
                           monthName,
                           style: TextStyle(
-                            color: AnalyticsTheme.secondaryText,
+                            color: AnalyticsTheme.secondaryText(context),
                             fontSize: 10,
                           ),
                         ),
                       );
                     }
                   }
-                  return SideTitleWidget(meta: meta, child: const Text(''));
+                  return SideTitleWidget(meta: meta, child: Text(''));
                 },
                 reservedSize: 30,
               ),
@@ -870,7 +954,7 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
                   return Text(
                     '₹${(value / 1000).toStringAsFixed(0)}k',
                     style: TextStyle(
-                      color: AnalyticsTheme.secondaryText,
+                      color: AnalyticsTheme.secondaryText(context),
                       fontSize: 10,
                     ),
                   );
@@ -889,7 +973,7 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
             drawVerticalLine: false,
             getDrawingHorizontalLine: (value) {
               return FlLine(
-                color: Colors.white.withOpacity(0.1),
+                color: AnalyticsTheme.dividerColor(context),
                 strokeWidth: 1,
               );
             },
@@ -901,7 +985,7 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
               barRods: [
                 BarChartRodData(
                   toY: entry.value.amount,
-                  color: AnalyticsTheme.primaryGold,
+                  color: AnalyticsTheme.primaryGold(context),
                   width: 16,
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(4),
@@ -918,13 +1002,13 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
   Widget _buildCategoryPerformance(AnalyticsData data) {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: AnalyticsTheme.glassCard(),
+      decoration: AnalyticsTheme.glassCard(context),
       child: Column(
         children: <Widget>[
           for (var i = 0; i < data.categoryPerformance.length; i++) ...[
             _buildCategoryRow(data.categoryPerformance[i], i == 0),
             if (i < data.categoryPerformance.length - 1)
-              const Divider(color: Colors.white10, height: 24),
+              Divider(color: AnalyticsTheme.dividerColor(context), height: 24),
           ],
         ],
       ),
@@ -939,14 +1023,14 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
           height: 40,
           decoration: BoxDecoration(
             color: isTop
-                ? AnalyticsTheme.primaryGold.withOpacity(0.2)
+                ? AnalyticsTheme.primaryGold(context).withOpacity(0.2)
                 : AnalyticsTheme.chartBlue.withOpacity(0.2),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(
             Icons.category_rounded,
             color: isTop
-                ? AnalyticsTheme.primaryGold
+                ? AnalyticsTheme.primaryGold(context)
                 : AnalyticsTheme.chartBlue,
             size: 20,
           ),
@@ -958,8 +1042,8 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
             children: [
               Text(
                 category.category,
-                style: const TextStyle(
-                  color: AnalyticsTheme.primaryText,
+                style: TextStyle(
+                  color: AnalyticsTheme.primaryText(context),
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                 ),
@@ -968,7 +1052,7 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
               Text(
                 '${category.quantity} items sold',
                 style: TextStyle(
-                  color: AnalyticsTheme.secondaryText,
+                  color: AnalyticsTheme.secondaryText(context),
                   fontSize: 12,
                 ),
               ),
@@ -982,8 +1066,8 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
               '₹${category.revenue.toStringAsFixed(0)}',
               style: TextStyle(
                 color: isTop
-                    ? AnalyticsTheme.primaryGold
-                    : AnalyticsTheme.primaryText,
+                    ? AnalyticsTheme.primaryGold(context)
+                    : AnalyticsTheme.primaryText(context),
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),

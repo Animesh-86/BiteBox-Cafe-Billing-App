@@ -1,5 +1,5 @@
+import 'package:hangout_spot/utils/log_utils.dart';
 import 'dart:io';
-import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -219,7 +219,7 @@ class ShareService {
     }
 
     // Don't fall back to PDF share - just fail silently if WhatsApp can't open
-    debugPrint('WhatsApp share failed: could not open WhatsApp');
+    logDebug('WhatsApp share failed: could not open WhatsApp');
   }
 
   Future<void> openWhatsAppChat(String phone, {String? text}) async {

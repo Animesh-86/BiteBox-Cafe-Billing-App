@@ -237,12 +237,17 @@ class _TabletLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    // Adaptive widths based on screen size
+    final sidebarWidth = (screenWidth * 0.12).clamp(100.0, 150.0);
+    final cartWidth = (screenWidth * 0.30).clamp(280.0, 380.0);
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Categories Sidebar
         Container(
-          width: 130, // Fixed width for tablet sidebar
+          width: sidebarWidth,
           margin: const EdgeInsets.fromLTRB(16, 0, 8, 16),
           decoration: BoxDecoration(
             color: billingSurface(context, darkOpacity: 0.04),
@@ -266,9 +271,9 @@ class _TabletLayout extends StatelessWidget {
         ),
 
         // Cart Panel (Right side)
-        const SizedBox(
-          width: 350,
-          child: Padding(
+        SizedBox(
+          width: cartWidth,
+          child: const Padding(
             padding: EdgeInsets.fromLTRB(8, 0, 16, 16),
             child: CartPanel(),
           ),

@@ -248,11 +248,12 @@ class AnalyticsExportService {
       data.discountEffectiveness.totalDiscountAmount.toStringAsFixed(2),
     ]);
 
-    // At-Risk Customers
+    // At-Risk Customers — position dynamically below discount section
     if (data.atRiskCustomers.isNotEmpty) {
-      _addRow(sheet, 15, ['At-Risk Customers']);
-      _addRow(sheet, 16, ['Customer Name', 'Last Visit']);
-      int row = 17;
+      int atRiskStart = discountRow + 8;
+      _addRow(sheet, atRiskStart, ['At-Risk Customers']);
+      _addRow(sheet, atRiskStart + 1, ['Customer Name', 'Last Visit']);
+      int row = atRiskStart + 2;
       for (var customer in data.atRiskCustomers) {
         _addRow(sheet, row++, [
           customer.name,
@@ -297,10 +298,14 @@ class AnalyticsExportService {
       'Is Synced',
     ]);
 
-    // Query Data
+    // Query Data — use same boundary as analytics: >= start AND < end
     final orders =
         await (db.select(db.orders)
-              ..where((t) => t.createdAt.isBetweenValues(start, end))
+              ..where(
+                (t) =>
+                    t.createdAt.isBiggerOrEqualValue(start) &
+                    t.createdAt.isSmallerThanValue(end),
+              )
               ..orderBy([
                 (t) => drift.OrderingTerm(
                   expression: t.createdAt,
@@ -351,9 +356,16 @@ class AnalyticsExportService {
     ]);
 
     // Since we need to join against orders to filter by date span
-    final query = db.select(db.orderItems).join([
-      drift.innerJoin(db.orders, db.orders.id.equalsExp(db.orderItems.orderId)),
-    ])..where(db.orders.createdAt.isBetweenValues(start, end));
+    final query =
+        db.select(db.orderItems).join([
+          drift.innerJoin(
+            db.orders,
+            db.orders.id.equalsExp(db.orderItems.orderId),
+          ),
+        ])..where(
+          db.orders.createdAt.isBiggerOrEqualValue(start) &
+              db.orders.createdAt.isSmallerThanValue(end),
+        );
 
     final rows = await query.get();
 

@@ -5,6 +5,11 @@ import 'package:hangout_spot/services/shared_cart_service.dart';
 
 /// Providers for Firebase Realtime Database services
 
+/// Incremented every time the RealTimeOrderService syncs remote orders
+/// into the local DB. Analytics providers watch this so they auto-refresh
+/// when another device creates / updates an order.
+final remoteSyncGenerationProvider = StateProvider<int>((ref) => 0);
+
 /// Live Analytics Service Provider
 final liveAnalyticsServiceProvider = Provider<LiveAnalyticsService>((ref) {
   return LiveAnalyticsService();

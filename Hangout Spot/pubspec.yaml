@@ -71,7 +71,6 @@ dependencies:
   flutter_timezone: ^5.0.1
   drift: ^2.28.2
   sqlite3_flutter_libs: ^0.5.41
-  drift_dev: ^2.28.0
 
 dev_dependencies:
   flutter_test:
@@ -83,6 +82,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+  drift_dev: ^2.28.0
   riverpod_generator: ^2.6.3
   build_runner: ^2.4.14
   custom_lint: ^0.7.0

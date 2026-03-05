@@ -50,9 +50,13 @@ class BillingItemsGrid extends ConsumerWidget {
               .toList();
         }
 
+        // Adaptive grid: more columns on wider screens, at least 2
         final crossAxisCount = isTablet
             ? ((screenWidth - 50) / 180).floor().clamp(2, 5)
-            : 2;
+            : (screenWidth / 160).floor().clamp(2, 3);
+
+        // Adaptive aspect ratio: taller cards on smaller screens for text visibility
+        final childAspectRatio = screenWidth < 360 ? 0.6 : 0.7;
 
         return Column(
           children: [
@@ -156,9 +160,9 @@ class BillingItemsGrid extends ConsumerWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 10),
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: crossAxisCount,
-                          childAspectRatio: 0.7,
-                          crossAxisSpacing: 10,
-                          mainAxisSpacing: 10,
+                          childAspectRatio: childAspectRatio,
+                          crossAxisSpacing: 8,
+                          mainAxisSpacing: 8,
                         ),
                         itemCount: filtered.length,
                         itemBuilder: (context, index) {
@@ -365,80 +369,75 @@ class BillingItemCard extends ConsumerWidget {
                   ),
                 ),
                 Expanded(
-                  flex: 2,
+                  flex: 3,
                   child: Padding(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 4,
+                    ),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          flex: 2,
-                          child: Padding(
-                            padding: const EdgeInsets.all(10),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    item.name,
-                                    maxLines: 4,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 12,
-                                      color: inCart
-                                          ? (isDark
-                                                ? colorScheme.onSurface
-                                                : caramel)
-                                          : coffeeDark,
-                                      letterSpacing: 0.1,
-                                    ),
+                        Flexible(
+                          child: Builder(
+                            builder: (context) {
+                              final sw = MediaQuery.of(context).size.width;
+                              return Text(
+                                item.name,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: sw < 360
+                                      ? 10
+                                      : sw < 600
+                                      ? 11
+                                      : 12,
+                                  color: inCart
+                                      ? (isDark
+                                            ? colorScheme.onSurface
+                                            : caramel)
+                                      : coffeeDark,
+                                  letterSpacing: 0.1,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _buildPricePill(
+                              context,
+                              "\u20b9${item.price.toStringAsFixed(0)}",
+                              inCart,
+                            ),
+                            if (item.discountPercent > 0)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(
+                                    color: Colors.orange.withOpacity(0.3),
+                                    width: 0.5,
                                   ),
                                 ),
-                                const SizedBox(height: 6),
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    _buildPricePill(
-                                      context,
-                                      "₹${item.price.toStringAsFixed(0)}",
-                                      inCart,
-                                    ),
-                                    if (item.discountPercent > 0)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 6,
-                                          vertical: 2,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.orange.withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(
-                                            4,
-                                          ),
-                                          border: Border.all(
-                                            color: Colors.orange.withOpacity(
-                                              0.3,
-                                            ),
-                                            width: 0.5,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          "-${item.discountPercent.toStringAsFixed(0)}%",
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            color: Colors.orange.shade300,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                  ],
+                                child: Text(
+                                  "-${item.discountPercent.toStringAsFixed(0)}%",
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.orange.shade300,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                              ],
-                            ),
-                          ),
+                              ),
+                          ],
                         ),
                       ],
                     ),
@@ -449,30 +448,33 @@ class BillingItemCard extends ConsumerWidget {
           ),
           if (isOutOfStock)
             Positioned.fill(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.35),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.error.withOpacity(0.14),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: theme.colorScheme.error.withOpacity(0.6),
-                      ),
-                    ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  color: Colors.black.withOpacity(0.55),
+                  child: Center(
                     child: Text(
-                      'Out of stock',
+                      'OUT OF STOCK',
+                      textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: theme.colorScheme.error,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.3,
+                        color: Colors.redAccent.shade100,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 12,
+                        letterSpacing: 1.2,
+                        shadows: [
+                          Shadow(
+                            color: Colors.redAccent.withOpacity(0.9),
+                            blurRadius: 16,
+                          ),
+                          Shadow(
+                            color: Colors.redAccent.withOpacity(0.6),
+                            blurRadius: 30,
+                          ),
+                          Shadow(
+                            color: Colors.red.withOpacity(0.4),
+                            blurRadius: 50,
+                          ),
+                        ],
                       ),
                     ),
                   ),

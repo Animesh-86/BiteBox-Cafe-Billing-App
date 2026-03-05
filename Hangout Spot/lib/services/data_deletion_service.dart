@@ -1,4 +1,6 @@
+import 'package:hangout_spot/utils/log_utils.dart';
 import 'dart:io';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -22,9 +24,9 @@ class DataDeletionService {
 
       if (await file.exists()) {
         await file.delete();
-        debugPrint('✅ Local database deleted: ${file.path}');
+        logDebug('✅ Local database deleted: ${file.path}');
       } else {
-        debugPrint('ℹ️ Local database file not found');
+        logDebug('ℹ️ Local database file not found');
       }
 
       // Also delete any WAL or SHM files
@@ -34,7 +36,7 @@ class DataDeletionService {
       if (await walFile.exists()) await walFile.delete();
       if (await shmFile.exists()) await shmFile.delete();
     } catch (e) {
-      debugPrint('❌ Error deleting local database: $e');
+      logDebug('❌ Error deleting local database: $e');
       rethrow;
     }
   }
@@ -44,24 +46,37 @@ class DataDeletionService {
     try {
       final user = _auth.currentUser;
       if (user == null) {
-        debugPrint('ℹ️ No user logged in, skipping cloud data deletion');
+        logDebug('ℹ️ No user logged in, skipping cloud data deletion');
         return;
       }
 
       final baseRef = _firestore.collection('cafes').doc(user.uid);
 
-      // Delete menu data
-      await _deleteCollection(baseRef.collection('menu'));
+      // Delete all subcollections (including large ones with batched deletes)
+      final collections = [
+        'menu',
+        'data',
+        'config',
+        'loyalty',
+        'orders',
+        'inventory_items',
+        'inventory_daily',
+        'inventory_movements',
+        'inventory_reminders',
+        'platform_orders',
+        'counters',
+      ];
 
-      // Delete other data
-      await _deleteCollection(baseRef.collection('data'));
+      for (final col in collections) {
+        await _deleteCollection(baseRef.collection(col));
+      }
 
       // Delete the base document
       await baseRef.delete();
 
-      debugPrint('✅ Cloud data deleted for user: ${user.uid}');
+      logDebug('✅ Cloud data deleted for user: ${user.uid}');
     } catch (e) {
-      debugPrint('❌ Error deleting cloud data: $e');
+      logDebug('❌ Error deleting cloud data: $e');
       rethrow;
     }
   }
@@ -74,7 +89,7 @@ class DataDeletionService {
         await doc.reference.delete();
       }
     } catch (e) {
-      debugPrint('Error deleting collection: $e');
+      logDebug('Error deleting collection: $e');
     }
   }
 
@@ -82,7 +97,7 @@ class DataDeletionService {
   Future<void> deleteAllData() async {
     await deleteLocalDatabase();
     await deleteCloudData();
-    debugPrint('✅ All data deleted (local + cloud)');
+    logDebug('✅ All data deleted (local + cloud)');
   }
 
   /// Show confirmation dialog and delete all data
@@ -192,8 +207,8 @@ class DataDeletionService {
                 ElevatedButton(
                   onPressed: () {
                     Navigator.pop(ctx);
-                    // Force exit the app
-                    exit(0);
+                    // Gracefully exit the app (safe on both Android & iOS)
+                    SystemNavigator.pop();
                   },
                   child: const Text('Exit App'),
                 ),

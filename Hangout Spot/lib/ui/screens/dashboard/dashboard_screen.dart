@@ -108,6 +108,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final analytics = ref.watch(analyticsRepositoryProvider);
     final sessionManager = ref.watch(sessionManagerProvider);
 
+    // Rebuild dashboard when remote orders arrive from another device
+    ref.watch(remoteSyncGenerationProvider);
+
     // Watch location
     final currentLocationAsync = ref.watch(currentLocationIdProvider);
     final currentLocationId = currentLocationAsync.value;
@@ -705,7 +708,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                           ),
                                           loading: () => _StatCard(
                                             title: "Total Sales",
-                                            value: "...",
+                                            value:
+                                                revenueAsync.valueOrNull != null
+                                                ? revenueAsync.valueOrNull!
+                                                      .toStringAsFixed(0)
+                                                : "0",
                                             icon: Icons.currency_rupee,
                                             prefix: "₹",
                                             iconColor:
@@ -713,6 +720,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                                     Brightness.dark
                                                 ? theme.colorScheme.secondary
                                                 : const Color(0xFFEDAD4C),
+                                            isLive: true,
                                           ),
                                           error: (_, __) => _StatCard(
                                             title: "Total Sales",
@@ -738,7 +746,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                         title: "Total Sales",
                                         value: snapshot.hasData
                                             ? snapshot.data!.toStringAsFixed(0)
-                                            : "...",
+                                            : "0",
                                         icon: Icons.currency_rupee,
                                         prefix: "₹",
                                         iconColor:
@@ -772,13 +780,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                           ),
                                           loading: () => _StatCard(
                                             title: "Orders",
-                                            value: "...",
+                                            value:
+                                                orderCountAsync.valueOrNull !=
+                                                    null
+                                                ? "${orderCountAsync.valueOrNull}"
+                                                : "0",
                                             icon: Icons.receipt_long,
                                             iconColor:
                                                 theme.brightness ==
                                                     Brightness.dark
                                                 ? theme.colorScheme.primary
                                                 : const Color(0xFF95674D),
+                                            isLive: true,
                                           ),
                                           error: (_, __) => _StatCard(
                                             title: "Orders",
@@ -803,7 +816,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                         title: "Orders",
                                         value: snapshot.hasData
                                             ? "${snapshot.data}"
-                                            : "...",
+                                            : "0",
                                         icon: Icons.receipt_long,
                                         iconColor:
                                             theme.brightness == Brightness.dark
@@ -836,13 +849,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                           ),
                                           loading: () => _StatCard(
                                             title: "Items Sold",
-                                            value: "...",
+                                            value:
+                                                itemCountAsync.valueOrNull !=
+                                                    null
+                                                ? "${itemCountAsync.valueOrNull}"
+                                                : "0",
                                             icon: Icons.inventory_2,
                                             iconColor:
                                                 theme.brightness ==
                                                     Brightness.dark
                                                 ? theme.colorScheme.onSurface
                                                 : const Color(0xFF98664D),
+                                            isLive: true,
                                           ),
                                           error: (_, __) => _StatCard(
                                             title: "Items Sold",
@@ -1078,6 +1096,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                                 final syncRepo = ref.read(
                                                   syncRepositoryProvider,
                                                 );
+                                                final custRepo = ref.read(
+                                                  customerRepositoryProvider,
+                                                );
                                                 await ref
                                                     .read(
                                                       orderRepositoryProvider,
@@ -1085,6 +1106,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                                     .cancelOrder(
                                                       order.id,
                                                       syncRepo: syncRepo,
+                                                      customerRepo: custRepo,
                                                     );
                                                 if (context.mounted) {
                                                   ScaffoldMessenger.of(

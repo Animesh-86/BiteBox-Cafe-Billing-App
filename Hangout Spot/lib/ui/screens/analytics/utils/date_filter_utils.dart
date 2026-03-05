@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hangout_spot/ui/screens/analytics/theme/analytics_theme.dart';
 
 enum DateFilterType {
   today,
@@ -159,12 +160,12 @@ class DateFilterChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFFD4A574).withOpacity(0.2)
+              ? AnalyticsTheme.primaryGold(context).withOpacity(0.2)
               : Colors.transparent,
           border: Border.all(
             color: isSelected
-                ? const Color(0xFFD4A574)
-                : Colors.white.withOpacity(0.2),
+                ? AnalyticsTheme.primaryGold(context)
+                : AnalyticsTheme.borderColor(context),
             width: 1,
           ),
           borderRadius: BorderRadius.circular(20),
@@ -173,8 +174,8 @@ class DateFilterChip extends StatelessWidget {
           label,
           style: TextStyle(
             color: isSelected
-                ? const Color(0xFFD4A574)
-                : const Color(0xFFEAE0D5),
+                ? AnalyticsTheme.primaryGold(context)
+                : AnalyticsTheme.primaryText(context),
             fontSize: 13,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
           ),

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +10,7 @@ import 'package:hangout_spot/ui/screens/splash_screen.dart';
 import 'package:hangout_spot/data/providers/theme_provider.dart';
 import 'package:hangout_spot/ui/utils/responsive_layout.dart';
 import 'package:hangout_spot/services/notification_service.dart';
+import 'package:hangout_spot/utils/log_utils.dart';
 
 // Global synchronous access to SharedPreferences for Riverpod providers
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
@@ -20,6 +22,13 @@ void main() async {
     () async {
       WidgetsFlutterBinding.ensureInitialized();
 
+      // Catch framework-level errors (render overflows, setState-after-dispose, etc.)
+      FlutterError.onError = (FlutterErrorDetails details) {
+        FlutterError.presentError(details); // default red-screen in debug
+        logDebug("FLUTTER ERROR: ${details.exceptionAsString()}");
+        logDebug("STACK: ${details.stack}");
+      };
+
       // Restrict to portrait mode on mobile
       SystemChrome.setPreferredOrientations([
         DeviceOrientation.portraitUp,
@@ -29,7 +38,7 @@ void main() async {
       try {
         await Firebase.initializeApp();
       } catch (e) {
-        debugPrint("Firebase init failed: $e");
+        logDebug("Firebase init failed: $e");
       }
 
       await NotificationService.instance.initialize();
@@ -44,8 +53,8 @@ void main() async {
       );
     },
     (error, stack) {
-      debugPrint("CRASH ERROR: $error");
-      debugPrint("CRASH STACK: $stack");
+      logDebug("CRASH ERROR: $error");
+      logDebug("CRASH STACK: $stack");
     },
   );
 }

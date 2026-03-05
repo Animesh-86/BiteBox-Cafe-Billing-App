@@ -16,19 +16,12 @@ class InventoryRemindersScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final remindersAsync = ref.watch(inventoryRemindersStreamProvider);
-    final itemsAsync = ref.watch(inventoryItemsStreamProvider);
 
     return SafeArea(
       child: remindersAsync.when(
         data: (reminders) {
           _scheduleEnabledTimeReminders(reminders);
-          return itemsAsync.when(
-            data: (items) {
-              return _buildList(context, ref, reminders, items);
-            },
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (err, _) => Center(child: Text('Error: $err')),
-          );
+          return _buildList(context, ref, reminders);
         },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => Center(child: Text('Error: $err')),
@@ -40,7 +33,6 @@ class InventoryRemindersScreen extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     List<InventoryReminder> reminders,
-    List<InventoryItem> items,
   ) {
     final dailyUpdate = reminders.firstWhere(
       (r) => r.type == 'daily_update',
@@ -58,7 +50,7 @@ class InventoryRemindersScreen extends ConsumerWidget {
         if (dailyUpdate.id.isEmpty)
           _buildDailyUpdateCard(context, ref)
         else
-          _buildReminderTile(context, ref, dailyUpdate, items),
+          _buildReminderTile(context, ref, dailyUpdate),
         const SizedBox(height: 16),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -73,8 +65,7 @@ class InventoryRemindersScreen extends ConsumerWidget {
                 ),
                 const SizedBox(width: 8),
                 FilledButton.icon(
-                  onPressed: () =>
-                      _openReminderDialog(context, ref, items, null),
+                  onPressed: () => _openReminderDialog(context, ref, null),
                   icon: const Icon(Icons.add),
                   label: const Text('Add'),
                 ),
@@ -85,7 +76,7 @@ class InventoryRemindersScreen extends ConsumerWidget {
         const SizedBox(height: 12),
         ...reminders
             .where((r) => r.type != 'daily_update')
-            .map((r) => _buildDismissibleReminder(context, ref, r, items))
+            .map((r) => _buildDismissibleReminder(context, ref, r))
             .toList(),
         if (reminders.where((r) => r.type != 'daily_update').isEmpty)
           const Padding(
@@ -113,7 +104,6 @@ class InventoryRemindersScreen extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     InventoryReminder reminder,
-    List<InventoryItem> items,
   ) {
     return Dismissible(
       key: ValueKey(reminder.id),
@@ -160,7 +150,7 @@ class InventoryRemindersScreen extends ConsumerWidget {
           );
         }
       },
-      child: _buildReminderTile(context, ref, reminder, items),
+      child: _buildReminderTile(context, ref, reminder),
     );
   }
 
@@ -168,24 +158,7 @@ class InventoryRemindersScreen extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     InventoryReminder reminder,
-    List<InventoryItem> items,
   ) {
-    String? itemName;
-    InventoryItem? matchedItem;
-    if (reminder.itemId != null) {
-      for (final item in items) {
-        if (item.id == reminder.itemId) {
-          itemName = item.name;
-          matchedItem = item;
-          break;
-        }
-      }
-    }
-
-    final isQuantity = reminder.type == 'quantity';
-    final threshold = reminder.threshold ?? matchedItem?.minQty ?? 0;
-    final currentQty = matchedItem?.currentQty;
-    final isLow = isQuantity && currentQty != null && currentQty < threshold;
     final isTimeBased =
         reminder.type == 'time' || reminder.type == 'daily_update';
 
@@ -195,7 +168,7 @@ class InventoryRemindersScreen extends ConsumerWidget {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(_subtitle(reminder, itemName)),
+            Text(_subtitle(reminder, null)),
             const SizedBox(height: 6),
             Wrap(
               spacing: 8,
@@ -216,22 +189,6 @@ class InventoryRemindersScreen extends ConsumerWidget {
                     Theme.of(context).colorScheme.primary.withOpacity(0.12),
                     Theme.of(context).colorScheme.primary,
                   ),
-                if (isQuantity)
-                  _pill(
-                    'Threshold: ${threshold.toStringAsFixed(0)} ${matchedItem?.unit ?? ''}'
-                        .trim(),
-                    Colors.orange.withOpacity(0.12),
-                    Colors.orange.shade800,
-                  ),
-                if (isQuantity && currentQty != null)
-                  _pill(
-                    'Stock: ${currentQty.toStringAsFixed(0)} ${matchedItem?.unit ?? ''}'
-                        .trim(),
-                    isLow
-                        ? Colors.red.withOpacity(0.14)
-                        : Colors.green.withOpacity(0.14),
-                    isLow ? Colors.red.shade700 : Colors.green.shade800,
-                  ),
               ],
             ),
           ],
@@ -242,17 +199,13 @@ class InventoryRemindersScreen extends ConsumerWidget {
         ),
         trailing: IconButton(
           icon: const Icon(Icons.edit_outlined),
-          onPressed: () => _openReminderDialog(context, ref, items, reminder),
+          onPressed: () => _openReminderDialog(context, ref, reminder),
         ),
       ),
     );
   }
 
   String _subtitle(InventoryReminder reminder, String? itemName) {
-    if (reminder.type == 'quantity') {
-      final threshold = reminder.threshold ?? 0;
-      return '${itemName ?? 'Item'} below $threshold';
-    }
     return 'Daily at ${reminder.time}';
   }
 
@@ -297,14 +250,18 @@ class InventoryRemindersScreen extends ConsumerWidget {
     }
 
     if (reminder.type == 'time' || reminder.type == 'daily_update') {
-      await _ensurePermissions();
-      final time = _parseTime(reminder.time);
-      await NotificationService.instance.scheduleDaily(
-        id: _hashId(reminder.id),
-        title: reminder.title,
-        body: 'Inventory reminder',
-        time: time,
-      );
+      try {
+        await _ensurePermissions();
+        final time = _parseTime(reminder.time);
+        await NotificationService.instance.scheduleDaily(
+          id: _hashId(reminder.id),
+          title: reminder.title,
+          body: 'Inventory reminder',
+          time: time,
+        );
+      } catch (e) {
+        debugPrint('⚠️ Failed to schedule reminder toggle: $e');
+      }
     }
   }
 
@@ -328,13 +285,17 @@ class InventoryRemindersScreen extends ConsumerWidget {
 
     final repo = ref.read(inventoryRepositoryProvider);
     await repo.upsertReminder(reminder);
-    await _ensurePermissions();
-    await NotificationService.instance.scheduleDaily(
-      id: _hashId(reminder.id),
-      title: reminder.title,
-      body: 'Please update today\'s inventory values.',
-      time: defaultTime,
-    );
+    try {
+      await _ensurePermissions(context: context);
+      await NotificationService.instance.scheduleDaily(
+        id: _hashId(reminder.id),
+        title: reminder.title,
+        body: 'Please update today\'s inventory values.',
+        time: defaultTime,
+      );
+    } catch (e) {
+      debugPrint('⚠️ Failed to schedule daily update: $e');
+    }
 
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -346,68 +307,84 @@ class InventoryRemindersScreen extends ConsumerWidget {
   Future<void> _scheduleEnabledTimeReminders(
     List<InventoryReminder> reminders,
   ) async {
-    final timeReminders = reminders.where(
-      (r) => r.isEnabled && (r.type == 'time' || r.type == 'daily_update'),
-    );
-
-    await _ensurePermissions();
-
-    for (final reminder in timeReminders) {
-      final key = '${reminder.id}_${reminder.time}';
-      if (_scheduledTimes[reminder.id] == key) continue;
-
-      final time = _parseTime(reminder.time);
-      await NotificationService.instance.scheduleDaily(
-        id: _hashId(reminder.id),
-        title: reminder.title,
-        body: reminder.type == 'daily_update'
-            ? "Please update today's inventory values."
-            : 'Inventory reminder',
-        time: time,
+    try {
+      final timeReminders = reminders.where(
+        (r) => r.isEnabled && (r.type == 'time' || r.type == 'daily_update'),
       );
 
-      _scheduledTimes[reminder.id] = key;
+      await _ensurePermissions();
+
+      for (final reminder in timeReminders) {
+        final key = '${reminder.id}_${reminder.time}';
+        if (_scheduledTimes[reminder.id] == key) continue;
+
+        final time = _parseTime(reminder.time);
+        await NotificationService.instance.scheduleDaily(
+          id: _hashId(reminder.id),
+          title: reminder.title,
+          body: reminder.type == 'daily_update'
+              ? "Please update today's inventory values."
+              : 'Inventory reminder',
+          time: time,
+        );
+
+        _scheduledTimes[reminder.id] = key;
+      }
+    } catch (e) {
+      debugPrint('⚠️ Failed to schedule reminders: $e');
     }
   }
 
   Future<void> _sendTestNotification(BuildContext context) async {
-    await _ensurePermissions();
-    // Use scheduleTest to test the exact same zonedSchedule path as reminders
-    await NotificationService.instance.scheduleTest(
-      id: _hashId('test_${DateTime.now().millisecondsSinceEpoch}'),
-      title: 'Scheduled test notification',
-      body: 'This used zonedSchedule — reminders should work!',
-      seconds: 10,
-    );
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Scheduled test notification — should appear in ~10s'),
-        ),
+    try {
+      await _ensurePermissions(context: context);
+
+      // Show an immediate notification to verify the channel works
+      final testId = _hashId('test_${DateTime.now().millisecondsSinceEpoch}');
+      await NotificationService.instance.showNow(
+        id: testId,
+        title: 'Test notification',
+        body: 'If you see this, notifications are working!',
       );
+
+      // Also schedule one via zonedSchedule to test the alarm path
+      try {
+        await NotificationService.instance.scheduleTest(
+          id: testId + 1,
+          title: 'Scheduled test',
+          body: 'This fired via zonedSchedule - reminders will work!',
+          seconds: 15,
+        );
+      } catch (e) {
+        debugPrint('⚠️ scheduleTest failed: $e');
+      }
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Instant notification sent + scheduled one in ~15s'),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ Test notification failed: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Notification test failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
   Future<void> _openReminderDialog(
     BuildContext context,
     WidgetRef ref,
-    List<InventoryItem> items,
     InventoryReminder? reminder,
   ) async {
     final titleController = TextEditingController(text: reminder?.title ?? '');
-    String type = reminder?.type ?? 'time';
-    InventoryItem? selectedItem;
-    if (reminder?.itemId != null) {
-      for (final item in items) {
-        if (item.id == reminder!.itemId) {
-          selectedItem = item;
-          break;
-        }
-      }
-    }
-    final thresholdController = TextEditingController(
-      text: reminder?.threshold?.toString() ?? '',
-    );
     TimeOfDay time = _parseTime(reminder?.time ?? '09:00');
 
     final confirmed = await showDialog<bool>(
@@ -418,68 +395,29 @@ class InventoryRemindersScreen extends ConsumerWidget {
           content: SingleChildScrollView(
             child: Column(
               children: [
-                DropdownButtonFormField<String>(
-                  value: type,
-                  items: const [
-                    DropdownMenuItem(value: 'time', child: Text('Time-based')),
-                    DropdownMenuItem(
-                      value: 'quantity',
-                      child: Text('Quantity-based'),
-                    ),
-                  ],
-                  onChanged: (value) => setState(() => type = value ?? type),
-                  decoration: const InputDecoration(labelText: 'Type'),
-                ),
-                const SizedBox(height: 12),
                 TextField(
                   controller: titleController,
                   decoration: const InputDecoration(labelText: 'Title'),
                 ),
-                if (type == 'quantity') ...[
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<InventoryItem>(
-                    value: selectedItem,
-                    items: items
-                        .map(
-                          (item) => DropdownMenuItem(
-                            value: item,
-                            child: Text(item.name),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) => setState(() => selectedItem = value),
-                    decoration: const InputDecoration(labelText: 'Item'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: thresholdController,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Text('Time: ${_formatTime(time)}'),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: () async {
+                        final picked = await showTimePicker(
+                          context: context,
+                          initialTime: time,
+                        );
+                        if (picked != null) {
+                          setState(() => time = picked);
+                        }
+                      },
+                      child: const Text('Pick'),
                     ),
-                    decoration: const InputDecoration(labelText: 'Threshold'),
-                  ),
-                ],
-                if (type == 'time') ...[
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Text('Time: ${_formatTime(time)}'),
-                      const Spacer(),
-                      TextButton(
-                        onPressed: () async {
-                          final picked = await showTimePicker(
-                            context: context,
-                            initialTime: time,
-                          );
-                          if (picked != null) {
-                            setState(() => time = picked);
-                          }
-                        },
-                        child: const Text('Pick'),
-                      ),
-                    ],
-                  ),
-                ],
+                  ],
+                ),
               ],
             ),
           ),
@@ -503,33 +441,50 @@ class InventoryRemindersScreen extends ConsumerWidget {
     final id = reminder?.id ?? const Uuid().v4();
     final newReminder = InventoryReminder(
       id: id,
-      type: type,
+      type: 'time',
       title: titleController.text.trim().isEmpty
           ? 'Reminder'
           : titleController.text.trim(),
       time: _formatTime(time),
-      itemId: selectedItem?.id,
-      threshold: double.tryParse(thresholdController.text.trim()),
       isEnabled: reminder?.isEnabled ?? true,
     );
 
     await repo.upsertReminder(newReminder);
 
-    if (type == 'time' || type == 'daily_update') {
-      await _ensurePermissions();
+    try {
+      await _ensurePermissions(context: context);
       await NotificationService.instance.scheduleDaily(
         id: _hashId(id),
         title: newReminder.title,
         body: 'Inventory reminder',
         time: time,
       );
+    } catch (e) {
+      debugPrint('⚠️ Failed to schedule reminder: $e');
     }
   }
 
-  Future<void> _ensurePermissions() async {
-    if (_permissionsRequested) return;
+  Future<bool> _ensurePermissions({BuildContext? context}) async {
+    if (_permissionsRequested) return true;
     _permissionsRequested = true;
-    await NotificationService.instance.requestPermissions();
+    try {
+      final granted = await NotificationService.instance.requestPermissions();
+      if (!granted && context != null && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Notification permission denied. Reminders won\'t work. '
+              'Please enable notifications in Settings.',
+            ),
+            duration: Duration(seconds: 5),
+          ),
+        );
+      }
+      return granted;
+    } catch (e) {
+      debugPrint('⚠️ Permission request failed: $e');
+      return false;
+    }
   }
 
   TimeOfDay _parseTime(String time) {

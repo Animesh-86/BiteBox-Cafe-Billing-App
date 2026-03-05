@@ -32,10 +32,6 @@ class InventoryRepository {
     return _baseRef().collection('inventory_reminders');
   }
 
-  CollectionReference<Map<String, dynamic>> _platformOrdersRef() {
-    return _baseRef().collection('platform_orders');
-  }
-
   Stream<List<InventoryItem>> watchItems() {
     return _itemsRef()
         .where('isActive', isEqualTo: true)
@@ -72,6 +68,33 @@ class InventoryRepository {
 
   Future<void> upsertDaily(DailyInventory daily) async {
     await _dailyRef().doc(daily.id).set(daily.toMap(), SetOptions(merge: true));
+  }
+
+  /// Field-level update for a single daily tracker item.
+  /// Uses Firestore dot-notation so concurrent edits from different devices
+  /// don't overwrite each other's fields.
+  Future<void> updateDailyItemField({
+    required DateTime date,
+    required String itemId,
+    required String? value,
+  }) async {
+    final docId = _dateId(date);
+    final docRef = _dailyRef().doc(docId);
+
+    if (value == null || value.isEmpty) {
+      // Remove the field
+      await docRef.set({
+        'date': Timestamp.fromDate(date),
+        'items': {itemId: FieldValue.delete()},
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } else {
+      await docRef.set({
+        'date': Timestamp.fromDate(date),
+        'items': {itemId: value},
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    }
   }
 
   Future<void> adjustStockTransaction({
@@ -152,6 +175,12 @@ class InventoryRepository {
         );
   }
 
+  /// One-shot fetch of all reminders (used for startup rescheduling).
+  Future<List<InventoryReminder>> fetchReminders() async {
+    final snap = await _remindersRef().orderBy('title').get();
+    return snap.docs.map((doc) => InventoryReminder.fromDoc(doc)).toList();
+  }
+
   Future<void> upsertReminder(InventoryReminder reminder) async {
     await _remindersRef()
         .doc(reminder.id)
@@ -160,23 +189,6 @@ class InventoryRepository {
 
   Future<void> deleteReminder(String id) async {
     await _remindersRef().doc(id).delete();
-  }
-
-  Future<void> createPlatformOrder(PlatformOrder order) async {
-    await _platformOrdersRef().doc(order.id).set(order.toMap());
-  }
-
-  Future<QuerySnapshot<Map<String, dynamic>>> fetchPlatformOrders({
-    DocumentSnapshot<Map<String, dynamic>>? startAfter,
-    int limit = 20,
-  }) {
-    var query = _platformOrdersRef()
-        .orderBy('createdAt', descending: true)
-        .limit(limit);
-    if (startAfter != null) {
-      query = query.startAfterDocument(startAfter);
-    }
-    return query.get();
   }
 
   Future<QuerySnapshot<Map<String, dynamic>>> fetchMovements({
@@ -349,29 +361,12 @@ class InventoryRepository {
       mostConsumedItem = items[topEntry.key]?.name;
     }
 
-    final platformSnapshot = await _platformOrdersRef()
-        .where(
-          'createdAt',
-          isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
-        )
-        .where('createdAt', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
-        .get();
-
-    final platformBreakdown = <String, double>{};
-    for (final doc in platformSnapshot.docs) {
-      final data = doc.data();
-      final platform = (data['platform'] ?? 'Other').toString();
-      final total = _toDouble(data['total']);
-      platformBreakdown[platform] = (platformBreakdown[platform] ?? 0) + total;
-    }
-
     return InventoryAnalyticsSummary(
       lowStockEvents: totalLowStockEvents,
       topLowStockItem: topLowStockItem,
       mostConsumedItem: mostConsumedItem,
       restockTotal: restockTotal,
       restockTrend: restockTrend,
-      platformBreakdown: platformBreakdown,
     );
   }
 }

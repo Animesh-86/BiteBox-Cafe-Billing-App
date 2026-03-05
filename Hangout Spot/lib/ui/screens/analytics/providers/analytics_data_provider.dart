@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/data/repositories/analytics_repository.dart';
 import 'package:hangout_spot/data/providers/database_provider.dart';
+import 'package:hangout_spot/data/providers/realtime_services_provider.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/logic/billing/session_provider.dart';
 
@@ -74,6 +75,10 @@ class AnalyticsData {
   // NEW: Today's peak hour forecast
   final TodayPeakForecast? todayPeakForecast;
 
+  // Cancelled Orders
+  final int cancelledOrdersCount;
+  final double cancelledRevenue;
+
   AnalyticsData({
     required this.totalSales,
     required this.totalOrders,
@@ -107,6 +112,8 @@ class AnalyticsData {
     required this.discountEffectiveness,
     required this.peakHoursByDay,
     this.todayPeakForecast,
+    required this.cancelledOrdersCount,
+    required this.cancelledRevenue,
   });
 }
 
@@ -265,6 +272,11 @@ final analyticsDataProvider =
       final repository = AnalyticsRepository(db);
       final sessionManager = ref.watch(sessionManagerProvider);
 
+      // Watch the remote sync generation counter. When another device syncs
+      // orders into the local DB, this counter increments and Riverpod
+      // automatically re-runs this provider, refreshing the analytics.
+      ref.watch(remoteSyncGenerationProvider);
+
       // Get active analytics outlet
       final activeOutlet = ref.watch(analyticsSelectedOutletProvider);
       final locationId = activeOutlet?.id;
@@ -342,6 +354,15 @@ final analyticsDataProvider =
         endDate,
         locationId: locationId,
       );
+
+      // Fetch Cancelled Data
+      final cancelledData = await repository.getSessionCancelledOrders(
+        startDate,
+        endDate,
+        locationId: locationId,
+      );
+      final cancelledCount = cancelledData['count'] as int;
+      final cancelledRev = cancelledData['revenue'] as double;
 
       // Fetch previous period data for comparison
       final previousSales = await repository.getSessionSales(
@@ -483,7 +504,8 @@ final analyticsDataProvider =
       );
 
       // Generate smart brief
-      final avgDailySales = totalSales / daysDiff;
+      final effectiveDays = daysDiff > 0 ? daysDiff : 1;
+      final avgDailySales = totalSales / effectiveDays;
       final smartBrief = _generateSmartBrief(
         totalSales,
         avgDailySales,
@@ -492,7 +514,7 @@ final analyticsDataProvider =
       );
 
       // Calculate forecast (weighted moving average)
-      final forecast = _calculateForecast(topItemsRaw);
+      final forecast = _calculateForecast(topItemsRaw, effectiveDays);
 
       // Build BCG Matrix
       final bcgMatrix = bcgDataRaw.map((item) {
@@ -650,6 +672,8 @@ final analyticsDataProvider =
         discountEffectiveness: discountEffectiveness,
         peakHoursByDay: peakHoursByDay,
         todayPeakForecast: todayPeakForecast,
+        cancelledOrdersCount: cancelledCount,
+        cancelledRevenue: cancelledRev,
       );
     });
 
@@ -673,10 +697,14 @@ String _generateSmartBrief(
       '${salesChange >= 0 ? "Great work! Keep up the momentum." : "Consider reviewing your menu or promotions."}';
 }
 
-List<ItemForecast> _calculateForecast(List<MapEntry<String, double>> items) {
-  // Simple forecast: use average from period
+List<ItemForecast> _calculateForecast(
+  List<MapEntry<String, double>> items,
+  int periodDays,
+) {
+  // Use actual period length for per-day average
+  final days = periodDays > 0 ? periodDays : 1;
   return items.take(10).map((item) {
-    final avgPerDay = item.value / 7.0; // Assuming 7-day period
+    final avgPerDay = item.value / days;
     return ItemForecast(itemName: item.key, expectedQuantity: avgPerDay);
   }).toList();
 }

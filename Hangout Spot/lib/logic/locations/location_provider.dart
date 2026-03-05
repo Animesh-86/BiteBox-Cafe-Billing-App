@@ -1,5 +1,5 @@
+import 'package:hangout_spot/utils/log_utils.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter/foundation.dart';
 import 'package:drift/drift.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/data/providers/database_provider.dart';
@@ -57,7 +57,7 @@ final activeOutletProvider = StreamProvider<Location?>((ref) {
   ) async {
     // If no active outlet found, ensure default outlet exists and is active
     if (activeOutlet == null) {
-      debugPrint(
+      logDebug(
         '⚠️ No active outlet found, ensuring default outlet is set as active...',
       );
       try {
@@ -69,7 +69,7 @@ final activeOutletProvider = StreamProvider<Location?>((ref) {
           db.locations,
         )..where((t) => t.id.equals('default-outlet-001'))).getSingleOrNull();
       } catch (e) {
-        debugPrint('❌ Error ensuring default outlet: $e');
+        logDebug('❌ Error ensuring default outlet: $e');
         return null;
       }
     }
@@ -96,7 +96,7 @@ Future<void> _ensureActiveDefaultOutlet(AppDatabase db) async {
     mode: InsertMode.insertOrReplace,
   );
 
-  debugPrint('✅ Default outlet ensured and activated');
+  logDebug('✅ Default outlet ensured and activated');
 }
 
 final currentLocationIdProvider = StreamProvider<String?>((ref) {
@@ -143,11 +143,11 @@ class LocationsController extends StateNotifier<AsyncValue<void>> {
         createdAt: Value(DateTime.now()),
       );
       await _db.into(_db.locations).insert(location);
-      debugPrint('✅ Outlet added successfully: $name');
+      logDebug('✅ Outlet added successfully: $name');
       state = const AsyncData(null);
       _refresh();
     } catch (e, st) {
-      debugPrint('❌ Error adding outlet: $e');
+      logDebug('❌ Error adding outlet: $e');
       state = AsyncError(e, st);
     }
   }

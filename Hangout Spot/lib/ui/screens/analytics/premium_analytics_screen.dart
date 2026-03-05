@@ -57,7 +57,7 @@ class _PremiumAnalyticsScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: AnalyticsTheme.mainBackground,
+      backgroundColor: AnalyticsTheme.mainBackground(context),
       drawer: _buildDrawer(),
       body: SafeArea(child: _getCurrentScreen()),
     );
@@ -65,7 +65,7 @@ class _PremiumAnalyticsScreenState
 
   Widget _buildDrawer() {
     return Drawer(
-      backgroundColor: AnalyticsTheme.mainBackground,
+      backgroundColor: AnalyticsTheme.mainBackground(context),
       child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -78,10 +78,10 @@ class _PremiumAnalyticsScreenState
                 children: [
                   Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: AnalyticsTheme.glassCard(),
+                    decoration: AnalyticsTheme.glassCard(context),
                     child: Icon(
                       Icons.analytics_rounded,
-                      color: AnalyticsTheme.primaryGold,
+                      color: AnalyticsTheme.primaryGold(context),
                       size: 32,
                     ),
                   ),
@@ -90,14 +90,14 @@ class _PremiumAnalyticsScreenState
                     'Analytics',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: AnalyticsTheme.primaryText,
+                      color: AnalyticsTheme.primaryText(context),
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'Premium Dashboard',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AnalyticsTheme.secondaryText,
+                      color: AnalyticsTheme.secondaryText(context),
                     ),
                   ),
                 ],
@@ -137,9 +137,9 @@ class _PremiumAnalyticsScreenState
                     section: AnalyticsSection.loyalty,
                   ),
 
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 16),
-                    child: Divider(color: Colors.white10, thickness: 1),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Divider(color: AnalyticsTheme.dividerColor(context), thickness: 1),
                   ),
 
                   _buildDrawerItem(
@@ -177,14 +177,14 @@ class _PremiumAnalyticsScreenState
           borderRadius: BorderRadius.circular(12),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: isSelected ? AnalyticsTheme.selectedDrawerItem() : null,
+            decoration: isSelected ? AnalyticsTheme.selectedDrawerItem(context) : null,
             child: Row(
               children: [
                 Icon(
                   icon,
                   color: isSelected
-                      ? AnalyticsTheme.primaryGold
-                      : AnalyticsTheme.secondaryText,
+                      ? AnalyticsTheme.primaryGold(context)
+                      : AnalyticsTheme.secondaryText(context),
                   size: 24,
                 ),
                 const SizedBox(width: 16),
@@ -197,15 +197,15 @@ class _PremiumAnalyticsScreenState
                           ? FontWeight.w600
                           : FontWeight.normal,
                       color: isSelected
-                          ? AnalyticsTheme.primaryGold
-                          : AnalyticsTheme.primaryText,
+                          ? AnalyticsTheme.primaryGold(context)
+                          : AnalyticsTheme.primaryText(context),
                     ),
                   ),
                 ),
                 if (isSelected)
                   Icon(
                     Icons.arrow_forward_ios_rounded,
-                    color: AnalyticsTheme.primaryGold,
+                    color: AnalyticsTheme.primaryGold(context),
                     size: 16,
                   ),
               ],

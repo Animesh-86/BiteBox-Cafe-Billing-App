@@ -5,6 +5,7 @@ import 'package:hangout_spot/ui/screens/analytics/theme/analytics_theme.dart';
 import 'package:hangout_spot/ui/screens/analytics/providers/analytics_data_provider.dart';
 import 'package:hangout_spot/ui/screens/analytics/utils/date_filter_utils.dart';
 import 'package:hangout_spot/ui/screens/analytics/services/analytics_export_service.dart';
+import 'package:hangout_spot/data/providers/database_provider.dart';
 import 'package:intl/intl.dart';
 import '../widgets/analytics_header.dart';
 
@@ -33,56 +34,56 @@ class _LoyaltyScreenState extends ConsumerState<LoyaltyScreen> {
     final selectedFilter = await showDialog<DateFilter>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AnalyticsTheme.cardBackground,
-        title: const Text(
+        backgroundColor: AnalyticsTheme.cardBackground(context),
+        title: Text(
           'Export Date Range',
-          style: TextStyle(color: AnalyticsTheme.primaryText),
+          style: TextStyle(color: AnalyticsTheme.primaryText(context)),
         ),
         content: SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.calendar_month,
-                  color: AnalyticsTheme.primaryGold,
+                  color: AnalyticsTheme.primaryGold(context),
                 ),
-                title: const Text(
+                title: Text(
                   'This Year',
-                  style: TextStyle(color: AnalyticsTheme.primaryText),
+                  style: TextStyle(color: AnalyticsTheme.primaryText(context)),
                 ),
                 onTap: () => Navigator.pop(context, DateFilter.thisYear()),
               ),
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.calendar_today,
-                  color: AnalyticsTheme.primaryGold,
+                  color: AnalyticsTheme.primaryGold(context),
                 ),
-                title: const Text(
+                title: Text(
                   'This Month',
-                  style: TextStyle(color: AnalyticsTheme.primaryText),
+                  style: TextStyle(color: AnalyticsTheme.primaryText(context)),
                 ),
                 onTap: () => Navigator.pop(context, DateFilter.thisMonth()),
               ),
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.date_range,
-                  color: AnalyticsTheme.primaryGold,
+                  color: AnalyticsTheme.primaryGold(context),
                 ),
-                title: const Text(
+                title: Text(
                   'This Week',
-                  style: TextStyle(color: AnalyticsTheme.primaryText),
+                  style: TextStyle(color: AnalyticsTheme.primaryText(context)),
                 ),
                 onTap: () => Navigator.pop(context, DateFilter.thisWeek()),
               ),
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.event,
-                  color: AnalyticsTheme.primaryGold,
+                  color: AnalyticsTheme.primaryGold(context),
                 ),
-                title: const Text(
+                title: Text(
                   'Custom Range',
-                  style: TextStyle(color: AnalyticsTheme.primaryText),
+                  style: TextStyle(color: AnalyticsTheme.primaryText(context)),
                 ),
                 onTap: () async {
                   Navigator.pop(context);
@@ -96,10 +97,10 @@ class _LoyaltyScreenState extends ConsumerState<LoyaltyScreen> {
                     ),
                     builder: (context, child) {
                       return Theme(
-                        data: ThemeData.dark().copyWith(
-                          colorScheme: const ColorScheme.dark(
-                            primary: AnalyticsTheme.primaryGold,
-                            surface: AnalyticsTheme.cardBackground,
+                        data: Theme.of(context).copyWith(
+                          colorScheme: Theme.of(context).colorScheme.copyWith(
+                            primary: AnalyticsTheme.primaryGold(context),
+                            surface: AnalyticsTheme.cardBackground(context),
                           ),
                         ),
                         child: child!,
@@ -112,18 +113,18 @@ class _LoyaltyScreenState extends ConsumerState<LoyaltyScreen> {
                 },
               ),
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.highlight,
-                  color: AnalyticsTheme.primaryGold,
+                  color: AnalyticsTheme.primaryGold(context),
                 ),
-                title: const Text(
+                title: Text(
                   'Current Selection',
-                  style: TextStyle(color: AnalyticsTheme.primaryText),
+                  style: TextStyle(color: AnalyticsTheme.primaryText(context)),
                 ),
                 subtitle: Text(
                   '${DateFormat('dd MMM yyyy').format(_startDate)} - ${DateFormat('dd MMM yyyy').format(_endDate)}',
                   style: TextStyle(
-                    color: AnalyticsTheme.secondaryText,
+                    color: AnalyticsTheme.secondaryText(context),
                     fontSize: 12,
                   ),
                 ),
@@ -135,9 +136,9 @@ class _LoyaltyScreenState extends ConsumerState<LoyaltyScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text(
+            child: Text(
               'Cancel',
-              style: TextStyle(color: AnalyticsTheme.primaryGold),
+              style: TextStyle(color: AnalyticsTheme.primaryGold(context)),
             ),
           ),
         ],
@@ -164,12 +165,13 @@ class _LoyaltyScreenState extends ConsumerState<LoyaltyScreen> {
         exportData,
         startDate: filter.startDate,
         endDate: filter.endDate,
+        db: ref.read(appDatabaseProvider),
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Analytics exported successfully!'),
-            backgroundColor: AnalyticsTheme.primaryGold,
+          SnackBar(
+            content: const Text('Analytics exported successfully!'),
+            backgroundColor: AnalyticsTheme.primaryGold(context),
           ),
         );
       }
@@ -209,9 +211,9 @@ class _LoyaltyScreenState extends ConsumerState<LoyaltyScreen> {
         Expanded(
           child: analyticsData.when(
             data: (data) => _buildContent(data),
-            loading: () => const Center(
+            loading: () => Center(
               child: CircularProgressIndicator(
-                color: AnalyticsTheme.primaryGold,
+                color: AnalyticsTheme.primaryGold(context),
               ),
             ),
             error: (error, stack) => Center(
@@ -301,7 +303,7 @@ class _LoyaltyScreenState extends ConsumerState<LoyaltyScreen> {
       {
         'label': 'VIP (10+ orders)',
         'count': vipSegment['count'] as int? ?? 0,
-        'color': AnalyticsTheme.primaryGold,
+        'color': AnalyticsTheme.primaryGold(context),
         'icon': Icons.diamond_rounded,
       },
       {
@@ -319,7 +321,7 @@ class _LoyaltyScreenState extends ConsumerState<LoyaltyScreen> {
       {
         'label': 'One-time (1 order)',
         'count': oneTimeSegment['count'] as int? ?? 0,
-        'color': AnalyticsTheme.secondaryBeige,
+        'color': AnalyticsTheme.secondaryBeige(context),
         'icon': Icons.person_rounded,
       },
     ];
@@ -346,8 +348,8 @@ class _LoyaltyScreenState extends ConsumerState<LoyaltyScreen> {
                   Expanded(
                     child: Text(
                       segment['label'] as String? ?? 'Unknown',
-                      style: const TextStyle(
-                        color: AnalyticsTheme.primaryText,
+                      style: TextStyle(
+                        color: AnalyticsTheme.primaryText(context),
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
                       ),
@@ -356,7 +358,7 @@ class _LoyaltyScreenState extends ConsumerState<LoyaltyScreen> {
                   Text(
                     '$count (${percentage.toStringAsFixed(1)}%)',
                     style: TextStyle(
-                      color: AnalyticsTheme.secondaryText,
+                      color: AnalyticsTheme.secondaryText(context),
                       fontSize: 12,
                     ),
                   ),
@@ -366,7 +368,7 @@ class _LoyaltyScreenState extends ConsumerState<LoyaltyScreen> {
               Container(
                 height: 8,
                 decoration: BoxDecoration(
-                  color: AnalyticsTheme.borderColor,
+                  color: AnalyticsTheme.borderColor(context),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: FractionallySizedBox(
@@ -395,7 +397,7 @@ class _LoyaltyScreenState extends ConsumerState<LoyaltyScreen> {
   }) {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: AnalyticsTheme.glassCard(),
+      decoration: AnalyticsTheme.glassCard(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -404,8 +406,8 @@ class _LoyaltyScreenState extends ConsumerState<LoyaltyScreen> {
               Container(
                 width: 48,
                 height: 48,
-                decoration: AnalyticsTheme.iconContainer(),
-                child: Icon(icon, color: AnalyticsTheme.primaryGold, size: 24),
+                decoration: AnalyticsTheme.iconContainer(context),
+                child: Icon(icon, color: AnalyticsTheme.primaryGold(context), size: 24),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -414,8 +416,8 @@ class _LoyaltyScreenState extends ConsumerState<LoyaltyScreen> {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
-                        color: AnalyticsTheme.primaryGold,
+                      style: TextStyle(
+                        color: AnalyticsTheme.primaryGold(context),
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
                       ),
@@ -424,7 +426,7 @@ class _LoyaltyScreenState extends ConsumerState<LoyaltyScreen> {
                     Text(
                       subtitle,
                       style: TextStyle(
-                        color: AnalyticsTheme.secondaryText,
+                        color: AnalyticsTheme.secondaryText(context),
                         fontSize: 13,
                       ),
                     ),
@@ -467,12 +469,12 @@ class _LoyaltyScreenState extends ConsumerState<LoyaltyScreen> {
                 PieChartSectionData(
                   value: data.newCustomers.toDouble(),
                   title: '${data.newCustomers}',
-                  color: AnalyticsTheme.secondaryBeige,
+                  color: AnalyticsTheme.secondaryBeige(context),
                   radius: 40,
-                  titleStyle: const TextStyle(
+                  titleStyle: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: AnalyticsTheme.onAccentText(context),
                   ),
                 ),
                 PieChartSectionData(
@@ -480,10 +482,10 @@ class _LoyaltyScreenState extends ConsumerState<LoyaltyScreen> {
                   title: '${data.returningCustomers}',
                   color: AnalyticsTheme.chartBlue,
                   radius: 40,
-                  titleStyle: const TextStyle(
+                  titleStyle: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: AnalyticsTheme.onAccentText(context),
                   ),
                 ),
               ],
@@ -497,7 +499,7 @@ class _LoyaltyScreenState extends ConsumerState<LoyaltyScreen> {
             _buildStatItem(
               'New',
               '${data.newCustomers}',
-              AnalyticsTheme.secondaryBeige,
+              AnalyticsTheme.secondaryBeige(context),
             ),
             _buildStatItem(
               'Returning',
@@ -507,7 +509,7 @@ class _LoyaltyScreenState extends ConsumerState<LoyaltyScreen> {
             _buildStatItem(
               'Retention',
               '${retentionRate.toStringAsFixed(1)}%',
-              AnalyticsTheme.primaryGold,
+              AnalyticsTheme.primaryGold(context),
             ),
           ],
         ),
@@ -531,7 +533,7 @@ class _LoyaltyScreenState extends ConsumerState<LoyaltyScreen> {
           label,
           style: Theme.of(
             context,
-          ).textTheme.bodyMedium?.copyWith(color: AnalyticsTheme.secondaryText),
+          ).textTheme.bodyMedium?.copyWith(color: AnalyticsTheme.secondaryText(context)),
         ),
       ],
     );
@@ -543,8 +545,8 @@ class _LoyaltyScreenState extends ConsumerState<LoyaltyScreen> {
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 24.0),
           child: Text(
-            '✅ All regulars are still active!',
-            style: const TextStyle(
+            'All regulars are still active!',
+            style: TextStyle(
               color: AnalyticsTheme.chartGreen,
               fontSize: 16,
               fontWeight: FontWeight.w500,
@@ -565,10 +567,10 @@ class _LoyaltyScreenState extends ConsumerState<LoyaltyScreen> {
               Container(
                 width: 40,
                 height: 40,
-                decoration: AnalyticsTheme.iconContainer(
+                decoration: AnalyticsTheme.iconContainer(context,
                   color: AnalyticsTheme.chartAmber,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.person_rounded,
                   color: AnalyticsTheme.chartAmber,
                   size: 20,
@@ -581,8 +583,8 @@ class _LoyaltyScreenState extends ConsumerState<LoyaltyScreen> {
                   children: [
                     Text(
                       customer.name,
-                      style: const TextStyle(
-                        color: AnalyticsTheme.primaryText,
+                      style: TextStyle(
+                        color: AnalyticsTheme.primaryText(context),
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
@@ -590,7 +592,7 @@ class _LoyaltyScreenState extends ConsumerState<LoyaltyScreen> {
                     Text(
                       'Last visit: ${DateFormat('dd MMM yyyy').format(customer.lastVisit)}',
                       style: TextStyle(
-                        color: AnalyticsTheme.secondaryText,
+                        color: AnalyticsTheme.secondaryText(context),
                         fontSize: 12,
                       ),
                     ),
@@ -608,7 +610,7 @@ class _LoyaltyScreenState extends ConsumerState<LoyaltyScreen> {
                 ),
                 child: Text(
                   '$daysAgo days',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AnalyticsTheme.chartRed,
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
@@ -628,37 +630,36 @@ class _LoyaltyScreenState extends ConsumerState<LoyaltyScreen> {
     required String subtitle,
   }) {
     return Container(
-      height: 200,
       padding: const EdgeInsets.all(32),
-      decoration: AnalyticsTheme.glassCard(),
+      decoration: AnalyticsTheme.glassCard(context),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: AnalyticsTheme.primaryGold.withOpacity(0.1),
+              color: AnalyticsTheme.primaryGold(context).withOpacity(0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
               icon,
               size: 48,
-              color: AnalyticsTheme.primaryGold.withOpacity(0.5),
+              color: AnalyticsTheme.primaryGold(context).withOpacity(0.5),
             ),
           ),
           const SizedBox(height: 16),
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: AnalyticsTheme.primaryText,
+              color: AnalyticsTheme.primaryText(context),
             ),
           ),
           const SizedBox(height: 8),
           Text(
             subtitle,
-            style: TextStyle(fontSize: 14, color: AnalyticsTheme.secondaryText),
+            style: TextStyle(fontSize: 14, color: AnalyticsTheme.secondaryText(context)),
             textAlign: TextAlign.center,
           ),
         ],

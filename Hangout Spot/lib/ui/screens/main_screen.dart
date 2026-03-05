@@ -5,6 +5,8 @@ import 'package:hangout_spot/ui/screens/menu/manage_menu_screen.dart';
 import 'package:hangout_spot/ui/screens/billing/billing_screen.dart';
 import 'package:hangout_spot/ui/screens/settings/settings_screen.dart';
 import 'package:hangout_spot/ui/widgets/sidebar_navigation.dart';
+import 'package:hangout_spot/data/repositories/auth_repository.dart';
+import 'package:hangout_spot/ui/screens/auth/login_screen.dart';
 import 'package:animations/animations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -20,6 +22,21 @@ class _MainScreenState extends ConsumerState<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Listen for auth state changes — if the user gets signed out
+    // (remote logout, token expiry, etc.) navigate back to login.
+    ref.listen(authStateProvider, (previous, next) {
+      final user = next.valueOrNull;
+      if (user == null && previous?.valueOrNull != null) {
+        // User was signed in but is now signed out
+        if (context.mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const LoginScreen()),
+            (_) => false,
+          );
+        }
+      }
+    });
+
     final width = MediaQuery.of(context).size.width;
     final isDesktop = width > 900;
 

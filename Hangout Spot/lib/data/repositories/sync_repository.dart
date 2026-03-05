@@ -1,14 +1,36 @@
+import 'package:hangout_spot/utils/log_utils.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' hide Order;
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart' hide Category;
 import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:drift/drift.dart';
-import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../providers/database_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-// Using simple Provider for now as we don't have riverpod_generator set up fully in this plan
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+/// Keys for SharedPreferences that should be backed up to the cloud.
+const _backupPrefKeys = [
+  'store_name',
+  'store_address',
+  'store_phone',
+  'store_email',
+  'store_logo',
+  'store_logo_url',
+  'receipt_footer',
+  'receipt_show_thank_you',
+  'bill_whatsapp_enabled',
+  'cloud_auto_sync_enabled',
+  'cloud_auto_sync_interval_mins',
+  'promo_enabled',
+  'promo_title',
+  'promo_discount',
+  'promo_bundle_ids',
+  'promo_start_iso',
+  'promo_end_iso',
+  'reward_feature_enabled',
+  'reward_earning_rate',
+  'reward_redemption_rate',
+  'last_active_outlet_id',
+];
 
 class SyncRepository {
   final AppDatabase _db;
@@ -17,28 +39,28 @@ class SyncRepository {
 
   SyncRepository(this._db, this._auth, this._firestore);
 
+  // ─── BACKUP ────────────────────────────────────────────────────────────────
+
+  /// Backs up non-order data (menu, customers, config, prefs).
+  /// Orders are pushed individually by OrderRepository; this method
+  /// only syncs bounded/static datasets that fit comfortably in a single
+  /// Firestore document (<1 MB each).
   Future<bool> backupData() async {
     try {
       final user = _auth.currentUser;
       if (user == null) throw Exception("Not logged in");
 
-      // Fetch all data from local database
+      // Fetch bounded data from local database
       final categories = await _db.select(_db.categories).get();
       final items = await _db.select(_db.items).get();
       final customers = await _db.select(_db.customers).get();
-      final orders = await _db.select(_db.orders).get();
-      final orderItems = await _db.select(_db.orderItems).get();
-
-      // NEW: Fetch additional data types
       final locations = await _db.select(_db.locations).get();
-      // Removed tables as feature is deprecated
       final settings = await _db.select(_db.settings).get();
       final rewardTransactions = await _db.select(_db.rewardTransactions).get();
 
       final baseRef = _firestore.collection('cafes').doc(user.uid);
-      final batch = _firestore.batch(); // ATOMIC BATCH START
+      final batch = _firestore.batch();
 
-      // Helper to add to batch
       void addToBatch(String col, String doc, List<dynamic> list) {
         batch.set(baseRef.collection(col).doc(doc), {
           'list': list.map((e) => e.toJson()).toList(),
@@ -46,35 +68,56 @@ class SyncRepository {
         });
       }
 
-      // Upload Menu data
+      // Menu
       addToBatch('menu', 'categories', categories);
       addToBatch('menu', 'items', items);
 
-      // Upload Customer data
+      // Customers
       addToBatch('data', 'customers', customers);
 
-      // Upload Order data
-      addToBatch('data', 'orders', orders);
-      addToBatch('data', 'order_items', orderItems);
-
-      // Upload Locations/Outlets data
+      // Config
       addToBatch('config', 'locations', locations);
-
-      // Upload Settings data
       addToBatch('config', 'settings', settings);
 
-      // Upload Reward Transactions data
+      // Loyalty
       addToBatch('loyalty', 'reward_transactions', rewardTransactions);
 
-      await batch.commit(); // ATOMIC COMMIT
+      await batch.commit();
+
+      // Backup SharedPreferences (outside batch – single doc, idempotent)
+      await _backupSharedPreferences(baseRef);
 
       return true;
     } catch (e) {
-      // Firestore not set up or other error - fail silently and return false
-      print('Backup failed (Firestore may not be configured): $e');
+      logDebug('Backup failed: $e');
       return false;
     }
   }
+
+  /// Persist selected SharedPreferences keys to Firestore.
+  Future<void> _backupSharedPreferences(DocumentReference baseRef) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final Map<String, dynamic> prefsMap = {};
+      for (final key in _backupPrefKeys) {
+        final value = prefs.getString(key);
+        if (value != null) prefsMap[key] = value;
+        // Also check bool values
+        final boolValue = prefs.getBool(key);
+        if (boolValue != null) prefsMap[key] = boolValue.toString();
+      }
+      if (prefsMap.isNotEmpty) {
+        await baseRef.collection('config').doc('preferences').set({
+          'data': prefsMap,
+          'lastUpdated': FieldValue.serverTimestamp(),
+        });
+      }
+    } catch (e) {
+      logDebug('⚠️ SharedPreferences backup failed: $e');
+    }
+  }
+
+  // ─── RESTORE ───────────────────────────────────────────────────────────────
 
   Future<void> restoreData() async {
     try {
@@ -83,7 +126,7 @@ class SyncRepository {
 
       final baseRef = _firestore.collection('cafes').doc(user.uid);
 
-      // Helper to fetch list
+      // Helper to fetch array-based document
       Future<List<Map<String, dynamic>>> fetchList(
         String col,
         String doc,
@@ -93,13 +136,10 @@ class SyncRepository {
         return List<Map<String, dynamic>>.from(s.data()!['list'] ?? []);
       }
 
+      // Fetch bounded data from array-based docs
       final categories = await fetchList('menu', 'categories');
       final items = await fetchList('menu', 'items');
       final customers = await fetchList('data', 'customers');
-      final orders = await fetchList('data', 'orders');
-      final orderItems = await fetchList('data', 'order_items');
-
-      // NEW: Fetch missing data (Tables excluded as unused)
       final locations = await fetchList('config', 'locations');
       final settings = await fetchList('config', 'settings');
       final rewardTransactions = await fetchList(
@@ -107,10 +147,40 @@ class SyncRepository {
         'reward_transactions',
       );
 
-      // CRITICAL: Clear old transactional data to prevent orphaned records
-      // This ensures fresh install gets clean data, not mixed with old local data
-      debugPrint('🧹 Clearing old transactional data before restore...');
+      // Fetch orders from INDIVIDUAL documents (scalable approach)
+      final orderDocs = await baseRef.collection('orders').get();
+      final List<Map<String, dynamic>> orders = [];
+      final List<Map<String, dynamic>> orderItemsList = [];
+
+      for (final doc in orderDocs.docs) {
+        final data = doc.data();
+        orders.add(data);
+        // Extract embedded items from each order document
+        final embeddedItems = data['items'] as List<dynamic>?;
+        if (embeddedItems != null) {
+          for (final item in embeddedItems) {
+            final itemMap = Map<String, dynamic>.from(item as Map);
+            itemMap['orderId'] = data['id'];
+            orderItemsList.add(itemMap);
+          }
+        }
+      }
+
+      // Fallback: if no individual order docs found, try legacy array
+      if (orders.isEmpty) {
+        logDebug('📖 No individual order docs found – trying legacy array…');
+        final legacyOrders = await fetchList('data', 'orders');
+        orders.addAll(legacyOrders);
+        final legacyItems = await fetchList('data', 'order_items');
+        orderItemsList.addAll(legacyItems);
+      }
+
+      // Clear ALL local data before restore so deleted items/categories
+      // on one device don't persist as ghosts on another (Bug 4 fix).
+      logDebug('🧹 Clearing all local data before restore...');
       await _db.batch((batch) {
+        batch.deleteWhere(_db.categories, (t) => const Constant(true));
+        batch.deleteWhere(_db.items, (t) => const Constant(true));
         batch.deleteWhere(_db.customers, (t) => const Constant(true));
         batch.deleteWhere(_db.orders, (t) => const Constant(true));
         batch.deleteWhere(_db.orderItems, (t) => const Constant(true));
@@ -119,94 +189,152 @@ class SyncRepository {
         batch.deleteWhere(_db.settings, (t) => const Constant(true));
       });
 
-      // Now insert clean data from cloud
-      debugPrint('📥 Inserting fresh data from cloud...');
+      // Insert clean data from cloud in safe-sized batches (≤500 rows each)
+      // Each record is parsed individually so one bad JSON doesn't crash the
+      // entire restore — bad records are skipped with a warning.
+      logDebug('📥 Inserting fresh data from cloud...');
+
+      int skipped = 0;
+
+      List<T> _safeParse<T>(
+        List<Map<String, dynamic>> list,
+        T Function(Map<String, dynamic>) fromJson,
+        String label,
+      ) {
+        final result = <T>[];
+        for (final e in list) {
+          try {
+            result.add(fromJson(e));
+          } catch (err) {
+            skipped++;
+            logDebug('⚠️ Skipping malformed $label record: $err');
+          }
+        }
+        return result;
+      }
 
       await _db.batch((batch) {
         batch.insertAll(
           _db.categories,
-          categories.map((e) => Category.fromJson(e)),
+          _safeParse(categories, Category.fromJson, 'category'),
           mode: InsertMode.insertOrReplace,
         );
         batch.insertAll(
           _db.items,
-          items.map((e) => Item.fromJson(e)),
+          _safeParse(items, Item.fromJson, 'item'),
           mode: InsertMode.insertOrReplace,
         );
         batch.insertAll(
           _db.customers,
-          customers.map((e) => Customer.fromJson(e)),
+          _safeParse(customers, Customer.fromJson, 'customer'),
           mode: InsertMode.insertOrReplace,
         );
-        batch.insertAll(
-          _db.orders,
-          orders.map((e) => Order.fromJson(e)),
-          mode: InsertMode.insertOrReplace,
-        );
-        batch.insertAll(
-          _db.orderItems,
-          orderItems.map((e) => OrderItem.fromJson(e)),
-          mode: InsertMode.insertOrReplace,
-        );
-
-        // NEW: Insert missing data (Tables excluded)
         batch.insertAll(
           _db.locations,
-          locations.map((e) => Location.fromJson(e)),
+          _safeParse(locations, Location.fromJson, 'location'),
           mode: InsertMode.insertOrReplace,
         );
         batch.insertAll(
           _db.settings,
-          settings.map((e) => Setting.fromJson(e)),
+          _safeParse(settings, Setting.fromJson, 'setting'),
           mode: InsertMode.insertOrReplace,
         );
         batch.insertAll(
           _db.rewardTransactions,
-          rewardTransactions.map((e) => RewardTransaction.fromJson(e)),
+          _safeParse(
+            rewardTransactions,
+            RewardTransaction.fromJson,
+            'rewardTransaction',
+          ),
           mode: InsertMode.insertOrReplace,
         );
       });
 
-      // Force refresh all Drift streams after restore
+      // Insert orders in chunks of 200 to avoid overwhelming SQLite
+      final parsedOrders = _safeParse(orders, Order.fromJson, 'order');
+      for (var i = 0; i < parsedOrders.length; i += 200) {
+        final chunk = parsedOrders.skip(i).take(200).toList();
+        await _db.batch((batch) {
+          batch.insertAll(_db.orders, chunk, mode: InsertMode.insertOrReplace);
+        });
+      }
+
+      // Insert order items in chunks of 200
+      final parsedItems = _safeParse(
+        orderItemsList,
+        OrderItem.fromJson,
+        'orderItem',
+      );
+      for (var i = 0; i < parsedItems.length; i += 200) {
+        final chunk = parsedItems.skip(i).take(200).toList();
+        await _db.batch((batch) {
+          batch.insertAll(
+            _db.orderItems,
+            chunk,
+            mode: InsertMode.insertOrReplace,
+          );
+        });
+      }
+
+      if (skipped > 0) {
+        logDebug('⚠️ Restore completed with $skipped skipped records');
+      }
+
+      // Restore SharedPreferences from cloud
+      await _restoreSharedPreferences(baseRef);
+
       await Future.delayed(const Duration(milliseconds: 100));
-      debugPrint('✅ Data restored successfully and streams refreshed');
+      logDebug('✅ Data restored successfully and streams refreshed');
     } catch (e) {
-      // Firestore not set up or no data to restore - fail silently
-      print(
+      logDebug(
         'Restore failed (Firestore may not be configured or no backup exists): $e',
       );
       throw Exception('Restore failed: $e');
     }
   }
 
+  /// Restore saved SharedPreferences from Firestore.
+  Future<void> _restoreSharedPreferences(DocumentReference baseRef) async {
+    try {
+      final doc = await baseRef.collection('config').doc('preferences').get();
+      if (!doc.exists || doc.data() == null) return;
+      final data = doc.data()!['data'] as Map<String, dynamic>?;
+      if (data == null || data.isEmpty) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      for (final entry in data.entries) {
+        await prefs.setString(entry.key, entry.value.toString());
+      }
+      logDebug('✅ SharedPreferences restored (${data.length} keys)');
+    } catch (e) {
+      logDebug('⚠️ SharedPreferences restore failed: $e');
+    }
+  }
+
+  // ─── CLEAR LOCAL ───────────────────────────────────────────────────────────
+
   /// Clears transactional & config data but PRESERVES menu (categories/items)
   Future<void> clearLocalData() async {
-    debugPrint('🗑️ Starting data deletion...');
+    logDebug('🗑️ Starting data deletion...');
 
     await _db.batch((batch) {
-      // Transactional data
       batch.deleteWhere(_db.customers, (t) => const Constant(true));
       batch.deleteWhere(_db.orders, (t) => const Constant(true));
       batch.deleteWhere(_db.orderItems, (t) => const Constant(true));
       batch.deleteWhere(_db.rewardTransactions, (t) => const Constant(true));
       batch.deleteWhere(_db.syncLogs, (t) => const Constant(true));
-
-      // Config data (outlets, settings) — menu is intentionally preserved
       batch.deleteWhere(_db.locations, (t) => const Constant(true));
       batch.deleteWhere(_db.settings, (t) => const Constant(true));
-
-      // NOTE: categories and items are NOT deleted (menu is preserved)
     });
 
-    debugPrint('✅ Batch deletion completed');
+    logDebug('✅ Batch deletion completed');
 
-    // Verify deletion
     final remainingOrders = await (_db.select(_db.orders).get());
     final remainingCustomers = await (_db.select(_db.customers).get());
-    debugPrint('📊 Remaining orders: ${remainingOrders.length}');
-    debugPrint('📊 Remaining customers: ${remainingCustomers.length}');
+    logDebug('📊 Remaining orders: ${remainingOrders.length}');
+    logDebug('📊 Remaining customers: ${remainingCustomers.length}');
 
-    // Re-seed default outlet after deletion using INSERT OR REPLACE (replaces if exists)
+    // Re-seed default outlet
     await _db
         .into(_db.locations)
         .insert(
@@ -220,9 +348,8 @@ class SyncRepository {
           ),
           mode: InsertMode.insertOrReplace,
         );
-    debugPrint('✅ Default outlet re-seeded: Hangout Spot – Kanha Dreamland');
+    logDebug('✅ Default outlet re-seeded: Hangout Spot – Kanha Dreamland');
 
-    // Re-seed the default location setting in the Settings table
     await _db
         .into(_db.settings)
         .insert(
@@ -233,36 +360,32 @@ class SyncRepository {
           ),
           mode: InsertMode.insertOrReplace,
         );
-    debugPrint('✅ Default location setting re-seeded');
+    logDebug('✅ Default location setting re-seeded');
 
-    // Force refresh all Drift streams by invalidating cache
-    // This ensures watchSessionOrders() and other streams see the changes
     await Future.delayed(const Duration(milliseconds: 200));
-    debugPrint('✅ Local data cleared and streams refreshed');
+    logDebug('✅ Local data cleared and streams refreshed');
 
-    // Also clear promo & outlet SharedPreferences
+    // Clear promo & outlet SharedPreferences
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('promo_enabled');
-    await prefs.remove('promo_title');
-    await prefs.remove('promo_discount');
-    await prefs.remove('promo_bundle_ids');
-    await prefs.remove('promo_start_iso');
-    await prefs.remove('promo_end_iso');
+    for (final key in _backupPrefKeys) {
+      await prefs.remove(key);
+    }
     await prefs.remove('last_active_outlet_id');
 
-    // Clear any persisted cart state to avoid restoring old customer selection
-    for (final key in prefs.getKeys()) {
+    // Clear persisted cart state
+    for (final key in prefs.getKeys().toList()) {
       if (key.startsWith('cart_state_v1_') || key == 'cart_state_temp') {
         await prefs.remove(key);
       }
     }
 
-    // Set the default outlet as last active
     await prefs.setString('last_active_outlet_id', 'default-outlet-001');
-    debugPrint('✅ Set default outlet as active in preferences');
+    logDebug('✅ Set default outlet as active in preferences');
   }
 
-  /// Deletes all cloud data EXCEPT menu (categories/items are preserved)
+  // ─── DELETE CLOUD ──────────────────────────────────────────────────────────
+
+  /// Deletes ALL cloud data EXCEPT menu (categories/items are preserved)
   Future<void> deleteCloudData() async {
     try {
       final user = _auth.currentUser;
@@ -273,37 +396,50 @@ class SyncRepository {
       Future<void> deleteCollectionDocs(
         CollectionReference<Map<String, dynamic>> col,
       ) async {
-        final snapshot = await col.get();
-        for (final doc in snapshot.docs) {
-          await doc.reference.delete();
-        }
+        // Delete in batches of 400 to stay under Firestore batch limits
+        QuerySnapshot<Map<String, dynamic>> snapshot;
+        do {
+          snapshot = await col.limit(400).get();
+          if (snapshot.docs.isEmpty) break;
+          final batch = _firestore.batch();
+          for (final doc in snapshot.docs) {
+            batch.delete(doc.reference);
+          }
+          await batch.commit();
+        } while (snapshot.docs.length == 400);
       }
 
-      // Delete transactional data
+      // Delete transactional array-based data
       final dataRef = baseRef.collection('data');
       await dataRef.doc('customers').delete();
       await dataRef.doc('orders').delete();
       await dataRef.doc('order_items').delete();
 
-      // Delete individual order documents (real-time sync collection)
+      // Delete individual order documents (scalable batch delete)
       await deleteCollectionDocs(baseRef.collection('orders'));
 
-      // Delete config (outlets, settings) — menu/* is intentionally kept
+      // Delete config (outlets, settings, preferences) — menu/* kept
       final configRef = baseRef.collection('config');
       await configRef.doc('locations').delete();
       await configRef.doc('settings').delete();
+      await configRef.doc('preferences').delete();
 
       // Delete loyalty data
-      final loyaltyRef = baseRef.collection('loyalty');
-      await loyaltyRef.doc('reward_transactions').delete();
+      await baseRef.collection('loyalty').doc('reward_transactions').delete();
+
+      // Delete inventory collections (cloud-only data)
+      await deleteCollectionDocs(baseRef.collection('inventory_items'));
+      await deleteCollectionDocs(baseRef.collection('inventory_daily'));
+      await deleteCollectionDocs(baseRef.collection('inventory_movements'));
+      await deleteCollectionDocs(baseRef.collection('inventory_reminders'));
+      await deleteCollectionDocs(baseRef.collection('platform_orders'));
 
       // Delete base document
       await baseRef.delete();
 
-      // NOTE: menu/categories and menu/items are NOT deleted
+      logDebug('✅ Cloud data deleted (menu preserved)');
     } catch (e) {
-      // Firestore not set up or already deleted - fail silently
-      print('Delete cloud data failed (Firestore may not be configured): $e');
+      logDebug('Delete cloud data failed: $e');
       // Don't throw - allow factory reset to continue with local deletion
     }
   }

@@ -1,6 +1,6 @@
+import 'package:hangout_spot/utils/log_utils.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
 
@@ -25,7 +25,7 @@ class LiveAnalyticsService {
   Future<void> recordSale(Order order, {int itemCount = 0}) async {
     final analyticsRef = _getUserAnalyticsRef();
     if (analyticsRef == null) {
-      debugPrint('⚠️ Cannot record sale: User not logged in');
+      logDebug('⚠️ Cannot record sale: User not logged in');
       return;
     }
 
@@ -77,11 +77,70 @@ class LiveAnalyticsService {
         }),
       ]);
 
-      debugPrint(
+      logDebug(
         '✅ Live analytics updated: ${order.invoiceNumber} (Items: $itemCount)',
       );
     } catch (e) {
-      debugPrint('❌ Failed to update live analytics: $e');
+      logDebug('❌ Failed to update live analytics: $e');
+    }
+  }
+
+  /// Revert a sale in real-time counters (e.g. order cancelled)
+  Future<void> revertSale(Order order, {int itemCount = 0}) async {
+    final analyticsRef = _getUserAnalyticsRef();
+    if (analyticsRef == null) {
+      logDebug('⚠️ Cannot revert sale: User not logged in');
+      return;
+    }
+
+    try {
+      // Use the ORDER's original date/hour, not now(), so we decrement
+      // the correct RTDB bucket (e.g. yesterday's 2PM, not today's 5PM).
+      final orderDate = order.createdAt;
+      final today = DateFormat('yyyy-MM-dd').format(orderDate);
+      final hour = orderDate.hour;
+      final yearMonth = DateFormat('yyyy-MM').format(orderDate);
+
+      // Use atomic increments to subtract from counters
+      final dailyRef = analyticsRef.child('daily').child(today);
+      final hourlyRef = dailyRef.child('hours').child(hour.toString());
+      final monthlyRef = analyticsRef.child('monthly').child(yearMonth);
+
+      await Future.wait([
+        // Daily totals
+        dailyRef
+            .child('revenue')
+            .set(ServerValue.increment(-order.totalAmount)),
+        dailyRef.child('orderCount').set(ServerValue.increment(-1)),
+        if (itemCount > 0)
+          dailyRef.child('itemCount').set(ServerValue.increment(-itemCount))
+        else
+          dailyRef.child('itemCount').set(ServerValue.increment(0)),
+
+        // Hourly breakdown
+        hourlyRef
+            .child('revenue')
+            .set(ServerValue.increment(-order.totalAmount)),
+        hourlyRef.child('count').set(ServerValue.increment(-1)),
+
+        // Monthly totals
+        monthlyRef
+            .child('revenue')
+            .set(ServerValue.increment(-order.totalAmount)),
+        monthlyRef.child('orderCount').set(ServerValue.increment(-1)),
+
+        // Payment mode breakdown
+        dailyRef
+            .child('payments')
+            .child(order.paymentMode)
+            .set(ServerValue.increment(-order.totalAmount)),
+      ]);
+
+      logDebug(
+        '✅ Live analytics reverted for cancelled order: ${order.invoiceNumber}',
+      );
+    } catch (e) {
+      logDebug('❌ Failed to revert live analytics: $e');
     }
   }
 
@@ -233,9 +292,9 @@ class LiveAnalyticsService {
 
     try {
       await analyticsRef.child('daily').child(targetDate).remove();
-      debugPrint('✅ Reset daily counters for $targetDate');
+      logDebug('✅ Reset daily counters for $targetDate');
     } catch (e) {
-      debugPrint('❌ Failed to reset counters: $e');
+      logDebug('❌ Failed to reset counters: $e');
     }
   }
 
@@ -261,7 +320,7 @@ class LiveAnalyticsService {
         'lastUpdated': data['lastUpdated'],
       };
     } catch (e) {
-      debugPrint('❌ Failed to get today snapshot: $e');
+      logDebug('❌ Failed to get today snapshot: $e');
       return {};
     }
   }

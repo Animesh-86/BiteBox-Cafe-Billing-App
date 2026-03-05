@@ -2,10 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hangout_spot/data/models/inventory_models.dart';
 import 'package:hangout_spot/data/providers/inventory_providers.dart';
-import 'package:hangout_spot/services/notification_service.dart';
-import 'package:hangout_spot/main.dart';
 import 'tabs/inventory_items_screen.dart';
 import 'tabs/inventory_reminders_screen.dart';
 
@@ -26,83 +23,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     });
   }
 
-  Future<void> _handleLowStockNotificationsFromAsyncValue(
-    AsyncValue<List<InventoryItem>> itemsAsyncValue,
-    AsyncValue<List<InventoryReminder>> remindersAsyncValue,
-  ) async {
-    final items = itemsAsyncValue.valueOrNull ?? [];
-    final reminders = remindersAsyncValue.valueOrNull ?? [];
-
-    if (items.isEmpty || reminders.isEmpty) return;
-
-    final prefs = ref.read(sharedPreferencesProvider);
-    final todayKey = _dateKey(DateTime.now());
-    final enabledReminders = reminders
-        .where((r) => r.type == 'quantity' && r.isEnabled)
-        .toList();
-    if (enabledReminders.isEmpty) return;
-
-    for (final reminder in enabledReminders) {
-      if (reminder.itemId == null) continue;
-      final item = items
-          .where((i) => i.id == reminder.itemId)
-          .cast<InventoryItem?>()
-          .firstWhere((i) => i != null, orElse: () => null);
-      if (item == null) continue;
-
-      final threshold = reminder.threshold ?? item.minQty;
-      if (item.currentQty >= threshold) continue;
-
-      final key = 'low_stock_${item.id}_$todayKey';
-      if (prefs.getBool(key) == true) continue;
-
-      await NotificationService.instance.showNow(
-        id: _hashId('low_${item.id}'),
-        title: 'Low stock: ${item.name}',
-        body: 'Only ${item.currentQty} ${item.unit} left.',
-      );
-      await prefs.setBool(key, true);
-    }
-  }
-
-  String _dateKey(DateTime date) {
-    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-  }
-
-  int _hashId(String value) {
-    return value.hashCode & 0x7fffffff;
-  }
-
-  // stat pill helper removed
-
   @override
   Widget build(BuildContext context) {
-    // Watch the streams to handle low stock notifications
-    final itemsAsyncValue = ref.watch(inventoryItemsStreamProvider);
-    final remindersAsyncValue = ref.watch(inventoryRemindersStreamProvider);
-
-    if (itemsAsyncValue.hasValue && remindersAsyncValue.hasValue) {
-      _handleLowStockNotificationsFromAsyncValue(
-        itemsAsyncValue,
-        remindersAsyncValue,
-      );
-    }
-
-    // Set up listeners for low stock notifications
-    ref.listen(inventoryItemsStreamProvider, (previous, next) {
-      _handleLowStockNotificationsFromAsyncValue(
-        next,
-        ref.read(inventoryRemindersStreamProvider),
-      );
-    });
-
-    ref.listen(inventoryRemindersStreamProvider, (previous, next) {
-      _handleLowStockNotificationsFromAsyncValue(
-        ref.read(inventoryItemsStreamProvider),
-        next,
-      );
-    });
-
     return DefaultTabController(
       length: 2,
       child: Scaffold(
@@ -222,10 +144,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                                   ).colorScheme.primary.withOpacity(0.22),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
-                                indicatorPadding: const EdgeInsets.symmetric(
-                                  horizontal: 4,
-                                  vertical: 4,
-                                ),
+                                indicatorSize: TabBarIndicatorSize.tab,
                                 tabs: const [
                                   Tab(text: 'Inventory'),
                                   Tab(text: 'Reminders'),

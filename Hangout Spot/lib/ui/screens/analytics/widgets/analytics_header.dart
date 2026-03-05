@@ -36,10 +36,10 @@ class AnalyticsHeader extends ConsumerWidget {
       ),
       builder: (context, child) {
         return Theme(
-          data: ThemeData.dark().copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: AnalyticsTheme.primaryGold,
-              surface: AnalyticsTheme.cardBackground,
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
+              primary: AnalyticsTheme.primaryGold(context),
+              surface: AnalyticsTheme.cardBackground(context),
             ),
           ),
           child: child!,
@@ -55,7 +55,7 @@ class AnalyticsHeader extends ConsumerWidget {
   void _showDateFilterSelector(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: AnalyticsTheme.cardBackground,
+      backgroundColor: AnalyticsTheme.cardBackground(context),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -66,10 +66,10 @@ class AnalyticsHeader extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Select Date Range',
                 style: TextStyle(
-                  color: AnalyticsTheme.primaryGold,
+                  color: AnalyticsTheme.primaryGold(context),
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                 ),
@@ -120,11 +120,11 @@ class AnalyticsHeader extends ConsumerWidget {
                     Navigator.pop(context);
                     _selectDateRange(context);
                   },
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.calendar_month_rounded,
                     color: Colors.black,
                   ),
-                  label: const Text(
+                  label: Text(
                     'Custom Range',
                     style: TextStyle(
                       color: Colors.black,
@@ -132,7 +132,7 @@ class AnalyticsHeader extends ConsumerWidget {
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AnalyticsTheme.primaryGold,
+                    backgroundColor: AnalyticsTheme.primaryGold(context),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
@@ -163,18 +163,18 @@ class AnalyticsHeader extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           color: isSelected
-              ? AnalyticsTheme.primaryGold
-              : AnalyticsTheme.cardBackground,
+              ? AnalyticsTheme.primaryGold(context)
+              : AnalyticsTheme.cardBackground(context),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: AnalyticsTheme.primaryGold.withOpacity(isSelected ? 1 : 0.3),
+            color: AnalyticsTheme.primaryGold(context).withOpacity(isSelected ? 1 : 0.3),
             width: 1,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? Colors.black : AnalyticsTheme.primaryText,
+            color: isSelected ? Colors.black : AnalyticsTheme.primaryText(context),
             fontSize: 14,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
           ),
@@ -194,7 +194,7 @@ class AnalyticsHeader extends ConsumerWidget {
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: AnalyticsTheme.cardBackground,
+      backgroundColor: AnalyticsTheme.cardBackground(context),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -205,10 +205,10 @@ class AnalyticsHeader extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Select Outlet',
                 style: TextStyle(
-                  color: AnalyticsTheme.primaryGold,
+                  color: AnalyticsTheme.primaryGold(context),
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                 ),
@@ -220,32 +220,32 @@ class AnalyticsHeader extends ConsumerWidget {
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: currentOutlet == null
-                        ? AnalyticsTheme.primaryGold.withOpacity(0.2)
-                        : AnalyticsTheme.secondaryBeige.withOpacity(0.1),
+                        ? AnalyticsTheme.primaryGold(context).withOpacity(0.2)
+                        : AnalyticsTheme.secondaryBeige(context).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
                     Icons.store_mall_directory_rounded,
                     color: currentOutlet == null
-                        ? AnalyticsTheme.primaryGold
-                        : AnalyticsTheme.secondaryText,
+                        ? AnalyticsTheme.primaryGold(context)
+                        : AnalyticsTheme.secondaryText(context),
                   ),
                 ),
                 title: Text(
                   'All Outlets',
                   style: TextStyle(
                     color: currentOutlet == null
-                        ? AnalyticsTheme.primaryGold
-                        : AnalyticsTheme.primaryText,
+                        ? AnalyticsTheme.primaryGold(context)
+                        : AnalyticsTheme.primaryText(context),
                     fontWeight: currentOutlet == null
                         ? FontWeight.bold
                         : FontWeight.normal,
                   ),
                 ),
                 trailing: currentOutlet == null
-                    ? const Icon(
+                    ? Icon(
                         Icons.check_circle_rounded,
-                        color: AnalyticsTheme.primaryGold,
+                        color: AnalyticsTheme.primaryGold(context),
                       )
                     : null,
                 onTap: () {
@@ -254,7 +254,7 @@ class AnalyticsHeader extends ConsumerWidget {
                   Navigator.pop(context);
                 },
               ),
-              const Divider(color: Colors.white12),
+              Divider(color: AnalyticsTheme.dividerColor(context)),
               ...locations.map(
                 (location) => ListTile(
                   contentPadding: EdgeInsets.zero,
@@ -262,23 +262,23 @@ class AnalyticsHeader extends ConsumerWidget {
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: location.id == currentOutlet?.id
-                          ? AnalyticsTheme.primaryGold.withOpacity(0.2)
-                          : AnalyticsTheme.secondaryBeige.withOpacity(0.1),
+                          ? AnalyticsTheme.primaryGold(context).withOpacity(0.2)
+                          : AnalyticsTheme.secondaryBeige(context).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
                       Icons.store_rounded,
                       color: location.id == currentOutlet?.id
-                          ? AnalyticsTheme.primaryGold
-                          : AnalyticsTheme.secondaryText,
+                          ? AnalyticsTheme.primaryGold(context)
+                          : AnalyticsTheme.secondaryText(context),
                     ),
                   ),
                   title: Text(
                     location.name,
                     style: TextStyle(
                       color: location.id == currentOutlet?.id
-                          ? AnalyticsTheme.primaryGold
-                          : AnalyticsTheme.primaryText,
+                          ? AnalyticsTheme.primaryGold(context)
+                          : AnalyticsTheme.primaryText(context),
                       fontWeight: location.id == currentOutlet?.id
                           ? FontWeight.bold
                           : FontWeight.normal,
@@ -289,15 +289,15 @@ class AnalyticsHeader extends ConsumerWidget {
                       ? Text(
                           location.address!,
                           style: TextStyle(
-                            color: AnalyticsTheme.secondaryText,
+                            color: AnalyticsTheme.secondaryText(context),
                             fontSize: 12,
                           ),
                         )
                       : null,
                   trailing: location.id == currentOutlet?.id
-                      ? const Icon(
+                      ? Icon(
                           Icons.check_circle_rounded,
-                          color: AnalyticsTheme.primaryGold,
+                          color: AnalyticsTheme.primaryGold(context),
                         )
                       : null,
                   onTap: () {
@@ -343,9 +343,9 @@ class AnalyticsHeader extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       decoration: BoxDecoration(
-        color: AnalyticsTheme.cardBackground.withOpacity(0.5),
+        color: AnalyticsTheme.cardBackground(context).withOpacity(0.5),
         border: Border(
-          bottom: BorderSide(color: AnalyticsTheme.borderColor, width: 1),
+          bottom: BorderSide(color: AnalyticsTheme.borderColor(context), width: 1),
         ),
       ),
       child: Column(
@@ -356,13 +356,13 @@ class AnalyticsHeader extends ConsumerWidget {
             children: [
               Container(
                 decoration: BoxDecoration(
-                  color: AnalyticsTheme.cardBackground,
+                  color: AnalyticsTheme.cardBackground(context),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AnalyticsTheme.borderColor),
+                  border: Border.all(color: AnalyticsTheme.borderColor(context)),
                 ),
                 child: IconButton(
-                  icon: const Icon(Icons.menu_rounded),
-                  color: AnalyticsTheme.primaryGold,
+                  icon: Icon(Icons.menu_rounded),
+                  color: AnalyticsTheme.primaryGold(context),
                   onPressed: onMenuPressed,
                   constraints: const BoxConstraints(
                     minWidth: 40,
@@ -375,10 +375,10 @@ class AnalyticsHeader extends ConsumerWidget {
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: AnalyticsTheme.primaryGold,
+                    color: AnalyticsTheme.primaryGold(context),
                     letterSpacing: 0.5,
                   ),
                 ),
@@ -389,27 +389,27 @@ class AnalyticsHeader extends ConsumerWidget {
                   height: 40,
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: AnalyticsTheme.cardBackground,
+                    color: AnalyticsTheme.cardBackground(context),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AnalyticsTheme.borderColor),
+                    border: Border.all(color: AnalyticsTheme.borderColor(context)),
                   ),
-                  child: const CircularProgressIndicator(
+                  child: CircularProgressIndicator(
                     strokeWidth: 2,
                     valueColor: AlwaysStoppedAnimation<Color>(
-                      AnalyticsTheme.primaryGold,
+                      AnalyticsTheme.primaryGold(context),
                     ),
                   ),
                 )
               else if (onExportPressed != null)
                 Container(
                   decoration: BoxDecoration(
-                    color: AnalyticsTheme.cardBackground,
+                    color: AnalyticsTheme.cardBackground(context),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AnalyticsTheme.borderColor),
+                    border: Border.all(color: AnalyticsTheme.borderColor(context)),
                   ),
                   child: IconButton(
-                    icon: const Icon(Icons.download_rounded),
-                    color: AnalyticsTheme.primaryGold,
+                    icon: Icon(Icons.download_rounded),
+                    color: AnalyticsTheme.primaryGold(context),
                     tooltip: 'Export to Excel',
                     onPressed: onExportPressed,
                     constraints: const BoxConstraints(
@@ -436,10 +436,10 @@ class AnalyticsHeader extends ConsumerWidget {
                       horizontal: 12,
                       vertical: 10,
                     ),
-                    decoration: AnalyticsTheme.glassCard().copyWith(
+                    decoration: AnalyticsTheme.glassCard(context).copyWith(
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: AnalyticsTheme.primaryGold.withOpacity(0.3),
+                        color: AnalyticsTheme.primaryGold(context).withOpacity(0.3),
                       ),
                     ),
                     child: Row(
@@ -448,7 +448,7 @@ class AnalyticsHeader extends ConsumerWidget {
                           activeOutlet == null
                               ? Icons.store_mall_directory_rounded
                               : Icons.store_rounded,
-                          color: AnalyticsTheme.primaryGold,
+                          color: AnalyticsTheme.primaryGold(context),
                           size: 18,
                         ),
                         const SizedBox(width: 8),
@@ -459,7 +459,7 @@ class AnalyticsHeader extends ConsumerWidget {
                               Text(
                                 'Outlet',
                                 style: TextStyle(
-                                  color: AnalyticsTheme.secondaryText,
+                                  color: AnalyticsTheme.secondaryText(context),
                                   fontSize: 10,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -467,8 +467,8 @@ class AnalyticsHeader extends ConsumerWidget {
                               const SizedBox(height: 2),
                               Text(
                                 activeOutlet?.name ?? 'All Outlets',
-                                style: const TextStyle(
-                                  color: AnalyticsTheme.primaryText,
+                                style: TextStyle(
+                                  color: AnalyticsTheme.primaryText(context),
                                   fontSize: 13,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -482,7 +482,7 @@ class AnalyticsHeader extends ConsumerWidget {
                                   child: Text(
                                     activeOutlet.address!,
                                     style: TextStyle(
-                                      color: AnalyticsTheme.secondaryText,
+                                      color: AnalyticsTheme.secondaryText(context),
                                       fontSize: 10,
                                     ),
                                     maxLines: 1,
@@ -492,9 +492,9 @@ class AnalyticsHeader extends ConsumerWidget {
                             ],
                           ),
                         ),
-                        const Icon(
+                        Icon(
                           Icons.keyboard_arrow_down_rounded,
-                          color: AnalyticsTheme.primaryGold,
+                          color: AnalyticsTheme.primaryGold(context),
                           size: 20,
                         ),
                       ],
@@ -512,17 +512,17 @@ class AnalyticsHeader extends ConsumerWidget {
                       horizontal: 12,
                       vertical: 10,
                     ),
-                    decoration: AnalyticsTheme.glassCard().copyWith(
+                    decoration: AnalyticsTheme.glassCard(context).copyWith(
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: AnalyticsTheme.primaryGold.withOpacity(0.3),
+                        color: AnalyticsTheme.primaryGold(context).withOpacity(0.3),
                       ),
                     ),
                     child: Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.calendar_month_rounded,
-                          color: AnalyticsTheme.primaryGold,
+                          color: AnalyticsTheme.primaryGold(context),
                           size: 18,
                         ),
                         const SizedBox(width: 8),
@@ -533,7 +533,7 @@ class AnalyticsHeader extends ConsumerWidget {
                               Text(
                                 'Duration',
                                 style: TextStyle(
-                                  color: AnalyticsTheme.secondaryText,
+                                  color: AnalyticsTheme.secondaryText(context),
                                   fontSize: 10,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -541,8 +541,8 @@ class AnalyticsHeader extends ConsumerWidget {
                               const SizedBox(height: 2),
                               Text(
                                 _getFilterLabel(),
-                                style: const TextStyle(
-                                  color: AnalyticsTheme.primaryText,
+                                style: TextStyle(
+                                  color: AnalyticsTheme.primaryText(context),
                                   fontSize: 13,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -552,9 +552,9 @@ class AnalyticsHeader extends ConsumerWidget {
                             ],
                           ),
                         ),
-                        const Icon(
+                        Icon(
                           Icons.keyboard_arrow_down_rounded,
-                          color: AnalyticsTheme.primaryGold,
+                          color: AnalyticsTheme.primaryGold(context),
                           size: 20,
                         ),
                       ],

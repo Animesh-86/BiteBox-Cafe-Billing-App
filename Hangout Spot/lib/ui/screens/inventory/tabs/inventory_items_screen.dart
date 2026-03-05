@@ -301,18 +301,13 @@ class _InventoryItemsScreenState extends ConsumerState<InventoryItemsScreen> {
                   onDismissed: (_) {
                     final repo = ref.read(inventoryRepositoryProvider);
                     repo.deleteItem(item.id);
-                    if (dailyInv != null) {
-                      final updatedItems = Map<String, String>.from(
-                        dailyInv.items,
-                      )..remove(item.id);
-                      repo.upsertDaily(
-                        DailyInventory(
-                          id: dailyInv.id,
-                          date: dailyInv.date,
-                          items: updatedItems,
-                        ),
-                      );
-                    }
+                    // Use field-level delete so we don't overwrite other
+                    // fields that another device may have edited
+                    repo.updateDailyItemField(
+                      date: _selectedDate,
+                      itemId: item.id,
+                      value: null,
+                    );
 
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -326,15 +321,10 @@ class _InventoryItemsScreenState extends ConsumerState<InventoryItemsScreen> {
                               if (dailyInv != null) {
                                 final oldVal = dailyInv.items[item.id];
                                 if (oldVal != null) {
-                                  final restoredItems =
-                                      Map<String, String>.from(dailyInv.items);
-                                  restoredItems[item.id] = oldVal;
-                                  repo.upsertDaily(
-                                    DailyInventory(
-                                      id: dailyInv.id,
-                                      date: dailyInv.date,
-                                      items: restoredItems,
-                                    ),
+                                  repo.updateDailyItemField(
+                                    date: _selectedDate,
+                                    itemId: item.id,
+                                    value: oldVal,
                                   );
                                 }
                               }
@@ -452,6 +442,18 @@ class _InventoryItemsScreenState extends ConsumerState<InventoryItemsScreen> {
                                 ),
                               ),
                               const Spacer(),
+                              IconButton(
+                                icon: const Icon(Icons.add_rounded),
+                                onPressed: () {
+                                  _showAddItemDialog(context, categoryTitle, (
+                                    newItem,
+                                  ) {
+                                    ref
+                                        .read(inventoryRepositoryProvider)
+                                        .upsertItem(newItem);
+                                  });
+                                },
+                              ),
                               IconButton(
                                 icon: const Icon(Icons.close_rounded),
                                 onPressed: () => Navigator.pop(context),
@@ -732,6 +734,78 @@ class _CategoryPopupListItem extends StatelessWidget {
   }
 }
 
+Future<void> _showAddItemDialog(
+  BuildContext context,
+  String categoryTitle,
+  void Function(InventoryItem) onSave,
+) async {
+  final nameCtrl = TextEditingController();
+  final qtyCtrl = TextEditingController(text: '0');
+  final minCtrl = TextEditingController(text: '0');
+
+  await showDialog(
+    context: context,
+    builder: (ctx) {
+      return AlertDialog(
+        title: Text('Add Item to $categoryTitle'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: 'Item Name'),
+              textCapitalization: TextCapitalization.words,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: qtyCtrl,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: const InputDecoration(labelText: 'Current Stock'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: minCtrl,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: const InputDecoration(labelText: 'Minimum Stock'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final newName = nameCtrl.text.trim();
+              final newQty = double.tryParse(qtyCtrl.text.trim()) ?? 0.0;
+              final newMin = double.tryParse(minCtrl.text.trim()) ?? 0.0;
+              if (newName.isNotEmpty) {
+                onSave(
+                  InventoryItem(
+                    id: const Uuid().v4(),
+                    name: newName,
+                    category: categoryTitle,
+                    currentQty: newQty,
+                    minQty: newMin,
+                    unit: 'pcs',
+                  ),
+                );
+              }
+              Navigator.pop(ctx);
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      );
+    },
+  );
+}
+
 Future<void> _showEditItemDialog(
   BuildContext context,
   InventoryItem item,
@@ -887,25 +961,14 @@ class _DailyTrackerRowState extends ConsumerState<_DailyTrackerRow> {
     final text = _valueController.text.trim();
     final repo = ref.read(inventoryRepositoryProvider);
 
-    final Map<String, String> newItemsMap = Map.from(
-      widget.currentDaily?.items ?? {},
-    );
-
-    if (text.isEmpty) {
-      newItemsMap.remove(widget.item.id);
-    } else {
-      newItemsMap[widget.item.id] = text;
-    }
-
-    final id =
-        '${widget.selectedDate.year}-${widget.selectedDate.month.toString().padLeft(2, '0')}-${widget.selectedDate.day.toString().padLeft(2, '0')}';
-
-    final newDaily = DailyInventory(
-      id: id,
+    // Use field-level update so concurrent edits from different devices
+    // don't overwrite each other's fields (only the specific item field is
+    // touched, not the entire items map).
+    repo.updateDailyItemField(
       date: widget.selectedDate,
-      items: newItemsMap,
+      itemId: widget.item.id,
+      value: text.isEmpty ? null : text,
     );
-    repo.upsertDaily(newDaily);
   }
 
   @override

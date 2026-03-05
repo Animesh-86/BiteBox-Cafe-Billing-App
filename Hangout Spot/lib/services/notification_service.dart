@@ -1,6 +1,8 @@
+import 'package:hangout_spot/utils/log_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -28,7 +30,7 @@ class NotificationService {
       final tzInfo = await FlutterTimezone.getLocalTimezone();
       final timeZoneName = tzInfo.identifier;
       tz.setLocalLocation(tz.getLocation(timeZoneName));
-      debugPrint('🕐 Timezone set to: $timeZoneName');
+      logDebug('🕐 Timezone set to: $timeZoneName');
     } catch (e) {
       // Fallback: estimate timezone from Dart's DateTime offset
       final offset = DateTime.now().timeZoneOffset;
@@ -44,9 +46,9 @@ class NotificationService {
       }
       try {
         tz.setLocalLocation(tz.getLocation(fallbackTz));
-        debugPrint('🕐 Timezone fallback to: $fallbackTz');
+        logDebug('🕐 Timezone fallback to: $fallbackTz');
       } catch (_) {
-        debugPrint('⚠️ Could not set timezone, using UTC');
+        logDebug('⚠️ Could not set timezone, using UTC');
       }
     }
 
@@ -55,20 +57,87 @@ class NotificationService {
     await _plugin.initialize(initSettings);
   }
 
-  Future<void> requestPermissions() async {
-    if (_permissionsRequested) return;
+  /// Request all permissions needed for reliable scheduled notifications.
+  /// Returns true if the critical notification permission was granted.
+  Future<bool> requestPermissions() async {
+    bool notificationsGranted = true;
 
+    // 1. Notification permission (Android 13+)
+    try {
+      final notifStatus = await Permission.notification.request();
+      notificationsGranted = notifStatus.isGranted;
+      logDebug('🔔 Notification permission: $notifStatus');
+    } catch (e) {
+      logDebug('⚠️ Notification permission request failed: $e');
+    }
+
+    // 2. Exact alarm permission (Android 12+)
     final androidPlugin = _plugin
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
         >();
-    await androidPlugin?.requestNotificationsPermission();
-    await androidPlugin?.requestExactAlarmsPermission();
+    try {
+      await androidPlugin?.requestExactAlarmsPermission();
+      logDebug('⏰ Exact alarm permission requested');
+    } catch (e) {
+      logDebug('⚠️ Exact alarm permission request failed: $e');
+    }
+
+    // 3. Battery optimization exemption — best-effort (can crash on some devices)
+    try {
+      final batteryStatus = await Permission.ignoreBatteryOptimizations
+          .request();
+      logDebug('🔋 Battery optimization exemption: $batteryStatus');
+    } catch (e) {
+      logDebug('⚠️ Battery optimization request failed: $e');
+    }
 
     _permissionsRequested = true;
+    return notificationsGranted;
   }
 
   Future<void> cancel(int id) => _plugin.cancel(id);
+
+  /// Cancel all pending notifications and reschedule from a list of reminders.
+  /// Call this on app startup to ensure time-based reminders survive app restarts.
+  Future<void> rescheduleReminders(
+    List<({String id, String title, String type, String time, bool isEnabled})>
+    reminders,
+  ) async {
+    try {
+      await requestPermissions();
+    } catch (e) {
+      logDebug('⚠️ requestPermissions failed during reschedule: $e');
+    }
+    for (final r in reminders) {
+      final notifId = r.id.hashCode & 0x7fffffff;
+      if (!r.isEnabled || (r.type != 'time' && r.type != 'daily_update')) {
+        try {
+          await _plugin.cancel(notifId);
+        } catch (_) {}
+        continue;
+      }
+      try {
+        final parts = r.time.split(':');
+        final hour = int.tryParse(parts.isNotEmpty ? parts[0] : '') ?? 9;
+        final minute = int.tryParse(parts.length > 1 ? parts[1] : '') ?? 0;
+        final time = TimeOfDay(hour: hour, minute: minute);
+        await scheduleDaily(
+          id: notifId,
+          title: r.title,
+          body: r.type == 'daily_update'
+              ? "Please update today's inventory values."
+              : 'Inventory reminder',
+          time: time,
+        );
+      } catch (e) {
+        logDebug('⚠️ Failed to reschedule reminder ${r.id}: $e');
+      }
+    }
+    logDebug(
+      '✅ Rescheduled ${reminders.where((r) => r.isEnabled && (r.type == 'time' || r.type == 'daily_update')).length} reminder notifications',
+    );
+  }
 
   Future<void> showNow({
     required int id,
@@ -111,7 +180,7 @@ class NotificationService {
       scheduled = scheduled.add(const Duration(days: 1));
     }
 
-    debugPrint(
+    logDebug(
       '📅 Scheduling notification "$title" at $scheduled '
       '(tz: ${tz.local.name}, now: $now)',
     );
@@ -138,9 +207,9 @@ class NotificationService {
             UILocalNotificationDateInterpretation.absoluteTime,
         matchDateTimeComponents: DateTimeComponents.time,
       );
-      debugPrint('✅ Notification scheduled (exact) with id=$id');
+      logDebug('✅ Notification scheduled (exact) with id=$id');
     } catch (e) {
-      debugPrint('⚠️ Exact alarm failed ($e), trying inexact...');
+      logDebug('⚠️ Exact alarm failed ($e), trying inexact...');
       try {
         await _plugin.zonedSchedule(
           id,
@@ -154,9 +223,9 @@ class NotificationService {
               UILocalNotificationDateInterpretation.absoluteTime,
           matchDateTimeComponents: DateTimeComponents.time,
         );
-        debugPrint('✅ Notification scheduled (inexact) with id=$id');
+        logDebug('✅ Notification scheduled (inexact) with id=$id');
       } catch (e2) {
-        debugPrint('❌ Failed to schedule notification: $e2');
+        logDebug('❌ Failed to schedule notification: $e2');
       }
     }
   }
@@ -172,9 +241,7 @@ class NotificationService {
       tz.local,
     ).add(Duration(seconds: seconds));
 
-    debugPrint(
-      '🧪 Scheduling test notification at $scheduled (in ${seconds}s)',
-    );
+    logDebug('🧪 Scheduling test notification at $scheduled (in ${seconds}s)');
 
     const androidDetails = AndroidNotificationDetails(
       _channelId,
@@ -196,9 +263,9 @@ class NotificationService {
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
       );
-      debugPrint('✅ Test notification scheduled with id=$id');
+      logDebug('✅ Test notification scheduled with id=$id');
     } catch (e) {
-      debugPrint('⚠️ Exact test alarm failed ($e), trying inexact...');
+      logDebug('⚠️ Exact test alarm failed ($e), trying inexact...');
       await _plugin.zonedSchedule(
         id,
         title,
@@ -210,7 +277,7 @@ class NotificationService {
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
       );
-      debugPrint('✅ Test notification scheduled (inexact) with id=$id');
+      logDebug('✅ Test notification scheduled (inexact) with id=$id');
     }
   }
 }

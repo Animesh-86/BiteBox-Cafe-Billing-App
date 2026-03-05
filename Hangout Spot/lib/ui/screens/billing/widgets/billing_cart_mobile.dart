@@ -214,20 +214,34 @@ class _MobileCartModalState extends ConsumerState<MobileCartModal> {
                     ),
                   ),
                 )
-              : GridView.builder(
-                  controller: widget.scrollController,
-                  padding: const EdgeInsets.all(12),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
-                    childAspectRatio: 1.8,
-                  ),
-                  itemCount: cart.items.length,
-                  itemBuilder: (context, index) {
-                    return CartItemTile(
-                      item: cart.items[index],
-                      notifier: notifier,
+              : Builder(
+                  builder: (context) {
+                    final screenWidth = MediaQuery.of(context).size.width;
+                    // Adaptive: 1 column on very small screens, 2 on normal
+                    final crossAxisCount = screenWidth < 360 ? 1 : 2;
+                    // Taller cards on small screens so names aren't clipped
+                    final childAspectRatio = screenWidth < 360
+                        ? 2.5
+                        : screenWidth < 420
+                        ? 1.6
+                        : 1.8;
+
+                    return GridView.builder(
+                      controller: widget.scrollController,
+                      padding: const EdgeInsets.all(12),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: crossAxisCount,
+                        crossAxisSpacing: 8,
+                        mainAxisSpacing: 8,
+                        childAspectRatio: childAspectRatio,
+                      ),
+                      itemCount: cart.items.length,
+                      itemBuilder: (context, index) {
+                        return CartItemTile(
+                          item: cart.items[index],
+                          notifier: notifier,
+                        );
+                      },
                     );
                   },
                 ),

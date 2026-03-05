@@ -1,6 +1,6 @@
+import 'package:hangout_spot/utils/log_utils.dart';
 import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
@@ -11,19 +11,37 @@ import 'package:image/image.dart' as img;
 class ThermalPrintingService {
   final BlueThermalPrinter _bluetooth = BlueThermalPrinter.instance;
 
+  // Cached to avoid re-parsing on every print
+  CapabilityProfile? _cachedProfile;
+  img.Image? _cachedLogo;
+  bool _logoLoadAttempted = false;
+
   ThermalPrintingService();
 
-  Future<void> _writeBytesInChunks(
-    Uint8List data, {
-    int chunkSize = 512,
-  }) async {
-    for (int index = 0; index < data.length; index += chunkSize) {
-      final end = (index + chunkSize < data.length)
-          ? index + chunkSize
-          : data.length;
-      await _bluetooth.writeBytes(data.sublist(index, end));
-      await Future.delayed(const Duration(milliseconds: 20));
+  /// Word-wrap text so lines break at word boundaries, not mid-word.
+  /// [maxCols] is the number of characters per line for the current font/size.
+  List<String> _wordWrap(String text, int maxCols) {
+    if (text.length <= maxCols) return [text];
+    final words = text.split(' ');
+    final lines = <String>[];
+    var currentLine = '';
+    for (final word in words) {
+      if (currentLine.isEmpty) {
+        currentLine = word;
+      } else if ((currentLine.length + 1 + word.length) <= maxCols) {
+        currentLine += ' $word';
+      } else {
+        lines.add(currentLine);
+        currentLine = word;
+      }
     }
+    if (currentLine.isNotEmpty) lines.add(currentLine);
+    return lines;
+  }
+
+  /// Write complete payload in one shot — much faster than small chunks.
+  Future<void> _writeBytes(Uint8List data) async {
+    await _bluetooth.writeBytes(data);
   }
 
   Future<bool> get isConnected =>
@@ -50,6 +68,23 @@ class ThermalPrintingService {
     await _bluetooth.disconnect();
   }
 
+  /// Ensure Bluetooth is connected; auto-reconnect to saved printer if not.
+  /// Returns true if connected after the check.
+  Future<bool> _ensureConnected() async {
+    if (await isConnected) return true;
+    final prefs = await SharedPreferences.getInstance();
+    final savedMac = prefs.getString('selected_printer_mac');
+    if (savedMac == null) return false;
+    final devices = await getBondedDevices();
+    try {
+      final device = devices.firstWhere((d) => d.address == savedMac);
+      await _bluetooth.connect(device);
+      return await isConnected;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> printBill(
     Order order,
     List<OrderItem> items,
@@ -60,75 +95,41 @@ class ThermalPrintingService {
     double? customerRewardBalance,
   }) async {
     try {
-      debugPrint(
+      logDebug(
         "[printBill] Starting bill print for order ${order.invoiceNumber}",
       );
 
-      if (!await isConnected) {
-        debugPrint("[printBill] Not connected, attempting auto-connect...");
-        // Try to auto-connect if saved
-        final prefs = await SharedPreferences.getInstance();
-        final savedMac = prefs.getString('selected_printer_mac');
-        debugPrint("[printBill] Saved printer MAC: $savedMac");
-
-        if (savedMac != null) {
-          final devices = await getBondedDevices();
-          debugPrint("[printBill] Found ${devices.length} bonded devices");
-
-          if (devices.isEmpty) {
-            debugPrint("[printBill] No bonded devices found!");
-            throw Exception('No Bluetooth devices found');
-          }
-
-          final device = devices.firstWhere(
-            (d) => d.address == savedMac,
-            orElse: () => devices.first,
-          );
-          debugPrint("[printBill] Connecting to device: ${device.address}");
-
-          // ignore: unnecessary_null_comparison
-          if (device != null) {
-            try {
-              await _bluetooth.connect(device);
-              debugPrint("[printBill] Connected successfully");
-            } catch (e) {
-              debugPrint("[printBill] Connection failed: $e");
-              rethrow;
-            }
-          }
-        }
+      if (!await _ensureConnected()) {
+        logDebug("[printBill] Not connected, skipping print");
+        return;
       }
 
-      if (!await isConnected) {
-        throw Exception(
-          'Bluetooth printer not connected. Please connect printer in Settings.',
-        );
-      }
-
-      debugPrint("[printBill] Loading capability profile...");
-      final profile = await CapabilityProfile.load();
-      final generator = Generator(PaperSize.mm58, profile);
+      logDebug("[printBill] Loading capability profile...");
+      _cachedProfile ??= await CapabilityProfile.load();
+      final generator = Generator(PaperSize.mm58, _cachedProfile!);
       List<int> bytes = [];
 
       // Header
       bytes += generator.reset();
 
-      // Logo
-      try {
-        debugPrint("[printBill] Loading logo...");
-        final ByteData data = await rootBundle.load('assets/logo.png');
-        final Uint8List imgBytes = data.buffer.asUint8List();
-        final img.Image? image = img.decodeImage(imgBytes);
-        if (image != null) {
-          // Resize if needed, thermal printers usually 384 dots width
-          final resized = img.copyResize(image, width: 150);
-          bytes += generator.image(resized);
-          bytes += generator.feed(1);
-          debugPrint("[printBill] Logo added");
+      // Logo (cached after first load)
+      if (!_logoLoadAttempted) {
+        _logoLoadAttempted = true;
+        try {
+          logDebug("[printBill] Loading logo...");
+          final ByteData data = await rootBundle.load('assets/logo.png');
+          final Uint8List imgBytes = data.buffer.asUint8List();
+          final decoded = img.decodeImage(imgBytes);
+          if (decoded != null) {
+            _cachedLogo = img.copyResize(decoded, width: 150);
+          }
+        } catch (e) {
+          logDebug("[printBill] Logo load failed (skipping): $e");
         }
-      } catch (e) {
-        // Logo failed, skip
-        debugPrint("[printBill] Logo load failed (skipping): $e");
+      }
+      if (_cachedLogo != null) {
+        bytes += generator.image(_cachedLogo!);
+        bytes += generator.feed(1);
       }
 
       bytes += generator.text(
@@ -141,10 +142,18 @@ class ThermalPrintingService {
         ),
       );
       if (storeAddress != null) {
-        bytes += generator.text(
-          storeAddress,
-          styles: const PosStyles(align: PosAlign.center),
-        );
+        // Strip any Phone: lines from address
+        final cleanAddress = storeAddress
+            .split('\n')
+            .where((line) => !line.trim().toLowerCase().startsWith('phone:'))
+            .join('\n')
+            .trim();
+        if (cleanAddress.isNotEmpty) {
+          bytes += generator.text(
+            cleanAddress,
+            styles: const PosStyles(align: PosAlign.center),
+          );
+        }
       }
       bytes += generator.feed(1);
 
@@ -184,26 +193,25 @@ class ThermalPrintingService {
       ]);
       bytes += generator.hr();
 
-      // Items - print with wrapping support
+      // Items - print with word-wrap (no mid-word breaks)
       for (var item in items) {
         final itemTotal = (item.price * item.quantity) - item.discountAmount;
 
-        // Print item name with wrapping (allows long names to wrap properly)
-        bytes += generator.text(
-          item.itemName,
-          styles: const PosStyles(bold: true),
-        );
+        // Word-wrap item name at word boundaries (32 chars/line for normal font on 58mm)
+        for (final line in _wordWrap(item.itemName, 32)) {
+          bytes += generator.text(line, styles: const PosStyles(bold: true));
+        }
 
         // Print qty, rate, total in a row
         bytes += generator.row([
           PosColumn(text: 'Qty: ${item.quantity}', width: 4),
           PosColumn(
-            text: '₹${item.price.toStringAsFixed(0)}',
+            text: 'Rs.${item.price.toStringAsFixed(0)}',
             width: 4,
             styles: const PosStyles(align: PosAlign.right),
           ),
           PosColumn(
-            text: '₹${itemTotal.toStringAsFixed(0)}',
+            text: 'Rs.${itemTotal.toStringAsFixed(0)}',
             width: 4,
             styles: const PosStyles(align: PosAlign.right),
           ),
@@ -216,7 +224,7 @@ class ThermalPrintingService {
               ? (item.discountAmount / item.price * 100)
               : 0.0;
           bytes += generator.text(
-            '  Discount (${discountPercent.toStringAsFixed(0)}%): -₹${item.discountAmount.toStringAsFixed(0)}',
+            '  Discount (${discountPercent.toStringAsFixed(0)}%): -Rs.${item.discountAmount.toStringAsFixed(0)}',
             styles: const PosStyles(align: PosAlign.left),
           );
         }
@@ -294,11 +302,12 @@ class ThermalPrintingService {
         ]);
       }
 
+      // Grand Total — use size1 height + size2 width to fit on one line
       bytes += generator.text(
-        'Grand Total: Rs.${order.totalAmount.toStringAsFixed(0)}',
+        'Total: Rs.${order.totalAmount.toStringAsFixed(0)}',
         styles: const PosStyles(
-          height: PosTextSize.size2,
-          width: PosTextSize.size2,
+          height: PosTextSize.size1,
+          width: PosTextSize.size1,
           bold: true,
           align: PosAlign.center,
         ),
@@ -333,14 +342,14 @@ class ThermalPrintingService {
         ),
       );
 
-      bytes += generator.feed(2);
+      bytes += generator.feed(1);
       bytes += generator.cut();
 
-      debugPrint("[printBill] Sending ${bytes.length} bytes to printer...");
-      await _writeBytesInChunks(Uint8List.fromList(bytes));
-      debugPrint("[printBill] Print completed successfully!");
+      logDebug("[printBill] Sending ${bytes.length} bytes to printer...");
+      await _writeBytes(Uint8List.fromList(bytes));
+      logDebug("[printBill] Print completed successfully!");
     } catch (e) {
-      debugPrint("[printBill] ERROR: $e");
+      logDebug("[printBill] ERROR: $e");
       rethrow;
     }
   }
@@ -351,24 +360,10 @@ class ThermalPrintingService {
     String? storeName,
     String? storeAddress,
   }) async {
-    if (!await isConnected) {
-      // Try to auto-connect if saved
-      final prefs = await SharedPreferences.getInstance();
-      final savedMac = prefs.getString('selected_printer_mac');
-      if (savedMac != null) {
-        final devices = await getBondedDevices();
-        try {
-          final device = devices.firstWhere((d) => d.address == savedMac);
-          await _bluetooth.connect(device);
-        } catch (e) {
-          // ignore
-        }
-      }
-    }
-    if (!await isConnected) return;
+    if (!await _ensureConnected()) return;
 
-    final profile = await CapabilityProfile.load();
-    final generator = Generator(PaperSize.mm58, profile);
+    _cachedProfile ??= await CapabilityProfile.load();
+    final generator = Generator(PaperSize.mm58, _cachedProfile!);
     List<int> bytes = [];
 
     // RESET PRINTER START
@@ -385,7 +380,7 @@ class ThermalPrintingService {
       ),
     );
     bytes += generator.text(
-      'Order #${order.invoiceNumber}',
+      'Order ${order.invoiceNumber}',
       styles: const PosStyles(align: PosAlign.center, bold: true),
     );
     final date = DateFormat('dd/MM/yy hh:mm a').format(order.createdAt);
@@ -398,15 +393,17 @@ class ThermalPrintingService {
 
     // Items
     for (var item in items) {
-      // Print full item name (allows wrapping for long names)
-      bytes += generator.text(
-        item.itemName,
-        styles: const PosStyles(
-          height: PosTextSize.size2,
-          width: PosTextSize.size2,
-          bold: true,
-        ),
-      );
+      // Word-wrap item name at word boundaries (16 chars/line for size2 on 58mm)
+      for (final line in _wordWrap(item.itemName, 16)) {
+        bytes += generator.text(
+          line,
+          styles: const PosStyles(
+            height: PosTextSize.size2,
+            width: PosTextSize.size2,
+            bold: true,
+          ),
+        );
+      }
 
       // Print quantity
       bytes += generator.text(
@@ -423,10 +420,10 @@ class ThermalPrintingService {
       bytes += generator.hr();
     }
 
-    bytes += generator.feed(3); // Feed more lines before cut
+    bytes += generator.feed(2); // Feed before cut for KOT
     bytes += generator.cut();
 
-    await _writeBytesInChunks(Uint8List.fromList(bytes));
+    await _writeBytes(Uint8List.fromList(bytes));
   }
 }
 

@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:hangout_spot/utils/log_utils.dart';
 import 'package:drift/drift.dart';
 import 'connection.dart';
 import 'menu_seeder.dart';
@@ -170,17 +170,17 @@ class AppDatabase extends _$AppDatabase {
           try {
             await m.addColumn(orders, orders.paidCash);
           } catch (e) {
-            debugPrint('Migration: paidCash column might already exist: $e');
+            logDebug('Migration: paidCash column might already exist: $e');
           }
           try {
             await m.addColumn(orders, orders.paidUPI);
           } catch (e) {
-            debugPrint('Migration: paidUPI column might already exist: $e');
+            logDebug('Migration: paidUPI column might already exist: $e');
           }
           try {
             await m.addColumn(orders, orders.paymentMode);
           } catch (e) {
-            debugPrint('Migration: paymentMode column might already exist: $e');
+            logDebug('Migration: paymentMode column might already exist: $e');
           }
         }
         if (from < 3) {
@@ -194,21 +194,21 @@ class AppDatabase extends _$AppDatabase {
           try {
             await m.createTable(rewardTransactions);
           } catch (e) {
-            debugPrint(
+            logDebug(
               'Migration: RewardTransactions table might already exist: $e',
             );
           }
           try {
             await m.createTable(settings);
           } catch (e) {
-            debugPrint('Migration: Settings table might already exist: $e');
+            logDebug('Migration: Settings table might already exist: $e');
           }
         }
         if (from < 6) {
           try {
             await m.addColumn(items, items.imageUrl);
           } catch (e) {
-            debugPrint('Migration: imageUrl column might already exist: $e');
+            logDebug('Migration: imageUrl column might already exist: $e');
           }
         }
         if (from < 7) {
@@ -226,33 +226,33 @@ class AppDatabase extends _$AppDatabase {
               'CREATE INDEX IF NOT EXISTS idx_order_items_item ON order_items(item_id)',
             );
           } catch (e) {
-            debugPrint('Migration: indexes might already exist: $e');
+            logDebug('Migration: indexes might already exist: $e');
           }
         }
         if (from < 8) {
           try {
             await m.createTable(locations);
           } catch (e) {
-            debugPrint('Migration: locations table might already exist: $e');
+            logDebug('Migration: locations table might already exist: $e');
           }
           try {
             await m.addColumn(orders, orders.locationId);
           } catch (e) {
-            debugPrint('Migration: locationId column might already exist: $e');
+            logDebug('Migration: locationId column might already exist: $e');
           }
           try {
             await m.database.customStatement(
               'CREATE INDEX IF NOT EXISTS idx_orders_location ON orders(location_id)',
             );
           } catch (e) {
-            debugPrint('Migration: location index might already exist: $e');
+            logDebug('Migration: location index might already exist: $e');
           }
         }
         if (from < 9) {
           try {
             await m.addColumn(orders, orders.isSynced);
           } catch (e) {
-            debugPrint('Migration: isSynced column might already exist: $e');
+            logDebug('Migration: isSynced column might already exist: $e');
           }
         }
         if (from < 10) {
@@ -262,7 +262,7 @@ class AppDatabase extends _$AppDatabase {
               'ALTER TABLE locations ADD COLUMN phone_number TEXT',
             );
           } catch (e) {
-            debugPrint(
+            logDebug(
               'Migration: phone_number column might already exist: $e',
             );
           }
@@ -271,21 +271,21 @@ class AppDatabase extends _$AppDatabase {
               'ALTER TABLE locations ADD COLUMN is_active INTEGER DEFAULT 0',
             );
           } catch (e) {
-            debugPrint('Migration: is_active column might already exist: $e');
+            logDebug('Migration: is_active column might already exist: $e');
           }
           try {
             await m.database.customStatement(
               "ALTER TABLE locations ADD COLUMN created_at INTEGER DEFAULT (strftime('%s', 'now'))",
             );
           } catch (e) {
-            debugPrint('Migration: created_at column might already exist: $e');
+            logDebug('Migration: created_at column might already exist: $e');
           }
           try {
             await m.database.customStatement(
               'ALTER TABLE locations ADD COLUMN address TEXT',
             );
           } catch (e) {
-            debugPrint('Migration: address column might already exist: $e');
+            logDebug('Migration: address column might already exist: $e');
           }
         }
       },
@@ -306,7 +306,7 @@ class AppDatabase extends _$AppDatabase {
             ),
             mode: InsertMode.insertOrReplace,
           );
-          debugPrint('✅ Default outlet seeded: Hangout Spot – Kanha Dreamland');
+          logDebug('✅ Default outlet seeded: Hangout Spot – Kanha Dreamland');
         }
 
         // Seed default menu items

@@ -1,3 +1,4 @@
+import 'package:hangout_spot/utils/log_utils.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'app_exceptions.dart';
@@ -199,11 +200,11 @@ class ErrorHandler {
   static void _logError(dynamic error, String? context) {
     if (kDebugMode) {
       final contextStr = context != null ? '[$context] ' : '';
-      debugPrint('🔴 ${contextStr}Error: $error');
+      logDebug('🔴 ${contextStr}Error: $error');
 
       // Print stack trace if available
       if (error is Error && error.stackTrace != null) {
-        debugPrint('Stack trace:\n${error.stackTrace}');
+        logDebug('Stack trace:\n${error.stackTrace}');
       }
     }
   }

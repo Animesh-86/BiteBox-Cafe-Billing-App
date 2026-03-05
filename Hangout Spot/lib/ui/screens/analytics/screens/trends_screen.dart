@@ -5,6 +5,7 @@ import 'package:hangout_spot/ui/screens/analytics/theme/analytics_theme.dart';
 import 'package:hangout_spot/ui/screens/analytics/providers/analytics_data_provider.dart';
 import 'package:hangout_spot/ui/screens/analytics/utils/date_filter_utils.dart';
 import 'package:hangout_spot/ui/screens/analytics/services/analytics_export_service.dart';
+import 'package:hangout_spot/data/providers/database_provider.dart';
 import 'package:intl/intl.dart';
 import '../widgets/analytics_header.dart';
 
@@ -33,56 +34,56 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
     final selectedFilter = await showDialog<DateFilter>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AnalyticsTheme.cardBackground,
-        title: const Text(
+        backgroundColor: AnalyticsTheme.cardBackground(context),
+        title: Text(
           'Export Date Range',
-          style: TextStyle(color: AnalyticsTheme.primaryText),
+          style: TextStyle(color: AnalyticsTheme.primaryText(context)),
         ),
         content: SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.calendar_month,
-                  color: AnalyticsTheme.primaryGold,
+                  color: AnalyticsTheme.primaryGold(context),
                 ),
-                title: const Text(
+                title: Text(
                   'This Year',
-                  style: TextStyle(color: AnalyticsTheme.primaryText),
+                  style: TextStyle(color: AnalyticsTheme.primaryText(context)),
                 ),
                 onTap: () => Navigator.pop(context, DateFilter.thisYear()),
               ),
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.calendar_today,
-                  color: AnalyticsTheme.primaryGold,
+                  color: AnalyticsTheme.primaryGold(context),
                 ),
-                title: const Text(
+                title: Text(
                   'This Month',
-                  style: TextStyle(color: AnalyticsTheme.primaryText),
+                  style: TextStyle(color: AnalyticsTheme.primaryText(context)),
                 ),
                 onTap: () => Navigator.pop(context, DateFilter.thisMonth()),
               ),
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.date_range,
-                  color: AnalyticsTheme.primaryGold,
+                  color: AnalyticsTheme.primaryGold(context),
                 ),
-                title: const Text(
+                title: Text(
                   'This Week',
-                  style: TextStyle(color: AnalyticsTheme.primaryText),
+                  style: TextStyle(color: AnalyticsTheme.primaryText(context)),
                 ),
                 onTap: () => Navigator.pop(context, DateFilter.thisWeek()),
               ),
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.event,
-                  color: AnalyticsTheme.primaryGold,
+                  color: AnalyticsTheme.primaryGold(context),
                 ),
-                title: const Text(
+                title: Text(
                   'Custom Range',
-                  style: TextStyle(color: AnalyticsTheme.primaryText),
+                  style: TextStyle(color: AnalyticsTheme.primaryText(context)),
                 ),
                 onTap: () async {
                   Navigator.pop(context);
@@ -96,10 +97,10 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
                     ),
                     builder: (context, child) {
                       return Theme(
-                        data: ThemeData.dark().copyWith(
-                          colorScheme: const ColorScheme.dark(
-                            primary: AnalyticsTheme.primaryGold,
-                            surface: AnalyticsTheme.cardBackground,
+                        data: Theme.of(context).copyWith(
+                          colorScheme: Theme.of(context).colorScheme.copyWith(
+                            primary: AnalyticsTheme.primaryGold(context),
+                            surface: AnalyticsTheme.cardBackground(context),
                           ),
                         ),
                         child: child!,
@@ -112,18 +113,18 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
                 },
               ),
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.highlight,
-                  color: AnalyticsTheme.primaryGold,
+                  color: AnalyticsTheme.primaryGold(context),
                 ),
-                title: const Text(
+                title: Text(
                   'Current Selection',
-                  style: TextStyle(color: AnalyticsTheme.primaryText),
+                  style: TextStyle(color: AnalyticsTheme.primaryText(context)),
                 ),
                 subtitle: Text(
                   '${DateFormat('dd MMM yyyy').format(_startDate)} - ${DateFormat('dd MMM yyyy').format(_endDate)}',
                   style: TextStyle(
-                    color: AnalyticsTheme.secondaryText,
+                    color: AnalyticsTheme.secondaryText(context),
                     fontSize: 12,
                   ),
                 ),
@@ -135,9 +136,9 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text(
+            child: Text(
               'Cancel',
-              style: TextStyle(color: AnalyticsTheme.primaryGold),
+              style: TextStyle(color: AnalyticsTheme.primaryGold(context)),
             ),
           ),
         ],
@@ -164,12 +165,13 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
         exportData,
         startDate: filter.startDate,
         endDate: filter.endDate,
+        db: ref.read(appDatabaseProvider),
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Analytics exported successfully!'),
-            backgroundColor: AnalyticsTheme.primaryGold,
+          SnackBar(
+            content: const Text('Analytics exported successfully!'),
+            backgroundColor: AnalyticsTheme.primaryGold(context),
           ),
         );
       }
@@ -209,9 +211,9 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
         Expanded(
           child: analyticsData.when(
             data: (data) => _buildContent(data),
-            loading: () => const Center(
+            loading: () => Center(
               child: CircularProgressIndicator(
-                color: AnalyticsTheme.primaryGold,
+                color: AnalyticsTheme.primaryGold(context),
               ),
             ),
             error: (error, stack) => Center(
@@ -306,7 +308,7 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
   }) {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: AnalyticsTheme.glassCard(),
+      decoration: AnalyticsTheme.glassCard(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -315,8 +317,8 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
               Container(
                 width: 48,
                 height: 48,
-                decoration: AnalyticsTheme.iconContainer(),
-                child: Icon(icon, color: AnalyticsTheme.primaryGold, size: 24),
+                decoration: AnalyticsTheme.iconContainer(context),
+                child: Icon(icon, color: AnalyticsTheme.primaryGold(context), size: 24),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -325,8 +327,8 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
-                        color: AnalyticsTheme.primaryGold,
+                      style: TextStyle(
+                        color: AnalyticsTheme.primaryGold(context),
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
                       ),
@@ -335,7 +337,7 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
                     Text(
                       subtitle,
                       style: TextStyle(
-                        color: AnalyticsTheme.secondaryText,
+                        color: AnalyticsTheme.secondaryText(context),
                         fontSize: 13,
                       ),
                     ),
@@ -369,7 +371,7 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
             drawVerticalLine: false,
             horizontalInterval: 500,
             getDrawingHorizontalLine: (value) {
-              return FlLine(color: Colors.white10, strokeWidth: 1);
+              return FlLine(color: AnalyticsTheme.dividerColor(context), strokeWidth: 1);
             },
           ),
           titlesData: FlTitlesData(
@@ -385,13 +387,13 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
                       child: Text(
                         DateFormat('dd/MM').format(date),
                         style: TextStyle(
-                          color: AnalyticsTheme.secondaryText,
+                          color: AnalyticsTheme.secondaryText(context),
                           fontSize: 10,
                         ),
                       ),
                     );
                   }
-                  return const Text('');
+                  return Text('');
                 },
               ),
             ),
@@ -403,7 +405,7 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
                   return Text(
                     '₹${value.toInt()}',
                     style: TextStyle(
-                      color: AnalyticsTheme.secondaryText,
+                      color: AnalyticsTheme.secondaryText(context),
                       fontSize: 10,
                     ),
                   );
@@ -426,7 +428,7 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
                     FlSpot(index.toDouble(), data.dailySales[index].amount),
               ),
               isCurved: true,
-              color: AnalyticsTheme.primaryGold,
+              color: AnalyticsTheme.primaryGold(context),
               barWidth: 3,
               isStrokeCapRound: true,
               dotData: const FlDotData(show: false),
@@ -434,8 +436,8 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
                 show: true,
                 gradient: LinearGradient(
                   colors: [
-                    AnalyticsTheme.primaryGold.withOpacity(0.3),
-                    AnalyticsTheme.primaryGold.withOpacity(0.0),
+                    AnalyticsTheme.primaryGold(context).withOpacity(0.3),
+                    AnalyticsTheme.primaryGold(context).withOpacity(0.0),
                   ],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
@@ -481,13 +483,13 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
                       value: item.quantity.toDouble(),
                       title: '${percentage.toStringAsFixed(0)}%',
                       color:
-                          AnalyticsTheme.chartColors[index %
-                              AnalyticsTheme.chartColors.length],
+                          AnalyticsTheme.chartColors(context)[index %
+                              AnalyticsTheme.chartColors(context).length],
                       radius: 40,
-                      titleStyle: const TextStyle(
+                      titleStyle: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: AnalyticsTheme.onAccentText(context),
                       ),
                     );
                   },
@@ -515,8 +517,8 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
                           height: 12,
                           decoration: BoxDecoration(
                             color:
-                                AnalyticsTheme.chartColors[index %
-                                    AnalyticsTheme.chartColors.length],
+                                AnalyticsTheme.chartColors(context)[index %
+                                    AnalyticsTheme.chartColors(context).length],
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -527,8 +529,8 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
                             children: [
                               Text(
                                 item.itemName,
-                                style: const TextStyle(
-                                  color: AnalyticsTheme.primaryText,
+                                style: TextStyle(
+                                  color: AnalyticsTheme.primaryText(context),
                                   fontSize: 12,
                                 ),
                                 maxLines: 1,
@@ -537,7 +539,7 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
                               Text(
                                 '${percentage.toStringAsFixed(0)}%',
                                 style: TextStyle(
-                                  color: AnalyticsTheme.secondaryText,
+                                  color: AnalyticsTheme.secondaryText(context),
                                   fontSize: 10,
                                 ),
                               ),
@@ -578,7 +580,7 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
             drawVerticalLine: false,
             horizontalInterval: 1,
             getDrawingHorizontalLine: (value) {
-              return FlLine(color: Colors.white10, strokeWidth: 1);
+              return FlLine(color: AnalyticsTheme.dividerColor(context), strokeWidth: 1);
             },
           ),
           titlesData: FlTitlesData(
@@ -604,14 +606,14 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
                         child: Text(
                           displayHour,
                           style: TextStyle(
-                            color: AnalyticsTheme.secondaryText,
+                            color: AnalyticsTheme.secondaryText(context),
                             fontSize: 9,
                           ),
                         ),
                       ),
                     );
                   }
-                  return const Text('');
+                  return Text('');
                 },
               ),
             ),
@@ -623,7 +625,7 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
                   return Text(
                     value.toInt().toString(),
                     style: TextStyle(
-                      color: AnalyticsTheme.secondaryText,
+                      color: AnalyticsTheme.secondaryText(context),
                       fontSize: 10,
                     ),
                   );
@@ -652,8 +654,8 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
                 BarChartRodData(
                   toY: hourData.count.toDouble(),
                   color: isPeakTime
-                      ? AnalyticsTheme.primaryGold
-                      : AnalyticsTheme.secondaryBeige,
+                      ? AnalyticsTheme.primaryGold(context)
+                      : AnalyticsTheme.secondaryBeige(context),
                   width: 12,
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(4),
@@ -693,9 +695,9 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: AnalyticsTheme.primaryGold.withOpacity(intensity * 0.8),
+                color: AnalyticsTheme.primaryGold(context).withOpacity(intensity * 0.8),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AnalyticsTheme.borderColor, width: 1),
+                border: Border.all(color: AnalyticsTheme.borderColor(context), width: 1),
               ),
             ),
             const SizedBox(height: 4),
@@ -708,7 +710,7 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
                   ? '12 PM'
                   : '${hour - 12} PM',
               style: TextStyle(
-                color: AnalyticsTheme.secondaryText,
+                color: AnalyticsTheme.secondaryText(context),
                 fontSize: 9,
               ),
             ),
@@ -730,7 +732,7 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
             drawVerticalLine: false,
             horizontalInterval: 5,
             getDrawingHorizontalLine: (value) {
-              return FlLine(color: Colors.white10, strokeWidth: 1);
+              return FlLine(color: AnalyticsTheme.dividerColor(context), strokeWidth: 1);
             },
           ),
           titlesData: FlTitlesData(
@@ -744,13 +746,13 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
                       child: Text(
                         topItems[value.toInt()].itemName.split(' ').first,
                         style: TextStyle(
-                          color: AnalyticsTheme.secondaryText,
+                          color: AnalyticsTheme.secondaryText(context),
                           fontSize: 10,
                         ),
                       ),
                     );
                   }
-                  return const Text('');
+                  return Text('');
                 },
               ),
             ),
@@ -762,7 +764,7 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
                   return Text(
                     value.toInt().toString(),
                     style: TextStyle(
-                      color: AnalyticsTheme.secondaryText,
+                      color: AnalyticsTheme.secondaryText(context),
                       fontSize: 10,
                     ),
                   );
@@ -811,10 +813,10 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
               Container(
                 width: 40,
                 height: 40,
-                decoration: AnalyticsTheme.iconContainer(),
-                child: const Icon(
+                decoration: AnalyticsTheme.iconContainer(context),
+                child: Icon(
                   Icons.restaurant_menu_rounded,
-                  color: AnalyticsTheme.primaryGold,
+                  color: AnalyticsTheme.primaryGold(context),
                   size: 20,
                 ),
               ),
@@ -822,8 +824,8 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
               Expanded(
                 child: Text(
                   item.itemName,
-                  style: const TextStyle(
-                    color: AnalyticsTheme.primaryText,
+                  style: TextStyle(
+                    color: AnalyticsTheme.primaryText(context),
                     fontSize: 14,
                   ),
                 ),
@@ -834,13 +836,13 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: AnalyticsTheme.primaryGold.withOpacity(0.2),
+                  color: AnalyticsTheme.primaryGold(context).withOpacity(0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   '${item.quantity} units',
-                  style: const TextStyle(
-                    color: AnalyticsTheme.primaryGold,
+                  style: TextStyle(
+                    color: AnalyticsTheme.primaryGold(context),
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
                   ),
@@ -873,7 +875,7 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
                 drawVerticalLine: false,
                 horizontalInterval: 1000,
                 getDrawingHorizontalLine: (value) {
-                  return FlLine(color: Colors.white10, strokeWidth: 1);
+                  return FlLine(color: AnalyticsTheme.dividerColor(context), strokeWidth: 1);
                 },
               ),
               titlesData: FlTitlesData(
@@ -896,13 +898,13 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
                           child: Text(
                             days[value.toInt()],
                             style: TextStyle(
-                              color: AnalyticsTheme.secondaryText,
+                              color: AnalyticsTheme.secondaryText(context),
                               fontSize: 10,
                             ),
                           ),
                         );
                       }
-                      return const Text('');
+                      return Text('');
                     },
                   ),
                 ),
@@ -914,7 +916,7 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
                       return Text(
                         '₹${(value / 1000).toStringAsFixed(0)}k',
                         style: TextStyle(
-                          color: AnalyticsTheme.secondaryText,
+                          color: AnalyticsTheme.secondaryText(context),
                           fontSize: 10,
                         ),
                       );
@@ -940,7 +942,7 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
                   barRods: [
                     BarChartRodData(
                       toY: dayData.amount,
-                      color: AnalyticsTheme.primaryGold,
+                      color: AnalyticsTheme.primaryGold(context),
                       width: 30,
                       borderRadius: const BorderRadius.only(
                         topLeft: Radius.circular(4),
@@ -973,8 +975,8 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
                     );
                     return BarTooltipItem(
                       '${days[group.x.toInt()]}\n₹${dayData.amount.toStringAsFixed(0)}\n${dayData.count} orders',
-                      const TextStyle(
-                        color: Colors.white,
+                      TextStyle(
+                        color: AnalyticsTheme.onAccentText(context),
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                       ),
@@ -1012,13 +1014,13 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: isTop
-                    ? AnalyticsTheme.primaryGold.withOpacity(0.2)
-                    : AnalyticsTheme.cardBackground,
+                    ? AnalyticsTheme.primaryGold(context).withOpacity(0.2)
+                    : AnalyticsTheme.cardBackground(context),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: isTop
-                      ? AnalyticsTheme.primaryGold
-                      : AnalyticsTheme.borderColor,
+                      ? AnalyticsTheme.primaryGold(context)
+                      : AnalyticsTheme.borderColor(context),
                   width: 1,
                 ),
               ),
@@ -1028,8 +1030,8 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
                     days[index],
                     style: TextStyle(
                       color: isTop
-                          ? AnalyticsTheme.primaryGold
-                          : AnalyticsTheme.secondaryText,
+                          ? AnalyticsTheme.primaryGold(context)
+                          : AnalyticsTheme.secondaryText(context),
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1037,8 +1039,8 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
                   const SizedBox(height: 8),
                   Text(
                     '₹${dayData.amount.toStringAsFixed(0)}',
-                    style: const TextStyle(
-                      color: AnalyticsTheme.primaryText,
+                    style: TextStyle(
+                      color: AnalyticsTheme.primaryText(context),
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
                     ),
@@ -1047,7 +1049,7 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
                   Text(
                     '${dayData.count} orders',
                     style: TextStyle(
-                      color: AnalyticsTheme.secondaryText,
+                      color: AnalyticsTheme.secondaryText(context),
                       fontSize: 10,
                     ),
                   ),
@@ -1068,35 +1070,35 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
     return Container(
       height: 250,
       padding: const EdgeInsets.all(32),
-      decoration: AnalyticsTheme.glassCard(),
+      decoration: AnalyticsTheme.glassCard(context),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: AnalyticsTheme.primaryGold.withOpacity(0.1),
+              color: AnalyticsTheme.primaryGold(context).withOpacity(0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
               icon,
               size: 48,
-              color: AnalyticsTheme.primaryGold.withOpacity(0.5),
+              color: AnalyticsTheme.primaryGold(context).withOpacity(0.5),
             ),
           ),
           const SizedBox(height: 16),
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: AnalyticsTheme.primaryText,
+              color: AnalyticsTheme.primaryText(context),
             ),
           ),
           const SizedBox(height: 8),
           Text(
             subtitle,
-            style: TextStyle(fontSize: 14, color: AnalyticsTheme.secondaryText),
+            style: TextStyle(fontSize: 14, color: AnalyticsTheme.secondaryText(context)),
             textAlign: TextAlign.center,
           ),
         ],

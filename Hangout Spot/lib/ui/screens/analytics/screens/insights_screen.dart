@@ -5,6 +5,7 @@ import 'package:hangout_spot/ui/screens/analytics/theme/analytics_theme.dart';
 import 'package:hangout_spot/ui/screens/analytics/providers/analytics_data_provider.dart';
 import 'package:hangout_spot/ui/screens/analytics/utils/date_filter_utils.dart';
 import 'package:hangout_spot/ui/screens/analytics/services/analytics_export_service.dart';
+import 'package:hangout_spot/data/providers/database_provider.dart';
 import 'package:intl/intl.dart';
 import '../widgets/analytics_header.dart';
 
@@ -33,56 +34,56 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
     final selectedFilter = await showDialog<DateFilter>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AnalyticsTheme.cardBackground,
-        title: const Text(
+        backgroundColor: AnalyticsTheme.cardBackground(context),
+        title: Text(
           'Export Date Range',
-          style: TextStyle(color: AnalyticsTheme.primaryText),
+          style: TextStyle(color: AnalyticsTheme.primaryText(context)),
         ),
         content: SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.calendar_month,
-                  color: AnalyticsTheme.primaryGold,
+                  color: AnalyticsTheme.primaryGold(context),
                 ),
-                title: const Text(
+                title: Text(
                   'This Year',
-                  style: TextStyle(color: AnalyticsTheme.primaryText),
+                  style: TextStyle(color: AnalyticsTheme.primaryText(context)),
                 ),
                 onTap: () => Navigator.pop(context, DateFilter.thisYear()),
               ),
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.calendar_today,
-                  color: AnalyticsTheme.primaryGold,
+                  color: AnalyticsTheme.primaryGold(context),
                 ),
-                title: const Text(
+                title: Text(
                   'This Month',
-                  style: TextStyle(color: AnalyticsTheme.primaryText),
+                  style: TextStyle(color: AnalyticsTheme.primaryText(context)),
                 ),
                 onTap: () => Navigator.pop(context, DateFilter.thisMonth()),
               ),
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.date_range,
-                  color: AnalyticsTheme.primaryGold,
+                  color: AnalyticsTheme.primaryGold(context),
                 ),
-                title: const Text(
+                title: Text(
                   'This Week',
-                  style: TextStyle(color: AnalyticsTheme.primaryText),
+                  style: TextStyle(color: AnalyticsTheme.primaryText(context)),
                 ),
                 onTap: () => Navigator.pop(context, DateFilter.thisWeek()),
               ),
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.event,
-                  color: AnalyticsTheme.primaryGold,
+                  color: AnalyticsTheme.primaryGold(context),
                 ),
-                title: const Text(
+                title: Text(
                   'Custom Range',
-                  style: TextStyle(color: AnalyticsTheme.primaryText),
+                  style: TextStyle(color: AnalyticsTheme.primaryText(context)),
                 ),
                 onTap: () async {
                   Navigator.pop(context);
@@ -96,10 +97,10 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                     ),
                     builder: (context, child) {
                       return Theme(
-                        data: ThemeData.dark().copyWith(
-                          colorScheme: const ColorScheme.dark(
-                            primary: AnalyticsTheme.primaryGold,
-                            surface: AnalyticsTheme.cardBackground,
+                        data: Theme.of(context).copyWith(
+                          colorScheme: Theme.of(context).colorScheme.copyWith(
+                            primary: AnalyticsTheme.primaryGold(context),
+                            surface: AnalyticsTheme.cardBackground(context),
                           ),
                         ),
                         child: child!,
@@ -112,18 +113,18 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                 },
               ),
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.highlight,
-                  color: AnalyticsTheme.primaryGold,
+                  color: AnalyticsTheme.primaryGold(context),
                 ),
-                title: const Text(
+                title: Text(
                   'Current Selection',
-                  style: TextStyle(color: AnalyticsTheme.primaryText),
+                  style: TextStyle(color: AnalyticsTheme.primaryText(context)),
                 ),
                 subtitle: Text(
                   '${DateFormat('dd MMM yyyy').format(_startDate)} - ${DateFormat('dd MMM yyyy').format(_endDate)}',
                   style: TextStyle(
-                    color: AnalyticsTheme.secondaryText,
+                    color: AnalyticsTheme.secondaryText(context),
                     fontSize: 12,
                   ),
                 ),
@@ -135,9 +136,9 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text(
+            child: Text(
               'Cancel',
-              style: TextStyle(color: AnalyticsTheme.primaryGold),
+              style: TextStyle(color: AnalyticsTheme.primaryGold(context)),
             ),
           ),
         ],
@@ -164,12 +165,13 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
         exportData,
         startDate: filter.startDate,
         endDate: filter.endDate,
+        db: ref.read(appDatabaseProvider),
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Analytics exported successfully!'),
-            backgroundColor: AnalyticsTheme.primaryGold,
+          SnackBar(
+            content: const Text('Analytics exported successfully!'),
+            backgroundColor: AnalyticsTheme.primaryGold(context),
           ),
         );
       }
@@ -209,9 +211,9 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
         Expanded(
           child: analyticsData.when(
             data: (data) => _buildContent(data),
-            loading: () => const Center(
+            loading: () => Center(
               child: CircularProgressIndicator(
-                color: AnalyticsTheme.primaryGold,
+                color: AnalyticsTheme.primaryGold(context),
               ),
             ),
             error: (error, stack) => Center(
@@ -299,10 +301,10 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                     title: '${percentage.toStringAsFixed(0)}%',
                     color: color,
                     radius: 50,
-                    titleStyle: const TextStyle(
+                    titleStyle: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: AnalyticsTheme.onAccentText(context),
                     ),
                   );
                 }).toList(),
@@ -337,8 +339,8 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                         children: [
                           Text(
                             method['method'],
-                            style: const TextStyle(
-                              color: AnalyticsTheme.primaryText,
+                            style: TextStyle(
+                              color: AnalyticsTheme.primaryText(context),
                               fontSize: 12,
                               fontWeight: FontWeight.w500,
                             ),
@@ -347,7 +349,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                           Text(
                             '₹${method['amount'].toStringAsFixed(0)} • ${method['count']} orders',
                             style: TextStyle(
-                              color: AnalyticsTheme.secondaryText,
+                              color: AnalyticsTheme.secondaryText(context),
                               fontSize: 10,
                             ),
                           ),
@@ -371,11 +373,11 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
       case 'card':
         return AnalyticsTheme.chartBlue;
       case 'upi':
-        return AnalyticsTheme.primaryGold;
+        return AnalyticsTheme.primaryGold(context);
       case 'credit':
         return AnalyticsTheme.chartAmber;
       default:
-        return AnalyticsTheme.secondaryBeige;
+        return AnalyticsTheme.secondaryBeige(context);
     }
   }
 
@@ -391,7 +393,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AnalyticsTheme.cardBackground,
+        color: AnalyticsTheme.cardBackground(context),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isPositive
@@ -432,8 +434,8 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                   children: [
                     Text(
                       'Overall Discount Impact',
-                      style: const TextStyle(
-                        color: AnalyticsTheme.primaryText,
+                      style: TextStyle(
+                        color: AnalyticsTheme.primaryText(context),
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
@@ -444,7 +446,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                     Text(
                       '${discount.ordersWithDiscount} orders with discounts',
                       style: TextStyle(
-                        color: AnalyticsTheme.secondaryText,
+                        color: AnalyticsTheme.secondaryText(context),
                         fontSize: 12,
                       ),
                       maxLines: 1,
@@ -470,7 +472,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                   Text(
                     isPositive ? 'Effective' : 'Review Needed',
                     style: TextStyle(
-                      color: AnalyticsTheme.secondaryText,
+                      color: AnalyticsTheme.secondaryText(context),
                       fontSize: 10,
                     ),
                   ),
@@ -488,15 +490,15 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                     Text(
                       'Discount Given',
                       style: TextStyle(
-                        color: AnalyticsTheme.secondaryText,
+                        color: AnalyticsTheme.secondaryText(context),
                         fontSize: 11,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       '₹${discount.totalDiscountAmount.toStringAsFixed(0)}',
-                      style: const TextStyle(
-                        color: AnalyticsTheme.primaryText,
+                      style: TextStyle(
+                        color: AnalyticsTheme.primaryText(context),
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
@@ -511,15 +513,15 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                     Text(
                       'Revenue with Discounts',
                       style: TextStyle(
-                        color: AnalyticsTheme.secondaryText,
+                        color: AnalyticsTheme.secondaryText(context),
                         fontSize: 11,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       '₹${discount.revenueWithDiscount.toStringAsFixed(0)}',
-                      style: const TextStyle(
-                        color: AnalyticsTheme.primaryGold,
+                      style: TextStyle(
+                        color: AnalyticsTheme.primaryGold(context),
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
@@ -539,15 +541,15 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                     Text(
                       'Orders without Discount',
                       style: TextStyle(
-                        color: AnalyticsTheme.secondaryText,
+                        color: AnalyticsTheme.secondaryText(context),
                         fontSize: 11,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       '${discount.ordersWithoutDiscount}',
-                      style: const TextStyle(
-                        color: AnalyticsTheme.primaryText,
+                      style: TextStyle(
+                        color: AnalyticsTheme.primaryText(context),
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
@@ -562,14 +564,14 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                     Text(
                       'Revenue without Discounts',
                       style: TextStyle(
-                        color: AnalyticsTheme.secondaryText,
+                        color: AnalyticsTheme.secondaryText(context),
                         fontSize: 11,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       '₹${discount.revenueWithoutDiscount.toStringAsFixed(0)}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AnalyticsTheme.chartGreen,
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -593,7 +595,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
   }) {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: AnalyticsTheme.glassCard(),
+      decoration: AnalyticsTheme.glassCard(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -602,8 +604,8 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
               Container(
                 width: 48,
                 height: 48,
-                decoration: AnalyticsTheme.iconContainer(),
-                child: Icon(icon, color: AnalyticsTheme.primaryGold, size: 24),
+                decoration: AnalyticsTheme.iconContainer(context),
+                child: Icon(icon, color: AnalyticsTheme.primaryGold(context), size: 24),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -615,8 +617,8 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                       alignment: Alignment.centerLeft,
                       child: Text(
                         title,
-                        style: const TextStyle(
-                          color: AnalyticsTheme.primaryGold,
+                        style: TextStyle(
+                          color: AnalyticsTheme.primaryGold(context),
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
                         ),
@@ -628,7 +630,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                     Text(
                       subtitle,
                       style: TextStyle(
-                        color: AnalyticsTheme.secondaryText,
+                        color: AnalyticsTheme.secondaryText(context),
                         fontSize: 13,
                       ),
                       maxLines: 1,
@@ -648,7 +650,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
 
   Widget _buildComboIntelligence(AnalyticsData data) {
     final colors = [
-      AnalyticsTheme.primaryGold,
+      AnalyticsTheme.primaryGold(context),
       Colors.grey,
       const Color(0xFFCD7F32), // bronze
       const Color(0xFF4A4A4A),
@@ -688,8 +690,8 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
               Expanded(
                 child: Text(
                   '${bundle.item1} + ${bundle.item2}',
-                  style: const TextStyle(
-                    color: AnalyticsTheme.primaryText,
+                  style: TextStyle(
+                    color: AnalyticsTheme.primaryText(context),
                     fontSize: 14,
                   ),
                   maxLines: 1,
@@ -702,13 +704,13 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: AnalyticsTheme.secondaryBeige.withOpacity(0.3),
+                  color: AnalyticsTheme.secondaryBeige(context).withOpacity(0.3),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   '${bundle.count}x',
-                  style: const TextStyle(
-                    color: AnalyticsTheme.secondaryBeige,
+                  style: TextStyle(
+                    color: AnalyticsTheme.secondaryBeige(context),
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
                   ),
@@ -730,32 +732,32 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
           child: Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: const Color(0xFF2A1810).withOpacity(0.5),
+              color: AnalyticsTheme.primaryGold(context).withOpacity(0.08),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AnalyticsTheme.borderColor, width: 1),
+              border: Border.all(color: AnalyticsTheme.borderColor(context), width: 1),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(
                   Icons.local_offer_rounded,
-                  color: AnalyticsTheme.primaryGold,
+                  color: AnalyticsTheme.primaryGold(context),
                   size: 32,
                 ),
                 const SizedBox(height: 16),
                 Text(
                   currencyFormat.format(data.discountsGiven),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
-                    color: AnalyticsTheme.primaryGold,
+                    color: AnalyticsTheme.primaryGold(context),
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Discounts Given',
-                  style: const TextStyle(
-                    color: AnalyticsTheme.primaryText,
+                  style: TextStyle(
+                    color: AnalyticsTheme.primaryText(context),
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
@@ -766,7 +768,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                 Text(
                   '${data.discountedOrdersCount} orders affected',
                   style: TextStyle(
-                    color: AnalyticsTheme.secondaryText,
+                    color: AnalyticsTheme.secondaryText(context),
                     fontSize: 12,
                   ),
                   maxLines: 1,
@@ -781,9 +783,9 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
           child: Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: const Color(0xFF2A1010).withOpacity(0.5),
+              color: AnalyticsTheme.chartRed.withOpacity(0.08),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AnalyticsTheme.borderColor, width: 1),
+              border: Border.all(color: AnalyticsTheme.borderColor(context), width: 1),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -796,7 +798,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                 const SizedBox(height: 16),
                 Text(
                   '${data.walkInGuests}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
                     color: AnalyticsTheme.chartRed,
@@ -805,8 +807,8 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                 const SizedBox(height: 8),
                 Text(
                   'Walk-in Guests',
-                  style: const TextStyle(
-                    color: AnalyticsTheme.primaryText,
+                  style: TextStyle(
+                    color: AnalyticsTheme.primaryText(context),
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
@@ -817,7 +819,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
                 Text(
                   'Loyalty opportunities missed',
                   style: TextStyle(
-                    color: AnalyticsTheme.secondaryText,
+                    color: AnalyticsTheme.secondaryText(context),
                     fontSize: 12,
                   ),
                   maxLines: 1,

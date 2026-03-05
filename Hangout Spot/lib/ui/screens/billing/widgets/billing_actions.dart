@@ -1,3 +1,4 @@
+import 'package:hangout_spot/utils/log_utils.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -70,6 +71,10 @@ Future<void> printKot(BuildContext context, WidgetRef ref) async {
         )
         .toList();
 
+    // Capture provider refs BEFORE popping (WidgetRef dies after pop)
+    final thermalPrinter = ref.read(thermalPrintingServiceProvider);
+    final activeOutletFuture = ref.read(activeOutletProvider.future);
+
     // Close the Cart modal if on a mobile view BEFORE printing blocks
     if (context.mounted) {
       ScaffoldMessenger.of(
@@ -82,34 +87,17 @@ Future<void> printKot(BuildContext context, WidgetRef ref) async {
       }
     }
 
-    // 1. Try Thermal Print in Background (Non-blocking)
+    // 1. Try Thermal Print in Background (Non-blocking, uses captured refs)
     try {
-      final activeOutlet = await ref.read(activeOutletProvider.future);
-      // Fire and forget printing so UI returns immediately
-      ref
-          .read(thermalPrintingServiceProvider)
-          .printKot(
-            order,
-            items,
-            storeName: activeOutlet?.name,
-            storeAddress: activeOutlet?.address,
-          );
+      final activeOutlet = await activeOutletFuture;
+      thermalPrinter.printKot(
+        order,
+        items,
+        storeName: activeOutlet?.name,
+        storeAddress: activeOutlet?.address,
+      );
     } catch (e) {
-      debugPrint("Thermal print failed: $e");
-      if (context.mounted) {
-        String errorMsg = e.toString();
-        if (errorMsg.contains('PlatformException') ||
-            errorMsg.contains('socket might closed')) {
-          errorMsg =
-              'Printer connection failed. Please check device pairing and power.';
-        }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Printing failed: $errorMsg"),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      logDebug("Thermal print failed: $e");
     }
   } catch (e) {
     if (context.mounted) {
@@ -133,17 +121,8 @@ Future<void> holdOrder(BuildContext context, WidgetRef ref) async {
 
   try {
     final sessionManager = ref.read(sessionManagerProvider);
-    await ref
-        .read(orderRepositoryProvider)
-        .createOrderFromCart(
-          cart,
-          status: 'pending',
-          sessionManager: sessionManager,
-        );
 
-    // Trigger Sync immediately for this pending order so other devices see it
-    // The createOrderFromCart already does an immediate push, so no extra code needed here!
-
+    // CLEAR CART AND CLOSE UI IMMEDIATELY
     ref.read(cartProvider.notifier).clearCart();
     if (context.mounted) {
       ScaffoldMessenger.of(
@@ -156,6 +135,15 @@ Future<void> holdOrder(BuildContext context, WidgetRef ref) async {
         Navigator.pop(context);
       }
     }
+
+    // DB write runs in background — cart ref still valid (immutable state)
+    await ref
+        .read(orderRepositoryProvider)
+        .createOrderFromCart(
+          cart,
+          status: 'pending',
+          sessionManager: sessionManager,
+        );
   } catch (e) {
     if (context.mounted) {
       ScaffoldMessenger.of(
@@ -196,61 +184,29 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
   }
 
   try {
-    // Immediate feedback so user sees the tap registered
-    if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Printing...")));
-    }
-
+    // ── Capture ALL provider references BEFORE clearing cart / popping ──
+    // After Navigator.pop the WidgetRef is disposed and ref.read() will throw.
     final customer = cart.selectedCustomer;
     final sessionManager = ref.read(sessionManagerProvider);
-    final orderId = await ref
-        .read(orderRepositoryProvider)
-        .createOrderFromCart(
-          cart,
-          status: 'completed',
-          sessionManager: sessionManager,
-        );
-
-    // Update customer stats and reward points if customer is selected
-    if (cart.selectedCustomer != null) {
-      await ref
-          .read(orderRepositoryProvider)
-          .updateCustomerStats(cart.selectedCustomer!.id, cart.grandTotal);
-
-      final rewardBaseAmount = cart.grandTotal + cart.manualDiscount;
-      await ref
-          .read(orderRepositoryProvider)
-          .processRewardForOrder(
-            orderId,
-            rewardBaseAmount,
-            cart.selectedCustomer?.id,
-          );
+    final grandTotal = cart.grandTotal;
+    final manualDiscount = cart.manualDiscount;
+    final customerId = customer?.id;
+    final orderRepo = ref.read(orderRepositoryProvider);
+    final db = ref.read(appDatabaseProvider);
+    final thermalPrinter = ref.read(thermalPrintingServiceProvider);
+    final shareService = ref.read(shareServiceProvider);
+    // Pre-fetch active outlet (usually cached, very fast)
+    final activeOutletFuture = ref.read(activeOutletProvider.future);
+    // Pre-fetch reward balance if customer selected
+    Future<double?>? rewardBalanceFuture;
+    if (customer != null) {
+      rewardBalanceFuture = ref
+          .read(customerRewardBalanceProvider(customer.id).future)
+          .then<double?>((v) => v)
+          .catchError((_) => null as double?);
     }
 
-    // FETCH FULL ORDER OBJECT FOR PRINTING
-    final db = ref.read(appDatabaseProvider);
-    final order = await (db.select(
-      db.orders,
-    )..where((t) => t.id.equals(orderId))).getSingle();
-
-    final items = cart.items
-        .map(
-          (ci) => OrderItem(
-            id: const Uuid().v4(), // IDs don't matter for printing
-            orderId: orderId,
-            itemId: ci.item.id,
-            itemName: ci.item.name,
-            price: ci.item.price,
-            quantity: ci.quantity,
-            discountAmount: ci.discountAmount,
-            note: ci.note,
-          ),
-        )
-        .toList();
-
-    // CLEAR CART AND CLOSE UI IMMEDIATELY
+    // CLEAR CART AND CLOSE UI IMMEDIATELY — zero wait
     ref.read(cartProvider.notifier).clearCart();
     if (context.mounted) {
       ScaffoldMessenger.of(
@@ -264,66 +220,78 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
       }
     }
 
-    // AUTO-PRINT THERMAL BILL IN BACKGROUND
-    try {
-      final activeOutlet = await ref.read(activeOutletProvider.future);
+    // ── Everything below runs in background — uses captured refs only ──
 
-      // Fetch customer reward balance if customer is selected
-      double? rewardBalance;
-      if (customer != null) {
-        try {
-          rewardBalance = await ref.read(
-            customerRewardBalanceProvider(customer.id).future,
-          );
-        } catch (e) {
-          debugPrint("Failed to fetch reward balance: $e");
-        }
-      }
+    final orderId = await orderRepo.createOrderFromCart(
+      cart,
+      status: 'completed',
+      sessionManager: sessionManager,
+    );
+
+    // Build items list for printing
+    final items = cart.items
+        .map(
+          (ci) => OrderItem(
+            id: const Uuid().v4(),
+            orderId: orderId,
+            itemId: ci.item.id,
+            itemName: ci.item.name,
+            price: ci.item.price,
+            quantity: ci.quantity,
+            discountAmount: ci.discountAmount,
+            note: ci.note,
+          ),
+        )
+        .toList();
+
+    // Update customer stats and reward points (fire-and-forget)
+    if (customerId != null) {
+      orderRepo
+          .updateCustomerStats(customerId, grandTotal)
+          .catchError((e) => logDebug("Customer stats update failed: $e"));
+
+      final rewardBaseAmount = grandTotal + manualDiscount;
+      orderRepo
+          .processRewardForOrder(orderId, rewardBaseAmount, customerId)
+          .catchError((e) => logDebug("Reward processing failed: $e"));
+    }
+
+    // PRINT in background using captured refs
+    try {
+      final order = await (db.select(
+        db.orders,
+      )..where((t) => t.id.equals(orderId))).getSingle();
+
+      final activeOutlet = await activeOutletFuture;
+      final rewardBalance = await rewardBalanceFuture;
 
       // Fire and forget print command
-      ref
-          .read(thermalPrintingServiceProvider)
+      thermalPrinter
           .printBill(
             order,
             items,
             customer,
             storeName: activeOutlet?.name,
-            storeAddress: activeOutlet != null
-                ? '${activeOutlet.address}\nPhone: ${activeOutlet.phoneNumber}'
-                : null,
+            storeAddress: activeOutlet?.address,
             customerRewardBalance: rewardBalance,
-          );
-    } catch (e) {
-      debugPrint("Thermal print failed: $e");
-      if (context.mounted) {
-        String errorMsg = e.toString();
-        if (errorMsg.contains('PlatformException') ||
-            errorMsg.contains('socket might closed') ||
-            errorMsg.contains("type 'Null' is not a subtype")) {
-          errorMsg =
-              'Printer connection failed. Please check device pairing and power.';
-        }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Printing failed: $errorMsg"),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
+          )
+          .catchError((e) {
+            logDebug("Thermal print failed: $e");
+          });
 
-    // Auto-Send to WhatsApp if enabled and customer has phone
-    final isWhatsAppEnabled = await _isBillWhatsAppEnabled();
-    if (isWhatsAppEnabled &&
-        customer != null &&
-        (customer.phone?.isNotEmpty ?? false)) {
-      try {
-        await ref
-            .read(shareServiceProvider)
-            .shareInvoiceWhatsApp(order, items, customer);
-      } catch (e) {
-        debugPrint("WhatsApp share failed: $e");
+      // Auto-Send to WhatsApp if enabled and customer has phone
+      final isWhatsAppEnabled = await _isBillWhatsAppEnabled();
+      if (isWhatsAppEnabled &&
+          customer != null &&
+          (customer.phone?.isNotEmpty ?? false)) {
+        try {
+          await shareService.shareInvoiceWhatsApp(order, items, customer);
+        } catch (e) {
+          logDebug("WhatsApp share failed: $e");
+        }
       }
+    } catch (e) {
+      logDebug("Thermal print setup failed: $e");
     }
 
     // if (context.mounted) {
@@ -452,7 +420,7 @@ void showCustomerSelect(BuildContext context, WidgetRef ref) {
     ),
   ).then((selected) {
     if (selected == "walk_in") {
-      debugPrint('🧍 Walk-in selected');
+      logDebug('🧍 Walk-in selected');
       ref.read(cartProvider.notifier).clearCustomerSelection();
     } else if (selected is Customer) {
       ref.read(cartProvider.notifier).setCustomer(selected);

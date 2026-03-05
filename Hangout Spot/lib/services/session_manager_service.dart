@@ -1,12 +1,16 @@
+import 'package:hangout_spot/utils/log_utils.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:hangout_spot/data/models/user_session.dart';
 import 'package:hangout_spot/data/models/user_metadata.dart' as app_models;
 import 'package:hangout_spot/services/device_info_service.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/data/repositories/order_repository.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+/// Key used to persist the current session ID across cold restarts.
+const _kSessionIdKey = 'session_manager_session_id';
 
 /// Service for managing user sessions across devices
 class SessionManagerService {
@@ -23,15 +27,41 @@ class SessionManagerService {
   /// Get current session ID
   String? get currentSessionId => _currentSessionId;
 
-  /// Start a new session on login
+  /// Start a new session on login, or resume the previous session after a cold
+  /// restart.  The session ID is persisted in SharedPreferences so a killed /
+  /// restarted app picks up the same session document in Firestore instead of
+  /// creating an orphan.
   Future<void> startSession({String? outletId}) async {
     final user = _auth.currentUser;
     if (user == null) {
-      debugPrint('❌ Cannot start session: No user logged in');
+      logDebug('❌ Cannot start session: No user logged in');
       return;
     }
 
+    // If heartbeat is already running we are already in a session — skip.
+    if (_heartbeatTimer != null && _currentSessionId != null) return;
+
     try {
+      // Try to resume a persisted session
+      final prefs = await SharedPreferences.getInstance();
+      final savedId = prefs.getString(_kSessionIdKey);
+      if (savedId != null) {
+        final doc = await _firestore
+            .collection('users')
+            .doc(user.uid)
+            .collection('sessions')
+            .doc(savedId)
+            .get();
+        if (doc.exists && doc.data()?['status'] == 'active') {
+          _currentSessionId = savedId;
+          _startHeartbeat();
+          _listenForRemoteLogout();
+          logDebug('♻️ Resumed session: $_currentSessionId');
+          return;
+        }
+      }
+
+      // No valid saved session — create a new one
       final deviceInfo = await DeviceInfoService.getDeviceInfo();
       _currentSessionId = DeviceInfoService.generateSessionId();
 
@@ -60,6 +90,9 @@ class SessionManagerService {
           .doc(_currentSessionId)
           .set(session.toJson());
 
+      // Persist session ID locally
+      await prefs.setString(_kSessionIdKey, _currentSessionId!);
+
       // Update metadata if first device
       if (trustLevel == 'trusted') {
         await _updateMetadataForFirstDevice(user.uid, _currentSessionId!);
@@ -71,11 +104,11 @@ class SessionManagerService {
       // Listen for remote logout commands
       _listenForRemoteLogout();
 
-      debugPrint(
+      logDebug(
         '✅ Session started: $_currentSessionId on ${deviceInfo['deviceName']} (Trust: $trustLevel)',
       );
     } catch (e) {
-      debugPrint('❌ Error starting session: $e');
+      logDebug('❌ Error starting session: $e');
     }
   }
 
@@ -92,15 +125,15 @@ class SessionManagerService {
 
       // If no sessions exist, this is the first device - auto-trust
       if (sessionsSnapshot.docs.isEmpty) {
-        debugPrint('🟢 First device detected - auto-trusting');
+        logDebug('🟢 First device detected - auto-trusting');
         return 'trusted';
       }
 
       // Otherwise, new devices start as pending
-      debugPrint('🟡 Additional device detected - pending approval');
+      logDebug('🟡 Additional device detected - pending approval');
       return 'pending';
     } catch (e) {
-      debugPrint('⚠️ Error determining trust level: $e');
+      logDebug('⚠️ Error determining trust level: $e');
       return 'pending'; // Default to pending on error
     }
   }
@@ -125,9 +158,9 @@ class SessionManagerService {
           .doc('account')
           .set(metadata.toJson());
 
-      debugPrint('📝 Metadata created for first device');
+      logDebug('📝 Metadata created for first device');
     } catch (e) {
-      debugPrint('⚠️ Error updating metadata: $e');
+      logDebug('⚠️ Error updating metadata: $e');
     }
   }
 
@@ -153,7 +186,7 @@ class SessionManagerService {
           .doc(_currentSessionId)
           .update({'lastActivity': FieldValue.serverTimestamp()});
     } catch (e) {
-      debugPrint('⚠️ Error updating heartbeat: $e');
+      logDebug('⚠️ Error updating heartbeat: $e');
     }
   }
 
@@ -165,7 +198,7 @@ class SessionManagerService {
       final orderRepo = OrderRepository(_db);
       await orderRepo.syncUnsyncedOrders();
     } catch (e) {
-      debugPrint('⚠️ Error in retry sync: $e');
+      logDebug('⚠️ Error in retry sync: $e');
     }
   }
 
@@ -184,7 +217,7 @@ class SessionManagerService {
           if (snapshot.exists) {
             final status = snapshot.data()?['status'];
             if (status == 'logged_out') {
-              debugPrint('🚪 Remote logout detected - logging out this device');
+              logDebug('🚪 Remote logout detected - logging out this device');
               _handleRemoteLogout();
             }
           }
@@ -215,12 +248,17 @@ class SessionManagerService {
           });
 
       _heartbeatTimer?.cancel();
+      _heartbeatTimer = null;
       _sessionListener?.cancel();
       _currentSessionId = null;
 
-      debugPrint('🚪 Session ended');
+      // Clear persisted session ID
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_kSessionIdKey);
+
+      logDebug('🚪 Session ended');
     } catch (e) {
-      debugPrint('⚠️ Error ending session: $e');
+      logDebug('⚠️ Error ending session: $e');
     }
   }
 
@@ -240,9 +278,9 @@ class SessionManagerService {
             'lastActivity': FieldValue.serverTimestamp(),
           });
 
-      debugPrint('🚪 Remote logout sent for session: $sessionId');
+      logDebug('🚪 Remote logout sent for session: $sessionId');
     } catch (e) {
-      debugPrint('❌ Error sending remote logout: $e');
+      logDebug('❌ Error sending remote logout: $e');
     }
   }
 
@@ -304,7 +342,7 @@ class SessionManagerService {
           .get();
 
       if (currentSession.data()?['trustLevel'] != 'trusted') {
-        debugPrint('❌ Only trusted devices can approve others');
+        logDebug('❌ Only trusted devices can approve others');
         return;
       }
 
@@ -320,9 +358,9 @@ class SessionManagerService {
             'approvedBy': _currentSessionId,
           });
 
-      debugPrint('✅ Device approved: $sessionId');
+      logDebug('✅ Device approved: $sessionId');
     } catch (e) {
-      debugPrint('❌ Error approving device: $e');
+      logDebug('❌ Error approving device: $e');
     }
   }
 
@@ -341,14 +379,14 @@ class SessionManagerService {
           .get();
 
       if (currentSession.data()?['trustLevel'] != 'trusted') {
-        debugPrint('❌ Only trusted devices can promote others');
+        logDebug('❌ Only trusted devices can promote others');
         return false;
       }
 
       // Check trusted device limit
       final metadata = await _getUserMetadata(user.uid);
       if (metadata.trustedSessionIds.length >= metadata.maxTrustedDevices) {
-        debugPrint(
+        logDebug(
           '❌ Maximum trusted devices reached (${metadata.maxTrustedDevices})',
         );
         return false;
@@ -372,21 +410,24 @@ class SessionManagerService {
             'trustedSessionIds': FieldValue.arrayUnion([sessionId]),
           });
 
-      debugPrint('✅ Device promoted to trusted: $sessionId');
+      logDebug('✅ Device promoted to trusted: $sessionId');
       return true;
     } catch (e) {
-      debugPrint('❌ Error promoting device: $e');
+      logDebug('❌ Error promoting device: $e');
       return false;
     }
   }
 
-  /// Claim trust with password verification
-  Future<bool> claimTrust(String password) async {
+  /// Claim trust with password verification.
+  /// Returns null on success, or a user-facing error message on failure.
+  Future<String?> claimTrust(String password) async {
     final user = _auth.currentUser;
-    if (user == null || _currentSessionId == null) return false;
+    if (user == null) return 'No signed-in account found. Please log in again.';
+    if (_currentSessionId == null)
+      return 'Session not initialised. Restart the app and try again.';
 
     final trimmedPassword = password.trim();
-    if (trimmedPassword.isEmpty) return false;
+    if (trimmedPassword.isEmpty) return 'Password cannot be empty.';
 
     try {
       // Check claim attempts
@@ -405,8 +446,8 @@ class SessionManagerService {
         final lastAttemptTime = DateTime.parse(lastAttempt);
         final hourAgo = DateTime.now().subtract(const Duration(hours: 1));
         if (lastAttemptTime.isAfter(hourAgo)) {
-          debugPrint('❌ Too many claim attempts. Try again later.');
-          return false;
+          logDebug('❌ Too many claim attempts. Try again later.');
+          return 'Too many attempts. Please wait an hour and try again.';
         }
       }
 
@@ -416,13 +457,32 @@ class SessionManagerService {
         password: trimmedPassword,
       );
 
-      await user.reauthenticateWithCredential(credential);
+      try {
+        await user.reauthenticateWithCredential(credential);
+      } on FirebaseAuthException catch (authErr) {
+        // Increment failed attempts for wrong-password
+        _incrementClaimAttempts(user.uid);
+        switch (authErr.code) {
+          case 'wrong-password':
+          case 'invalid-credential':
+          case 'user-mismatch':
+          case 'user-not-found':
+            return 'Incorrect password. Please try again.';
+          case 'network-request-failed':
+            return 'Network error. Check your internet and try again.';
+          case 'too-many-requests':
+            return 'Too many attempts. Please wait a moment and try again.';
+          default:
+            return authErr.message ??
+                'Password verification failed. Please try again.';
+        }
+      }
 
       // Check trusted device limit
       final metadata = await _getUserMetadata(user.uid);
       if (metadata.trustedSessionIds.length >= metadata.maxTrustedDevices) {
-        debugPrint('❌ Maximum trusted devices reached');
-        return false;
+        logDebug('❌ Maximum trusted devices reached');
+        return 'Maximum trusted devices reached (${metadata.maxTrustedDevices}). Remove a trusted device first.';
       }
 
       // Promote to trusted
@@ -447,23 +507,28 @@ class SessionManagerService {
             'trustedSessionIds': FieldValue.arrayUnion([_currentSessionId]),
           });
 
-      debugPrint('✅ Trust claimed successfully');
-      return true;
+      logDebug('✅ Trust claimed successfully');
+      return null; // success
     } catch (e) {
-      // Increment failed attempts
-      await _firestore
-          .collection('users')
-          .doc(user.uid)
-          .collection('sessions')
-          .doc(_currentSessionId)
-          .update({
-            'trustClaimAttempts': FieldValue.increment(1),
-            'lastClaimAttempt': DateTime.now().toIso8601String(),
-          });
-
-      debugPrint('❌ Trust claim failed: $e');
-      return false;
+      _incrementClaimAttempts(user.uid);
+      logDebug('❌ Trust claim failed: $e');
+      return 'Something went wrong. Please try again.';
     }
+  }
+
+  /// Helper to increment failed claim attempts without blocking the caller.
+  void _incrementClaimAttempts(String userId) {
+    if (_currentSessionId == null) return;
+    _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('sessions')
+        .doc(_currentSessionId)
+        .update({
+          'trustClaimAttempts': FieldValue.increment(1),
+          'lastClaimAttempt': DateTime.now().toIso8601String(),
+        })
+        .catchError((e) => logDebug('⚠️ Failed to update claim attempts: $e'));
   }
 
   /// Get user metadata
@@ -483,7 +548,7 @@ class SessionManagerService {
       // Return default metadata if doesn't exist
       return app_models.UserMetadata(userId: userId);
     } catch (e) {
-      debugPrint('⚠️ Error getting metadata: $e');
+      logDebug('⚠️ Error getting metadata: $e');
       return app_models.UserMetadata(userId: userId);
     }
   }
@@ -507,12 +572,16 @@ class SessionManagerService {
     }
   }
 
-  /// Cleanup old sessions (older than 7 days)
+  /// Cleanup old sessions (older than 7 days) that are NOT still trusted
   Future<void> cleanupOldSessions() async {
     final user = _auth.currentUser;
     if (user == null) return;
 
     try {
+      // Fetch trusted session IDs so we don't accidentally delete them
+      final metadata = await _getUserMetadata(user.uid);
+      final trustedIds = metadata.trustedSessionIds.toSet();
+
       final cutoffDate = DateTime.now().subtract(const Duration(days: 7));
 
       final snapshot = await _firestore
@@ -522,13 +591,19 @@ class SessionManagerService {
           .where('lastActivity', isLessThan: cutoffDate)
           .get();
 
+      int deleted = 0;
       for (var doc in snapshot.docs) {
+        // Skip sessions that are still in the trusted list
+        if (trustedIds.contains(doc.id)) continue;
         await doc.reference.delete();
+        deleted++;
       }
 
-      debugPrint('🧹 Cleaned up ${snapshot.docs.length} old sessions');
+      logDebug(
+        '🧹 Cleaned up $deleted old sessions (${snapshot.docs.length - deleted} trusted kept)',
+      );
     } catch (e) {
-      debugPrint('⚠️ Error cleaning up sessions: $e');
+      logDebug('⚠️ Error cleaning up sessions: $e');
     }
   }
 
@@ -554,12 +629,17 @@ class SessionManagerService {
       await batch.commit();
 
       _heartbeatTimer?.cancel();
+      _heartbeatTimer = null;
       _sessionListener?.cancel();
       _currentSessionId = null;
 
-      debugPrint('💥 All device sessions have been globally terminated.');
+      // Clear persisted session ID
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_kSessionIdKey);
+
+      logDebug('💥 All device sessions have been globally terminated.');
     } catch (e) {
-      debugPrint('⚠️ Error ending all sessions globally: $e');
+      logDebug('⚠️ Error ending all sessions globally: $e');
     }
   }
 

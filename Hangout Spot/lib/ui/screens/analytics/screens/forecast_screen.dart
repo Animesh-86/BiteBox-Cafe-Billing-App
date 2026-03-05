@@ -45,9 +45,9 @@ class _ForecastScreenState extends ConsumerState<ForecastScreen> {
         Expanded(
           child: analyticsData.when(
             data: (data) => _buildContent(data),
-            loading: () => const Center(
+            loading: () => Center(
               child: CircularProgressIndicator(
-                color: AnalyticsTheme.primaryGold,
+                color: AnalyticsTheme.primaryGold(context),
               ),
             ),
             error: (error, stack) => Center(
@@ -96,7 +96,7 @@ class _ForecastScreenState extends ConsumerState<ForecastScreen> {
   }) {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: AnalyticsTheme.glassCard(),
+      decoration: AnalyticsTheme.glassCard(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -105,8 +105,8 @@ class _ForecastScreenState extends ConsumerState<ForecastScreen> {
               Container(
                 width: 48,
                 height: 48,
-                decoration: AnalyticsTheme.iconContainer(),
-                child: Icon(icon, color: AnalyticsTheme.primaryGold, size: 24),
+                decoration: AnalyticsTheme.iconContainer(context),
+                child: Icon(icon, color: AnalyticsTheme.primaryGold(context), size: 24),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -118,8 +118,8 @@ class _ForecastScreenState extends ConsumerState<ForecastScreen> {
                       alignment: Alignment.centerLeft,
                       child: Text(
                         title,
-                        style: const TextStyle(
-                          color: AnalyticsTheme.primaryGold,
+                        style: TextStyle(
+                          color: AnalyticsTheme.primaryGold(context),
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
                         ),
@@ -131,7 +131,7 @@ class _ForecastScreenState extends ConsumerState<ForecastScreen> {
                     Text(
                       subtitle,
                       style: TextStyle(
-                        color: AnalyticsTheme.secondaryText,
+                        color: AnalyticsTheme.secondaryText(context),
                         fontSize: 13,
                       ),
                       maxLines: 1,
@@ -174,10 +174,10 @@ class _ForecastScreenState extends ConsumerState<ForecastScreen> {
         return Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AnalyticsTheme.cardBackground,
+            color: AnalyticsTheme.cardBackground(context),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: AnalyticsTheme.primaryGold.withOpacity(0.2),
+              color: AnalyticsTheme.primaryGold(context).withOpacity(0.2),
               width: 1,
             ),
           ),
@@ -191,12 +191,12 @@ class _ForecastScreenState extends ConsumerState<ForecastScreen> {
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      color: AnalyticsTheme.primaryGold.withOpacity(0.2),
+                      color: AnalyticsTheme.primaryGold(context).withOpacity(0.2),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.restaurant_rounded,
-                      color: AnalyticsTheme.primaryGold,
+                      color: AnalyticsTheme.primaryGold(context),
                       size: 20,
                     ),
                   ),
@@ -207,13 +207,13 @@ class _ForecastScreenState extends ConsumerState<ForecastScreen> {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: AnalyticsTheme.primaryGold.withOpacity(0.2),
+                      color: AnalyticsTheme.primaryGold(context).withOpacity(0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       forecast.expectedQuantity.toStringAsFixed(0),
-                      style: const TextStyle(
-                        color: AnalyticsTheme.primaryGold,
+                      style: TextStyle(
+                        color: AnalyticsTheme.primaryGold(context),
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
                       ),
@@ -227,8 +227,8 @@ class _ForecastScreenState extends ConsumerState<ForecastScreen> {
                   alignment: Alignment.centerLeft,
                   child: Text(
                     forecast.itemName,
-                    style: const TextStyle(
-                      color: AnalyticsTheme.primaryText,
+                    style: TextStyle(
+                      color: AnalyticsTheme.primaryText(context),
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
@@ -240,7 +240,7 @@ class _ForecastScreenState extends ConsumerState<ForecastScreen> {
               Text(
                 'Expected qty/day',
                 style: TextStyle(
-                  color: AnalyticsTheme.secondaryText,
+                  color: AnalyticsTheme.secondaryText(context),
                   fontSize: 11,
                 ),
               ),
@@ -258,35 +258,35 @@ class _ForecastScreenState extends ConsumerState<ForecastScreen> {
   }) {
     return Container(
       padding: const EdgeInsets.all(32),
-      decoration: AnalyticsTheme.glassCard(),
+      decoration: AnalyticsTheme.glassCard(context),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: AnalyticsTheme.primaryGold.withOpacity(0.1),
+              color: AnalyticsTheme.primaryGold(context).withOpacity(0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
               icon,
               size: 48,
-              color: AnalyticsTheme.primaryGold.withOpacity(0.5),
+              color: AnalyticsTheme.primaryGold(context).withOpacity(0.5),
             ),
           ),
           const SizedBox(height: 16),
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: AnalyticsTheme.primaryText,
+              color: AnalyticsTheme.primaryText(context),
             ),
           ),
           const SizedBox(height: 8),
           Text(
             subtitle,
-            style: TextStyle(fontSize: 14, color: AnalyticsTheme.secondaryText),
+            style: TextStyle(fontSize: 14, color: AnalyticsTheme.secondaryText(context)),
             textAlign: TextAlign.center,
           ),
         ],
@@ -320,10 +320,10 @@ class _ForecastScreenState extends ConsumerState<ForecastScreen> {
         return Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AnalyticsTheme.cardBackground,
+            color: AnalyticsTheme.cardBackground(context),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: AnalyticsTheme.primaryGold.withOpacity(0.2),
+              color: AnalyticsTheme.primaryGold(context).withOpacity(0.2),
               width: 1,
             ),
           ),
@@ -334,12 +334,12 @@ class _ForecastScreenState extends ConsumerState<ForecastScreen> {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: AnalyticsTheme.primaryGold.withOpacity(0.15),
+                  color: AnalyticsTheme.primaryGold(context).withOpacity(0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.calendar_today_rounded,
-                  color: AnalyticsTheme.primaryGold,
+                  color: AnalyticsTheme.primaryGold(context),
                   size: 24,
                 ),
               ),
@@ -351,8 +351,8 @@ class _ForecastScreenState extends ConsumerState<ForecastScreen> {
                   children: [
                     Text(
                       peakHour.dayName,
-                      style: const TextStyle(
-                        color: AnalyticsTheme.primaryText,
+                      style: TextStyle(
+                        color: AnalyticsTheme.primaryText(context),
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
@@ -363,7 +363,7 @@ class _ForecastScreenState extends ConsumerState<ForecastScreen> {
                     Text(
                       '${peakHour.orderCount} orders',
                       style: TextStyle(
-                        color: AnalyticsTheme.secondaryText,
+                        color: AnalyticsTheme.secondaryText(context),
                         fontSize: 13,
                       ),
                       maxLines: 1,
@@ -379,22 +379,22 @@ class _ForecastScreenState extends ConsumerState<ForecastScreen> {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: AnalyticsTheme.primaryGold.withOpacity(0.2),
+                  color: AnalyticsTheme.primaryGold(context).withOpacity(0.2),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.schedule_rounded,
-                      color: AnalyticsTheme.primaryGold,
+                      color: AnalyticsTheme.primaryGold(context),
                       size: 16,
                     ),
                     const SizedBox(width: 6),
                     Text(
                       timeStr,
-                      style: const TextStyle(
-                        color: AnalyticsTheme.primaryGold,
+                      style: TextStyle(
+                        color: AnalyticsTheme.primaryGold(context),
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
                       ),

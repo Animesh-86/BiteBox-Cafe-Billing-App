@@ -646,7 +646,9 @@ class _ActiveSessionsScreenState extends ConsumerState<ActiveSessionsScreen> {
                     border: const OutlineInputBorder(),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        obscurePassword ? Icons.visibility : Icons.visibility_off,
+                        obscurePassword
+                            ? Icons.visibility
+                            : Icons.visibility_off,
                       ),
                       onPressed: () {
                         setState(() {
@@ -714,12 +716,12 @@ class _ActiveSessionsScreenState extends ConsumerState<ActiveSessionsScreen> {
     );
 
     try {
-      final success = await sessionManager.claimTrust(password);
+      final errorMsg = await sessionManager.claimTrust(password);
 
       if (context.mounted) {
         Navigator.pop(context); // Hide loading
 
-        if (success) {
+        if (errorMsg == null) {
           setState(() {
             _isCurrentDeviceTrusted = true;
           });
@@ -731,12 +733,7 @@ class _ActiveSessionsScreenState extends ConsumerState<ActiveSessionsScreen> {
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Failed to claim trust. Check your password or try again later.',
-              ),
-              backgroundColor: Colors.red,
-            ),
+            SnackBar(content: Text(errorMsg), backgroundColor: Colors.red),
           );
         }
       }

@@ -1,4 +1,4 @@
-import 'dart:async';
+import 'package:hangout_spot/utils/log_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/data/repositories/auth_repository.dart';
@@ -9,7 +9,11 @@ import 'package:hangout_spot/ui/screens/main_screen.dart';
 import 'package:hangout_spot/ui/screens/auth/login_screen.dart';
 import 'package:hangout_spot/data/providers/database_provider.dart';
 import 'package:hangout_spot/services/realtime_order_service.dart';
+import 'package:hangout_spot/services/auto_sync_service.dart';
+import 'package:hangout_spot/data/providers/inventory_providers.dart';
+import 'package:hangout_spot/services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -20,22 +24,30 @@ class SplashScreen extends ConsumerStatefulWidget {
 
 class _SplashScreenState extends ConsumerState<SplashScreen> {
   bool _navigated = false;
-  Timer? _timeoutTimer;
 
   @override
   void initState() {
     super.initState();
     // Defer _seedData() to after first frame to avoid ref.read() in initState
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _seedData();
-    });
-    // Safety timeout: 4 seconds max for splash
-    _timeoutTimer = Timer(const Duration(seconds: 4), () {
-      _navigateAway();
+      _initAndNavigate();
     });
   }
 
-  // ... (existing imports)
+  /// Run seeding + cloud sync, then navigate. A generous safety timeout
+  /// prevents the splash from getting stuck forever if Firebase hangs.
+  Future<void> _initAndNavigate() async {
+    await _seedData();
+
+    // Navigate as soon as sync finishes OR after a generous 30-second timeout
+    await Future.any([
+      _navigateAway(),
+      Future.delayed(const Duration(seconds: 30)),
+    ]);
+
+    // If _navigateAway() hasn't completed yet, force navigation
+    _forceNavigate();
+  }
 
   Future<void> _seedData() async {
     try {
@@ -45,7 +57,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       final db = ref.read(appDatabaseProvider);
       await LocationSeeder.seed(db);
     } catch (e) {
-      debugPrint("Seeding error: $e");
+      logDebug("Seeding error: $e");
     }
   }
 
@@ -57,22 +69,23 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       if (resetCompleted) {
         await prefs.setBool('factory_reset_completed', false);
         await prefs.remove('last_sync_app_version');
-        debugPrint('🧹 Factory reset detected - skipping cloud restore');
+        logDebug('🧹 Factory reset detected - skipping cloud restore');
         return;
       }
       final skipAutoRestore = prefs.getBool('skip_auto_restore') ?? false;
       if (skipAutoRestore) {
-        debugPrint('⏭️ Auto-restore disabled until manual restore');
+        logDebug('⏭️ Auto-restore disabled until manual restore');
         return;
       }
       final lastSyncVersion = prefs.getString('last_sync_app_version');
-      const currentVersion = '1.0.0'; // TODO: Get from package_info
+      final packageInfo = await PackageInfo.fromPlatform();
+      final currentVersion = packageInfo.version;
 
       // Force sync if:
       // 1. Never synced before (fresh install)
       // 2. App version changed (new APK installed)
       if (lastSyncVersion != currentVersion) {
-        debugPrint('🔄 Fresh install detected - forcing cloud sync...');
+        logDebug('🔄 Fresh install detected - forcing cloud sync...');
 
         try {
           final syncRepo = ref.read(syncRepositoryProvider);
@@ -84,26 +97,75 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
           // Save current version
           await prefs.setString('last_sync_app_version', currentVersion);
-          debugPrint('✅ Cloud sync completed');
+          logDebug('✅ Cloud sync completed');
         } catch (e) {
-          debugPrint('⚠️ Cloud sync failed (might be new user): $e');
+          logDebug('⚠️ Cloud sync failed (might be new user): $e');
           // Continue anyway - might be a new account with no data
         }
       } else {
         // Not a fresh install, but still start real-time listener
         final orderService = ref.read(realTimeOrderServiceProvider);
         orderService.startListening();
-        debugPrint('✅ Real-time order sync started');
+        logDebug('✅ Real-time order sync started');
       }
     } catch (e) {
-      debugPrint('⚠️ Sync check failed: $e');
+      logDebug('⚠️ Sync check failed: $e');
+    }
+  }
+
+  /// Reschedule all enabled time-based reminders on app startup so they
+  /// survive cold restarts and OS-level notification pruning.
+  Future<void> _rescheduleReminders() async {
+    try {
+      final repo = ref.read(inventoryRepositoryProvider);
+      final reminders = await repo.fetchReminders();
+      await NotificationService.instance.rescheduleReminders(
+        reminders
+            .map(
+              (r) => (
+                id: r.id,
+                title: r.title,
+                type: r.type,
+                time: r.time,
+                isEnabled: r.isEnabled,
+              ),
+            )
+            .toList(),
+      );
+    } catch (e) {
+      logDebug('⚠️ Failed to reschedule reminders: $e');
     }
   }
 
   Future<void> _navigateAway() async {
     if (!mounted || _navigated) return;
+
+    final authRepo = ref.read(authRepositoryProvider);
+    final user = authRepo.currentUser;
+
+    if (user != null) {
+      // Already logged in – sync first, then navigate
+      await _checkAndSyncData();
+
+      // Start periodic auto-sync (reads enabled/interval from SharedPreferences)
+      ref.read(autoSyncServiceProvider).start();
+
+      // Restore session tracking so the heartbeat and remote-logout
+      // listener keep working after a cold restart.
+      await authRepo.sessionManager.startSession();
+
+      // Reschedule time-based inventory reminders so they survive app restarts
+      await _rescheduleReminders();
+    }
+
+    _forceNavigate();
+  }
+
+  /// Navigate to the appropriate screen (MainScreen or LoginScreen).
+  /// Safe to call multiple times — only navigates once.
+  void _forceNavigate() {
+    if (!mounted || _navigated) return;
     _navigated = true;
-    _timeoutTimer?.cancel();
 
     final authRepo = ref.read(authRepositoryProvider);
     final user = authRepo.currentUser;
@@ -111,11 +173,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     if (!mounted) return;
 
     if (user != null) {
-      // Already logged in - check if we need to force sync
-      await _checkAndSyncData();
-
-      if (!mounted) return;
-
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
           pageBuilder: (_, __, ___) => const MainScreen(),
@@ -125,7 +182,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         ),
       );
     } else {
-      // Not logged in — go to login screen
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
           pageBuilder: (_, __, ___) => const LoginScreen(),
@@ -139,7 +195,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
   @override
   void dispose() {
-    _timeoutTimer?.cancel();
     super.dispose();
   }
 

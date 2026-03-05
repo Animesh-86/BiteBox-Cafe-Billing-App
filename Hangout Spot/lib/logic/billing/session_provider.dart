@@ -1,5 +1,5 @@
+import 'package:hangout_spot/utils/log_utils.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter/foundation.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/data/providers/database_provider.dart';
 import 'package:drift/drift.dart';
@@ -150,7 +150,7 @@ class SessionManager {
         return '#$result';
       }
     } catch (e) {
-      debugPrint('⚠️ Firestore counter failed, falling back to local: $e');
+      logDebug('⚠️ Firestore counter failed, falling back to local: $e');
     }
 
     // Fallback to local counting (legacy behavior for offline mode)
@@ -269,7 +269,7 @@ class SessionManager {
         return '#1001';
       }
     } catch (e) {
-      debugPrint('⚠️ Firestore peek failed, falling back to local: $e');
+      logDebug('⚠️ Firestore peek failed, falling back to local: $e');
     }
 
     // Fallback to local counting

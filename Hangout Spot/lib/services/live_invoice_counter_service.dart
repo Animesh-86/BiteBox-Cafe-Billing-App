@@ -1,3 +1,4 @@
+import 'package:hangout_spot/utils/log_utils.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -28,7 +29,7 @@ class LiveInvoiceCounterService {
   Future<void> initializeCounter({required String sessionId}) async {
     final counterRef = _getUserCounterRef();
     if (counterRef == null) {
-      debugPrint('⚠️ Cannot initialize counter: User not logged in');
+      logDebug('⚠️ Cannot initialize counter: User not logged in');
       return;
     }
 
@@ -38,7 +39,7 @@ class LiveInvoiceCounterService {
       // Check if session already exists
       final snapshot = await sessionRef.get();
       if (snapshot.exists) {
-        debugPrint('✅ Counter already initialized for session: $sessionId');
+        logDebug('✅ Counter already initialized for session: $sessionId');
         return;
       }
 
@@ -51,9 +52,9 @@ class LiveInvoiceCounterService {
         'lastUpdated': ServerValue.timestamp,
       });
 
-      debugPrint('✅ Initialized invoice counter for session: $sessionId');
+      logDebug('✅ Initialized invoice counter for session: $sessionId');
     } catch (e) {
-      debugPrint('❌ Failed to initialize counter: $e');
+      logDebug('❌ Failed to initialize counter: $e');
     }
   }
 
@@ -106,7 +107,7 @@ class LiveInvoiceCounterService {
       final invoiceNumber = '$prefix${newNumber.toString().padLeft(4, '0')}';
 
       if (kDebugMode) {
-        debugPrint('✅ Generated invoice number: $invoiceNumber');
+        logDebug('✅ Generated invoice number: $invoiceNumber');
       }
       return invoiceNumber;
     } catch (e) {
@@ -130,7 +131,7 @@ class LiveInvoiceCounterService {
       return (snapshot.value as num?)?.toInt() ?? 0;
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('⚠️ Failed to get current counter: $e');
+        logDebug('⚠️ Failed to get current counter: $e');
       }
       return 0;
     }
@@ -170,7 +171,7 @@ class LiveInvoiceCounterService {
       prefix: prefix,
     );
 
-    debugPrint('✅ Converted $oldHoldNumber → $realInvoiceNumber');
+    logDebug('✅ Converted $oldHoldNumber → $realInvoiceNumber');
     return realInvoiceNumber;
   }
 
@@ -214,7 +215,7 @@ class LiveInvoiceCounterService {
         invoiceNumbers.add('$prefix${i.toString().padLeft(4, '0')}');
       }
 
-      debugPrint(
+      logDebug(
         '✅ Reserved $count invoice numbers: ${invoiceNumbers.first} to ${invoiceNumbers.last}',
       );
       return invoiceNumbers;
@@ -240,7 +241,7 @@ class LiveInvoiceCounterService {
         'resetAt': ServerValue.timestamp,
       });
 
-      debugPrint('✅ Counter reset to $startFrom for session: $sessionId');
+      logDebug('✅ Counter reset to $startFrom for session: $sessionId');
     } catch (e) {
       throw ErrorHandler.handleInvoiceError(e);
     }
@@ -271,7 +272,7 @@ class LiveInvoiceCounterService {
         'resetAt': data['resetAt'],
       };
     } catch (e) {
-      debugPrint('❌ Failed to get counter stats: $e');
+      logDebug('❌ Failed to get counter stats: $e');
       return {};
     }
   }
@@ -320,12 +321,12 @@ class LiveInvoiceCounterService {
 
       if (syncedCounter > cloudCounter) {
         await sessionRef.child('currentNumber').set(syncedCounter);
-        debugPrint(
+        logDebug(
           '✅ Synced counter: local=$localCounter, cloud=$cloudCounter, synced=$syncedCounter',
         );
       }
     } catch (e) {
-      debugPrint('❌ Failed to sync counter: $e');
+      logDebug('❌ Failed to sync counter: $e');
     }
   }
 
@@ -361,9 +362,9 @@ class LiveInvoiceCounterService {
         await counterRef.child('sessions').child(sessionId).remove();
       }
 
-      debugPrint('✅ Cleaned up ${toDelete.length} old sessions');
+      logDebug('✅ Cleaned up ${toDelete.length} old sessions');
     } catch (e) {
-      debugPrint('❌ Failed to cleanup old sessions: $e');
+      logDebug('❌ Failed to cleanup old sessions: $e');
     }
   }
 

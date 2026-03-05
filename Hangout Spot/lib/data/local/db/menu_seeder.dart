@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:hangout_spot/utils/log_utils.dart';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 import 'app_database.dart';
@@ -298,13 +298,13 @@ class MenuSeeder {
     }
 
     if (insertedItems > 0 || catDupeCount > 0 || itemDupeCount > 0) {
-      debugPrint(
+      logDebug(
         '🌱 Menu seed: inserted $insertedItems new items, '
         'removed $catDupeCount duplicate categories, '
         'removed $itemDupeCount duplicate items',
       );
     } else {
-      debugPrint('✅ Menu already seeded. Skipping default seeding.');
+      logDebug('✅ Menu already seeded. Skipping default seeding.');
     }
   }
 }
@@ -337,7 +337,7 @@ Future<int> _dedupeCategories(AppDatabase db) async {
     await (db.update(db.categories)..where((t) => t.id.isIn(dupes))).write(
       const CategoriesCompanion(isDeleted: Value(true)),
     );
-    debugPrint(
+    logDebug(
       '🧹 Soft-deleted ${dupes.length} duplicate categories and migrated their items.',
     );
   }
@@ -364,7 +364,7 @@ Future<int> _dedupeItems(AppDatabase db) async {
     await (db.update(db.items)..where((t) => t.id.isIn(dupes))).write(
       const ItemsCompanion(isDeleted: Value(true)),
     );
-    debugPrint('🧹 Soft-deleted ${dupes.length} duplicate menu items');
+    logDebug('🧹 Soft-deleted ${dupes.length} duplicate menu items');
   }
   return dupes.length;
 }

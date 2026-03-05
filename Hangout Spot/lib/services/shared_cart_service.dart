@@ -1,3 +1,4 @@
+import 'package:hangout_spot/utils/log_utils.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -56,7 +57,7 @@ class SharedCartService {
 
       await cartsRef.child(cartId).set(cartData);
 
-      debugPrint('✅ Created shared cart: $cartId');
+      logDebug('✅ Created shared cart: $cartId');
       return cartId;
     } catch (e) {
       throw ErrorHandler.handleOrderError(e);
@@ -112,9 +113,9 @@ class SharedCartService {
       // Update cart totals (use transaction for accuracy)
       await _updateCartTotals(cartRef);
 
-      debugPrint('✅ Added item to cart: $itemName x$quantity');
+      logDebug('✅ Added item to cart: $itemName x$quantity');
     } catch (e) {
-      debugPrint('❌ Failed to add item: $e');
+      logDebug('❌ Failed to add item: $e');
       rethrow;
     }
   }
@@ -140,7 +141,7 @@ class SharedCartService {
       // Get current price
       final snapshot = await itemRef.get();
       if (!snapshot.exists) {
-        debugPrint('⚠️ Item not found: $itemId');
+        logDebug('⚠️ Item not found: $itemId');
         return;
       }
 
@@ -157,9 +158,9 @@ class SharedCartService {
       // Update cart totals
       await _updateCartTotals(cartsRef.child(cartId));
 
-      debugPrint('✅ Updated item quantity: $itemId = $newQuantity');
+      logDebug('✅ Updated item quantity: $itemId = $newQuantity');
     } catch (e) {
-      debugPrint('❌ Failed to update quantity: $e');
+      logDebug('❌ Failed to update quantity: $e');
       rethrow;
     }
   }
@@ -180,7 +181,7 @@ class SharedCartService {
       // Update cart totals
       await _updateCartTotals(cartRef);
 
-      debugPrint('✅ Removed item from cart: $itemId');
+      logDebug('✅ Removed item from cart: $itemId');
     } catch (e) {
       throw ErrorHandler.handleOrderError(e);
     }
@@ -201,9 +202,9 @@ class SharedCartService {
         'updatedAt': ServerValue.timestamp,
       });
 
-      debugPrint('✅ Updated item notes: $itemId');
+      logDebug('✅ Updated item notes: $itemId');
     } catch (e) {
-      debugPrint('❌ Failed to update notes: $e');
+      logDebug('❌ Failed to update notes: $e');
     }
   }
 
@@ -222,9 +223,9 @@ class SharedCartService {
         'updatedAt': ServerValue.timestamp,
       });
 
-      debugPrint('✅ Cleared cart: $cartId');
+      logDebug('✅ Cleared cart: $cartId');
     } catch (e) {
-      debugPrint('❌ Failed to clear cart: $e');
+      logDebug('❌ Failed to clear cart: $e');
       rethrow;
     }
   }
@@ -245,7 +246,7 @@ class SharedCartService {
       try {
         return SharedCart.fromJson(Map<String, dynamic>.from(data));
       } catch (e) {
-        debugPrint('⚠️ Failed to parse cart: $e');
+        logDebug('⚠️ Failed to parse cart: $e');
         return SharedCart.empty(cartId);
       }
     });
@@ -268,7 +269,7 @@ class SharedCartService {
       try {
         return SharedCartItem.fromJson(Map<String, dynamic>.from(data));
       } catch (e) {
-        debugPrint('⚠️ Failed to parse cart item: $e');
+        logDebug('⚠️ Failed to parse cart item: $e');
         return null;
       }
     });
@@ -293,7 +294,7 @@ class SharedCartService {
             carts.add(SharedCart.fromJson(Map<String, dynamic>.from(value)));
           } catch (e) {
             if (kDebugMode) {
-              debugPrint('⚠️ Failed to parse cart: $e');
+              logDebug('⚠️ Failed to parse cart: $e');
             }
           }
         }
@@ -318,7 +319,7 @@ class SharedCartService {
         'updatedAt': ServerValue.timestamp,
       });
 
-      debugPrint('✅ Completed cart: $cartId');
+      logDebug('✅ Completed cart: $cartId');
     } catch (e) {
       throw ErrorHandler.handleOrderError(e);
     }
@@ -336,9 +337,9 @@ class SharedCartService {
         'updatedAt': ServerValue.timestamp,
       });
 
-      debugPrint('✅ Abandoned cart: $cartId');
+      logDebug('✅ Abandoned cart: $cartId');
     } catch (e) {
-      debugPrint('❌ Failed to abandon cart: $e');
+      logDebug('❌ Failed to abandon cart: $e');
     }
   }
 
@@ -349,9 +350,9 @@ class SharedCartService {
 
     try {
       await cartsRef.child(cartId).remove();
-      debugPrint('✅ Deleted cart: $cartId');
+      logDebug('✅ Deleted cart: $cartId');
     } catch (e) {
-      debugPrint('❌ Failed to delete cart: $e');
+      logDebug('❌ Failed to delete cart: $e');
       rethrow;
     }
   }
@@ -393,7 +394,7 @@ class SharedCartService {
       });
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('⚠️ Failed to update cart totals: $e');
+        logDebug('⚠️ Failed to update cart totals: $e');
       }
     }
   }
@@ -434,10 +435,10 @@ class SharedCartService {
         await cartsRef.child(cartId).remove();
       }
 
-      debugPrint('✅ Cleaned up ${toDelete.length} old carts');
+      logDebug('✅ Cleaned up ${toDelete.length} old carts');
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('⚠️ Failed to cleanup old carts: $e');
+        logDebug('⚠️ Failed to cleanup old carts: $e');
       }
     }
   }
@@ -486,7 +487,7 @@ class SharedCart {
               Map<String, dynamic>.from(value),
             );
           } catch (e) {
-            debugPrint('⚠️ Failed to parse cart item: $e');
+            logDebug('⚠️ Failed to parse cart item: $e');
           }
         }
       });

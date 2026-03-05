@@ -166,49 +166,12 @@ class InventoryReminder {
   }
 }
 
-class PlatformOrder {
-  final String id;
-  final String platform;
-  final double total;
-  final String? notes;
-  final DateTime createdAt;
-
-  PlatformOrder({
-    required this.id,
-    required this.platform,
-    required this.total,
-    required this.createdAt,
-    this.notes,
-  });
-
-  factory PlatformOrder.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data() ?? {};
-    return PlatformOrder(
-      id: doc.id,
-      platform: (data['platform'] ?? '').toString(),
-      total: _toDouble(data['total']),
-      notes: data['notes']?.toString(),
-      createdAt: _toDateTime(data['createdAt']) ?? DateTime.now(),
-    );
-  }
-
-  Map<String, dynamic> toMap() {
-    return {
-      'platform': platform,
-      'total': total,
-      'notes': notes,
-      'createdAt': FieldValue.serverTimestamp(),
-    };
-  }
-}
-
 class InventoryAnalyticsSummary {
   final int lowStockEvents;
   final String? topLowStockItem;
   final String? mostConsumedItem;
   final double restockTotal;
   final Map<String, double> restockTrend;
-  final Map<String, double> platformBreakdown;
 
   InventoryAnalyticsSummary({
     required this.lowStockEvents,
@@ -216,7 +179,6 @@ class InventoryAnalyticsSummary {
     required this.mostConsumedItem,
     required this.restockTotal,
     required this.restockTrend,
-    required this.platformBreakdown,
   });
 }
 

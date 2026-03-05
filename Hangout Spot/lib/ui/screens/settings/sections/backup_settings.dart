@@ -9,6 +9,7 @@ import 'package:hangout_spot/data/providers/database_provider.dart';
 import 'package:hangout_spot/logic/locations/location_provider.dart';
 import 'package:hangout_spot/ui/screens/analytics/providers/analytics_data_provider.dart';
 import 'package:hangout_spot/services/realtime_order_service.dart';
+import 'package:hangout_spot/services/auto_sync_service.dart';
 import 'package:hangout_spot/logic/billing/cart_provider.dart';
 import '../utils/password_reauth.dart';
 import '../widgets/settings_shared.dart';
@@ -92,10 +93,14 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
     }
   }
 
-  // NOTE: In a real app, you would probably trigger a background service update here.
-  // For this refactor, we just save the preferences.
+  /// Re-read auto-sync settings and restart (or stop) the timer.
   void _applyAutoSync() {
-    // Placeholder for restarting background service
+    final autoSync = ref.read(autoSyncServiceProvider);
+    if (_autoSyncEnabled) {
+      autoSync.restart();
+    } else {
+      autoSync.stop();
+    }
   }
 
   @override
@@ -269,7 +274,10 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
                         }
 
                         try {
-                          // 2. Perform Backup
+                          // 2. Stop auto-sync before backup
+                          ref.read(autoSyncServiceProvider).stop();
+
+                          // 3. Perform final backup
                           final syncRepo = ref.read(syncRepositoryProvider);
                           await syncRepo.backupData();
 

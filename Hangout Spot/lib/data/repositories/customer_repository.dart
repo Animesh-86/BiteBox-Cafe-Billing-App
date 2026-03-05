@@ -62,8 +62,7 @@ class CustomerRepository {
       }
     }
     await _db.into(_db.customers).insert(customer);
-    // Trigger non-blocking sync
-    syncRepo?.backupData();
+    // Sync is handled by AutoSyncService on a schedule.
   }
 
   Future<void> updateCustomer(
@@ -71,8 +70,7 @@ class CustomerRepository {
     SyncRepository? syncRepo,
   }) async {
     await _db.update(_db.customers).replace(customer);
-    // Trigger non-blocking sync
-    syncRepo?.backupData();
+    // Sync is handled by AutoSyncService on a schedule.
   }
 
   Future<void> deleteCustomer(String id, {SyncRepository? syncRepo}) async {
@@ -80,8 +78,7 @@ class CustomerRepository {
       throw Exception('Default customers cannot be deleted');
     }
     await (_db.delete(_db.customers)..where((t) => t.id.equals(id))).go();
-    // Trigger non-blocking sync
-    syncRepo?.backupData();
+    // Sync is handled by AutoSyncService on a schedule.
   }
 
   Future<void> ensureDefaultCustomers() async {
@@ -131,8 +128,34 @@ class CustomerRepository {
             ),
           );
     });
-    // Trigger non-blocking sync
-    syncRepo?.backupData();
+    // Sync is handled by AutoSyncService on a schedule.
+  }
+
+  Future<void> revertVisitStats(
+    String id,
+    double amount, {
+    SyncRepository? syncRepo,
+  }) async {
+    // Transaction to securely deduct connection stats safely
+    await _db.transaction(() async {
+      final customer = await (_db.select(
+        _db.customers,
+      )..where((t) => t.id.equals(id))).getSingleOrNull();
+
+      if (customer == null) return;
+
+      final newVisits = customer.totalVisits > 0 ? customer.totalVisits - 1 : 0;
+      final newSpent = customer.totalSpent >= amount
+          ? customer.totalSpent - amount
+          : 0.0;
+
+      await _db
+          .update(_db.customers)
+          .replace(
+            customer.copyWith(totalVisits: newVisits, totalSpent: newSpent),
+          );
+    });
+    // Sync is handled by AutoSyncService on a schedule.
   }
 }
 
