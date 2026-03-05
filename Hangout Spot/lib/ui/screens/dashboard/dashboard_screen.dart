@@ -1034,7 +1034,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                                 context: context,
                                                 builder: (_) => AlertDialog(
                                                   title: Text(
-                                                    'Order #${order.invoiceNumber}',
+                                                    'Order ${order.invoiceNumber}',
                                                   ),
                                                   content: Column(
                                                     mainAxisSize:
