@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/services/live_analytics_service.dart';
 import 'package:hangout_spot/services/live_invoice_counter_service.dart';
 import 'package:hangout_spot/services/shared_cart_service.dart';
+import 'package:hangout_spot/data/repositories/analytics_repository.dart';
+import 'package:hangout_spot/logic/locations/location_provider.dart';
 
 /// Providers for Firebase Realtime Database services
 
@@ -28,21 +30,35 @@ final sharedCartServiceProvider = Provider<SharedCartService>((ref) {
 });
 
 /// Stream provider for today's revenue (live)
-final liveRevenueProvider = StreamProvider<double>((ref) {
-  final service = ref.watch(liveAnalyticsServiceProvider);
-  return service.watchTodayRevenue();
+final liveRevenueProvider = StreamProvider<double>((ref) async* {
+  // Watch for sync generation changes
+  ref.watch(remoteSyncGenerationProvider);
+  final analytics = ref.read(analyticsRepositoryProvider);
+  final locationId = ref.watch(currentLocationIdProvider).valueOrNull;
+  yield await analytics.getTodaySales(locationId: locationId);
 });
 
 /// Stream provider for today's order count (live)
-final liveOrderCountProvider = StreamProvider<int>((ref) {
-  final service = ref.watch(liveAnalyticsServiceProvider);
-  return service.watchTodayOrderCount();
+final liveOrderCountProvider = StreamProvider<int>((ref) async* {
+  ref.watch(remoteSyncGenerationProvider);
+  final analytics = ref.read(analyticsRepositoryProvider);
+  final locationId = ref.watch(currentLocationIdProvider).valueOrNull;
+  yield await analytics.getTodayOrdersCount(locationId: locationId);
 });
 
 /// Stream provider for today's item count (live)
-final liveItemCountProvider = StreamProvider<int>((ref) {
-  final service = ref.watch(liveAnalyticsServiceProvider);
-  return service.watchTodayItemCount();
+final liveItemCountProvider = StreamProvider<int>((ref) async* {
+  ref.watch(remoteSyncGenerationProvider);
+  final analytics = ref.read(analyticsRepositoryProvider);
+  final locationId = ref.watch(currentLocationIdProvider).valueOrNull;
+  final now = DateTime.now();
+  final startOfDay = DateTime(now.year, now.month, now.day);
+  final endOfDay = startOfDay.add(const Duration(days: 1));
+  yield await analytics.getSessionItemsSold(
+    startOfDay,
+    endOfDay,
+    locationId: locationId,
+  );
 });
 
 /// Stream provider for hourly revenue chart data

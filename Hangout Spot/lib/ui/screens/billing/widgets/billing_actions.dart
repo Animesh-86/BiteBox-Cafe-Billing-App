@@ -16,6 +16,7 @@ import 'package:hangout_spot/ui/screens/customer/customer_list_screen.dart';
 import 'package:hangout_spot/ui/screens/billing/widgets/billing_shared_widgets.dart';
 import 'package:uuid/uuid.dart';
 import 'package:hangout_spot/utils/constants/app_keys.dart';
+import 'package:hangout_spot/data/providers/realtime_services_provider.dart';
 
 import 'package:hangout_spot/services/thermal_printing_service.dart';
 
@@ -227,6 +228,9 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
       status: 'completed',
       sessionManager: sessionManager,
     );
+
+    // Bump sync generation so dashboard live stats re-query local DB
+    ref.read(remoteSyncGenerationProvider.notifier).state++;
 
     // Build items list for printing
     final items = cart.items

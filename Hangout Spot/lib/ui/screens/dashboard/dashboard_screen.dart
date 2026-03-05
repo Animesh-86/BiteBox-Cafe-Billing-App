@@ -1108,6 +1108,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                                       syncRepo: syncRepo,
                                                       customerRepo: custRepo,
                                                     );
+                                                // Bump so live stats re-query
+                                                ref
+                                                    .read(
+                                                      remoteSyncGenerationProvider
+                                                          .notifier,
+                                                    )
+                                                    .state++;
                                                 if (context.mounted) {
                                                   ScaffoldMessenger.of(
                                                     context,
