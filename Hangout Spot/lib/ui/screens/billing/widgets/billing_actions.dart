@@ -223,6 +223,11 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
 
     // ── Everything below runs in background — uses captured refs only ──
 
+    // Resolve outlet and reward balance NOW (in parallel with each other)
+    // so they're ready for instant printing after DB write.
+    final activeOutlet = await activeOutletFuture;
+    final rewardBalance = await rewardBalanceFuture;
+
     final orderId = await orderRepo.createOrderFromCart(
       cart,
       status: 'completed',
@@ -232,7 +237,28 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
     // Bump sync generation so dashboard live stats re-query local DB
     ref.read(remoteSyncGenerationProvider.notifier).state++;
 
-    // Build items list for printing
+    // Build Order from in-memory cart data + fast PK lookup for invoice number
+    // (a single indexed SELECT by primary key is ~1ms — negligible)
+    final dbOrder = await (db.select(
+      db.orders,
+    )..where((t) => t.id.equals(orderId))).getSingleOrNull();
+    final order = Order(
+      id: orderId,
+      invoiceNumber: dbOrder?.invoiceNumber ?? orderId,
+      customerId: customer?.id,
+      locationId: activeOutlet?.id,
+      subtotal: cart.subtotal,
+      discountAmount: cart.totalDiscount,
+      taxAmount: cart.taxAmount,
+      totalAmount: cart.grandTotal,
+      paymentMode: cart.paymentMode,
+      paidCash: cart.paidCash,
+      paidUPI: cart.paidUPI,
+      status: 'completed',
+      createdAt: dbOrder?.createdAt ?? DateTime.now(),
+      isSynced: false,
+    );
+
     final items = cart.items
         .map(
           (ci) => OrderItem(
@@ -260,43 +286,32 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
           .catchError((e) => logDebug("Reward processing failed: $e"));
     }
 
-    // PRINT in background using captured refs
-    try {
-      final order = await (db.select(
-        db.orders,
-      )..where((t) => t.id.equals(orderId))).getSingle();
+    // PRINT instantly — data is constructed from memory, no DB round-trip
+    thermalPrinter
+        .printBill(
+          order,
+          items,
+          customer,
+          storeName: activeOutlet?.name,
+          storeAddress: activeOutlet?.address,
+          customerRewardBalance: rewardBalance,
+        )
+        .catchError((e) {
+          logDebug("Thermal print failed: $e");
+        });
 
-      final activeOutlet = await activeOutletFuture;
-      final rewardBalance = await rewardBalanceFuture;
-
-      // Fire and forget print command
-      thermalPrinter
-          .printBill(
-            order,
-            items,
-            customer,
-            storeName: activeOutlet?.name,
-            storeAddress: activeOutlet?.address,
-            customerRewardBalance: rewardBalance,
-          )
-          .catchError((e) {
-            logDebug("Thermal print failed: $e");
-          });
-
-      // Auto-Send to WhatsApp if enabled and customer has phone
-      final isWhatsAppEnabled = await _isBillWhatsAppEnabled();
-      if (isWhatsAppEnabled &&
-          customer != null &&
-          (customer.phone?.isNotEmpty ?? false)) {
-        try {
-          await shareService.shareInvoiceWhatsApp(order, items, customer);
-        } catch (e) {
-          logDebug("WhatsApp share failed: $e");
-        }
-      }
-    } catch (e) {
-      logDebug("Thermal print setup failed: $e");
-    }
+    // Auto-Send to WhatsApp (fire-and-forget)
+    _isBillWhatsAppEnabled()
+        .then((isEnabled) {
+          if (isEnabled &&
+              customer != null &&
+              (customer.phone?.isNotEmpty ?? false)) {
+            shareService
+                .shareInvoiceWhatsApp(order, items, customer)
+                .catchError((e) => logDebug("WhatsApp share failed: $e"));
+          }
+        })
+        .catchError((_) {});
 
     // if (context.mounted) {
     //   await showPostCheckoutActions(context, ref, orderId, customer);
