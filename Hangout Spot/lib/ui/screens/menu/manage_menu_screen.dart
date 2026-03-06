@@ -74,6 +74,20 @@ class ManageMenuScreen extends ConsumerWidget {
               );
             },
           ),
+          IconButton(
+            tooltip: 'Edit Category',
+            icon: Icon(Icons.edit_outlined, size: 18, color: coffee),
+            onPressed: () {
+              showEditCategorySelectDialog(context, ref);
+            },
+          ),
+          IconButton(
+            tooltip: 'New Category',
+            icon: Icon(Icons.add_circle_outline, size: 18, color: coffee),
+            onPressed: () {
+              showAddCategoryDialog(context, ref);
+            },
+          ),
           const SizedBox(width: 4),
         ],
       ),
@@ -94,51 +108,23 @@ class ManageMenuScreen extends ConsumerWidget {
                     color: coffeeDark,
                   ),
                 ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextButton.icon(
-                      onPressed: () {
-                        showEditCategorySelectDialog(context, ref);
-                      },
-                      icon: Icon(Icons.edit_outlined, size: 16, color: coffee),
-                      label: Text(
-                        'Edit',
-                        style: TextStyle(color: coffee, fontSize: 12),
-                      ),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
+                TextButton.icon(
+                  onPressed: () {
+                    showSmartAddItemDialog(context, ref, selectedCat);
+                  },
+                  icon: Icon(Icons.add_circle_outline, size: 16, color: coffee),
+                  label: Text(
+                    'Add Item',
+                    style: TextStyle(color: coffee, fontSize: 12),
+                  ),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
                     ),
-                    const SizedBox(width: 4),
-                    TextButton.icon(
-                      onPressed: () {
-                        showAddCategoryDialog(context, ref);
-                      },
-                      icon: Icon(
-                        Icons.add_circle_outline,
-                        size: 16,
-                        color: coffee,
-                      ),
-                      label: Text(
-                        'New',
-                        style: TextStyle(color: coffee, fontSize: 12),
-                      ),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                    ),
-                  ],
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
                 ),
               ],
             ),
@@ -199,28 +185,6 @@ class ManageMenuScreen extends ConsumerWidget {
               ),
             ),
           ],
-        ),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        child: FloatingActionButton.extended(
-          onPressed: () {
-            showSmartAddItemDialog(context, ref, selectedCat);
-          },
-          icon: const Icon(Icons.add_rounded, size: 20),
-          label: Text(
-            selectedCat == null || selectedCat == 'all'
-                ? 'Add Item'
-                : 'Add to ${_getCategoryName(ref, selectedCat)}',
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-          ),
-          extendedPadding: const EdgeInsets.symmetric(
-            horizontal: 20,
-            vertical: 14,
-          ),
-          backgroundColor: theme.colorScheme.primary,
-          elevation: 6,
         ),
       ),
     );

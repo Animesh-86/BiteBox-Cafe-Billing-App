@@ -70,7 +70,7 @@ class _BillingView extends ConsumerWidget {
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.5,
-                        fontSize: 18,
+                        fontSize: 14,
                         color: theme.colorScheme.primary,
                       ),
                     ),
@@ -169,30 +169,29 @@ class _MobileLayout extends ConsumerWidget {
           ),
         ),
         // Draggable Divider
-        MouseRegion(
-          cursor: SystemMouseCursors.resizeColumn,
-          child: GestureDetector(
-            onHorizontalDragUpdate: (details) {
-              // Calculate new flex based on drag movement
-              final newFlex =
-                  constrainedFlex + (details.delta.dx / screenWidth * 100);
-              ref.read(sidebarFlexProvider.notifier).state = newFlex.clamp(
-                15.0,
-                35.0,
-              );
-            },
+        GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onHorizontalDragUpdate: (details) {
+            // Calculate new flex based on drag movement
+            final newFlex =
+                constrainedFlex + (details.delta.dx / screenWidth * 100);
+            ref.read(sidebarFlexProvider.notifier).state = newFlex.clamp(
+              15.0,
+              35.0,
+            );
+          },
+          child: MouseRegion(
+            cursor: SystemMouseCursors.resizeColumn,
             child: Container(
-              width: 4,
-              color: billingOutline(context),
-              child: MouseRegion(
-                child: Center(
-                  child: Container(
-                    width: 3,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: billingOutline(context, darkOpacity: 0.4),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
+              width: 20,
+              color: Colors.transparent,
+              child: Center(
+                child: Container(
+                  width: 3,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: billingOutline(context, darkOpacity: 0.4),
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),

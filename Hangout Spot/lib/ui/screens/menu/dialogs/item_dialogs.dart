@@ -168,10 +168,7 @@ void showSmartAddItemDialog(
                       ),
                     ),
                     keyboardType: TextInputType.number,
-                    style: const TextStyle(
-                      color: Color(0xFF98664D),
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(color: coffeeDark, fontSize: 14),
                   ),
                   const SizedBox(height: 12),
                   TextField(
@@ -187,16 +184,14 @@ void showSmartAddItemDialog(
                       ),
                       suffixText: '%',
                       filled: true,
-                      fillColor:
-                          theme.inputDecorationTheme.fillColor ??
-                          theme.colorScheme.surfaceVariant,
+                      fillColor: surface,
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 12,
                         vertical: 12,
                       ),
                     ),
                     keyboardType: TextInputType.number,
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    style: TextStyle(color: coffeeDark, fontSize: 14),
                   ),
                 ],
               ),
@@ -206,7 +201,7 @@ void showSmartAddItemDialog(
                 onPressed: () => Navigator.pop(context),
                 child: Text(
                   'Cancel',
-                  style: TextStyle(color: Colors.white.withOpacity(0.7)),
+                  style: TextStyle(color: coffeeDark.withOpacity(0.7)),
                 ),
               ),
               FilledButton(
@@ -280,11 +275,22 @@ void _showAddItemWithCategoryPicker(
     context: context,
     builder: (context) {
       final theme = Theme.of(context);
-      const cream = Color(0xFFFEF9F5);
-      const surface = Color(0xFFFFF3E8);
-      const coffee = Color(0xFF95674D);
-      const coffeeDark = Color(0xFF98664D);
-      const caramel = Color(0xFFEDAD4C);
+      final isDark = theme.brightness == Brightness.dark;
+      final cream = isDark
+          ? theme.colorScheme.background
+          : const Color(0xFFFEF9F5);
+      final surface = isDark
+          ? theme.colorScheme.surface
+          : const Color(0xFFFFF3E8);
+      final coffee = isDark
+          ? theme.colorScheme.primary
+          : const Color(0xFF95674D);
+      final coffeeDark = isDark
+          ? theme.colorScheme.onSurface
+          : const Color(0xFF98664D);
+      final caramel = isDark
+          ? theme.colorScheme.secondary
+          : const Color(0xFFEDAD4C);
       return StatefulBuilder(
         builder: (context, setState) => AlertDialog(
           backgroundColor: cream,
@@ -345,10 +351,7 @@ void _showAddItemWithCategoryPicker(
                       .toList(),
                   onChanged: (v) => setState(() => selectedCategoryId = v),
                   dropdownColor: cream,
-                  style: const TextStyle(
-                    color: Color(0xFF98664D),
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(color: coffeeDark, fontSize: 14),
                 ),
                 const SizedBox(height: 12),
                 TextField(
@@ -369,10 +372,7 @@ void _showAddItemWithCategoryPicker(
                       vertical: 12,
                     ),
                   ),
-                  style: const TextStyle(
-                    color: Color(0xFF98664D),
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(color: coffeeDark, fontSize: 14),
                 ),
                 const SizedBox(height: 12),
                 TextField(
@@ -395,10 +395,7 @@ void _showAddItemWithCategoryPicker(
                     ),
                   ),
                   keyboardType: TextInputType.number,
-                  style: const TextStyle(
-                    color: Color(0xFF98664D),
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(color: coffeeDark, fontSize: 14),
                 ),
                 const SizedBox(height: 12),
                 TextField(
@@ -411,16 +408,14 @@ void _showAddItemWithCategoryPicker(
                     prefixIcon: const Icon(Icons.local_offer_rounded, size: 20),
                     suffixText: '%',
                     filled: true,
-                    fillColor:
-                        theme.inputDecorationTheme.fillColor ??
-                        theme.colorScheme.surfaceVariant,
+                    fillColor: surface,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 12,
                     ),
                   ),
                   keyboardType: TextInputType.number,
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  style: TextStyle(color: coffeeDark, fontSize: 14),
                 ),
               ],
             ),
@@ -430,7 +425,7 @@ void _showAddItemWithCategoryPicker(
               onPressed: () => Navigator.pop(context),
               child: Text(
                 'Cancel',
-                style: TextStyle(color: Colors.white.withOpacity(0.7)),
+                style: TextStyle(color: coffeeDark.withOpacity(0.7)),
               ),
             ),
             FilledButton(

@@ -191,6 +191,22 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
                           label: const Text("Backup Now"),
                         ),
                       ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _isSyncing ? null : _restore,
+                          icon: _isSyncing
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.download_rounded),
+                          label: const Text("Restore Now"),
+                        ),
+                      ),
                     ],
                   ),
                 ],

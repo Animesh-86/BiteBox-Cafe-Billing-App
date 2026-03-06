@@ -517,6 +517,9 @@ class SyncRepository {
       // Delete loyalty data
       await baseRef.collection('loyalty').doc('reward_transactions').delete();
 
+      // Delete session counters so order numbers reset to #1001
+      await deleteCollectionDocs(baseRef.collection('counters'));
+
       // Delete inventory collections (cloud-only data)
       await deleteCollectionDocs(baseRef.collection('inventory_items'));
       await deleteCollectionDocs(baseRef.collection('inventory_daily'));
