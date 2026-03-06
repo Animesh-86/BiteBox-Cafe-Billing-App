@@ -20,7 +20,18 @@ class MenuRepository {
     return (_db.select(_db.categories)
           ..where((tbl) => tbl.isDeleted.equals(false))
           ..orderBy([(t) => OrderingTerm(expression: t.sortOrder)]))
-        .watch();
+        .watch()
+        .map((categories) {
+          // Deduplicate by normalized name, keeping the first (lowest sortOrder)
+          final seen = <String>{};
+          return categories.where((cat) {
+            final key = cat.name.toLowerCase().trim().replaceAll(
+              RegExp(r'[^a-z0-9]'),
+              '',
+            );
+            return seen.add(key);
+          }).toList();
+        });
   }
 
   Future<void> addCategory(CategoriesCompanion category) {
@@ -51,7 +62,15 @@ class MenuRepository {
   Stream<List<Item>> watchAllItems() {
     return (_db.select(
       _db.items,
-    )..where((tbl) => tbl.isDeleted.equals(false))).watch();
+    )..where((tbl) => tbl.isDeleted.equals(false))).watch().map((items) {
+      // Deduplicate by categoryId + normalized name, keeping the first occurrence
+      final seen = <String>{};
+      return items.where((item) {
+        final key =
+            '${item.categoryId}|${item.name.toLowerCase().trim().replaceAll(RegExp(r'[^a-z0-9]'), '')}';
+        return seen.add(key);
+      }).toList();
+    });
   }
 
   Future<void> addItem(ItemsCompanion item, {String? categoryName}) async {

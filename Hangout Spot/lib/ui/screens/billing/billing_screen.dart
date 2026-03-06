@@ -102,18 +102,23 @@ class _BillingView extends ConsumerWidget {
         ),
         actions: [
           // Customer Select
-          TextButton.icon(
-            onPressed: () => showCustomerSelect(context, ref),
-            icon: const Icon(Icons.person_outline, size: 16),
-            label: Text(
-              cart.customer?.name ?? 'Walk-in',
-              style: const TextStyle(fontSize: 12),
-            ),
-            style: TextButton.styleFrom(
-              foregroundColor: theme.colorScheme.primary,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 140),
+            child: TextButton.icon(
+              onPressed: () => showCustomerSelect(context, ref),
+              icon: const Icon(Icons.person_outline, size: 16),
+              label: Text(
+                cart.customer?.name ?? 'Walk-in',
+                style: const TextStyle(fontSize: 12),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+              style: TextButton.styleFrom(
+                foregroundColor: theme.colorScheme.primary,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
             ),
           ),
           const SizedBox(width: 4),

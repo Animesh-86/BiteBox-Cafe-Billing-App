@@ -85,51 +85,134 @@ class _CustomerListScreenState extends ConsumerState<CustomerListScreen> {
               }
               final customerIndex = widget.isSelectionMode ? index - 1 : index;
               final customer = visibleCustomers[customerIndex];
+              final isProtected = CustomerDefaults.seeded.any(
+                (c) => c.id == customer.id,
+              );
               return ListTile(
                 leading: CircleAvatar(child: Text(customer.name[0])),
                 title: Text(customer.name),
                 subtitle: Text(customer.phone ?? 'No phone'),
-                trailing: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text("${customer.totalVisits} visits"),
-                    Text("₹${customer.totalSpent.toStringAsFixed(0)}"),
-                    Consumer(
-                      builder: (context, ref, _) {
-                        final pointsAsync = ref.watch(
-                          customerRewardBalanceProvider(customer.id),
-                        );
-                        return pointsAsync.when(
-                          data: (points) {
-                            if (points <= 0) return const SizedBox.shrink();
-                            return Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.stars,
-                                  size: 12,
-                                  color: Colors.amber,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  "${points.toStringAsFixed(0)} pts",
-                                  style: const TextStyle(
-                                    color: Colors.amber,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                          loading: () => const SizedBox.shrink(),
-                          error: (_, __) => const SizedBox.shrink(),
-                        );
-                      },
-                    ),
-                  ],
-                ),
+                trailing: widget.isSelectionMode
+                    ? Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text("${customer.totalVisits} visits"),
+                          Text("₹${customer.totalSpent.toStringAsFixed(0)}"),
+                          Consumer(
+                            builder: (context, ref, _) {
+                              final pointsAsync = ref.watch(
+                                customerRewardBalanceProvider(customer.id),
+                              );
+                              return pointsAsync.when(
+                                data: (points) {
+                                  if (points <= 0)
+                                    return const SizedBox.shrink();
+                                  return Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.stars,
+                                        size: 12,
+                                        color: Colors.amber,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        "${points.toStringAsFixed(0)} pts",
+                                        style: const TextStyle(
+                                          color: Colors.amber,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
+                                loading: () => const SizedBox.shrink(),
+                                error: (_, __) => const SizedBox.shrink(),
+                              );
+                            },
+                          ),
+                        ],
+                      )
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                "${customer.totalVisits} visits",
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              Text(
+                                "₹${customer.totalSpent.toStringAsFixed(0)}",
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              Consumer(
+                                builder: (context, ref, _) {
+                                  final pointsAsync = ref.watch(
+                                    customerRewardBalanceProvider(customer.id),
+                                  );
+                                  return pointsAsync.when(
+                                    data: (points) {
+                                      if (points <= 0)
+                                        return const SizedBox.shrink();
+                                      return Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(
+                                            Icons.stars,
+                                            size: 12,
+                                            color: Colors.amber,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            "${points.toStringAsFixed(0)} pts",
+                                            style: const TextStyle(
+                                              color: Colors.amber,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                    loading: () => const SizedBox.shrink(),
+                                    error: (_, __) => const SizedBox.shrink(),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                          if (!isProtected) ...[
+                            const SizedBox(width: 4),
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined, size: 18),
+                              tooltip: 'Edit',
+                              padding: const EdgeInsets.all(4),
+                              constraints: const BoxConstraints(),
+                              onPressed: () => _showAddEditDialog(
+                                context,
+                                customer: customer,
+                              ),
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                Icons.delete_outline,
+                                size: 18,
+                                color: Colors.red.shade400,
+                              ),
+                              tooltip: 'Delete',
+                              padding: const EdgeInsets.all(4),
+                              constraints: const BoxConstraints(),
+                              onPressed: () =>
+                                  _confirmDeleteCustomer(context, customer),
+                            ),
+                          ],
+                        ],
+                      ),
                 onTap: () {
                   if (widget.isSelectionMode) {
                     Navigator.pop(context, customer);
@@ -143,8 +226,9 @@ class _CustomerListScreenState extends ConsumerState<CustomerListScreen> {
                     );
                   }
                 },
-                onLongPress: () =>
-                    _showAddEditDialog(context, customer: customer),
+                onLongPress: isProtected
+                    ? null
+                    : () => _showAddEditDialog(context, customer: customer),
               );
             },
           );
@@ -155,7 +239,58 @@ class _CustomerListScreenState extends ConsumerState<CustomerListScreen> {
     );
   }
 
+  void _confirmDeleteCustomer(BuildContext context, Customer customer) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Customer'),
+        content: Text(
+          'Are you sure you want to delete "${customer.name}"? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                final syncRepo = ref.read(syncRepositoryProvider);
+                await ref
+                    .read(customerRepositoryProvider)
+                    .deleteCustomer(customer.id, syncRepo: syncRepo);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('"${customer.name}" deleted'),
+                      duration: const Duration(milliseconds: 1500),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showAddEditDialog(BuildContext context, {Customer? customer}) {
+    final isProtected =
+        customer != null &&
+        CustomerDefaults.seeded.any((c) => c.id == customer.id);
     final nameController = TextEditingController(text: customer?.name ?? '');
     final phoneController = TextEditingController(text: customer?.phone ?? '');
     final discountController = TextEditingController(
@@ -173,11 +308,18 @@ class _CustomerListScreenState extends ConsumerState<CustomerListScreen> {
               children: [
                 TextField(
                   controller: nameController,
-                  decoration: const InputDecoration(labelText: 'Name'),
+                  readOnly: isProtected,
+                  decoration: InputDecoration(
+                    labelText: 'Name',
+                    helperText: isProtected
+                        ? 'Cannot edit default customer'
+                        : null,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 TextField(
                   controller: phoneController,
+                  readOnly: isProtected,
                   decoration: const InputDecoration(labelText: 'Phone'),
                   keyboardType: TextInputType.phone,
                 ),
@@ -192,20 +334,16 @@ class _CustomerListScreenState extends ConsumerState<CustomerListScreen> {
           ),
         ),
         actions: [
-          if (customer != null)
-            if (!CustomerDefaults.seeded.any((c) => c.id == customer.id))
-              TextButton.icon(
-                onPressed: () async {
-                  final syncRepo = ref.read(syncRepositoryProvider);
-                  await ref
-                      .read(customerRepositoryProvider)
-                      .deleteCustomer(customer.id, syncRepo: syncRepo);
-                  if (context.mounted) Navigator.pop(context);
-                },
-                icon: const Icon(Icons.delete_outline),
-                label: const Text('Delete'),
-                style: TextButton.styleFrom(foregroundColor: Colors.red),
-              ),
+          if (customer != null && !isProtected)
+            TextButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
+                _confirmDeleteCustomer(context, customer);
+              },
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('Delete'),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+            ),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),

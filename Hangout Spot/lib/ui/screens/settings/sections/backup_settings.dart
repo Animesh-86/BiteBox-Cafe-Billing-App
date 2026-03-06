@@ -129,7 +129,7 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
           child: Column(
             children: [
               SettingsSection(
-                title: "Backup & Restore",
+                title: "Cloud Backup",
                 icon: Icons.cloud_sync_rounded,
                 children: [
                   SwitchListTile(
@@ -189,14 +189,6 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
                                 )
                               : const Icon(Icons.upload_rounded),
                           label: const Text("Backup Now"),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _isSyncing ? null : _restore,
-                          icon: const Icon(Icons.download_rounded),
-                          label: const Text("Restore Data"),
                         ),
                       ),
                     ],

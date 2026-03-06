@@ -78,9 +78,12 @@ Future<void> printKot(BuildContext context, WidgetRef ref) async {
 
     // Close the Cart modal if on a mobile view BEFORE printing blocks
     if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("KOT sent to printer")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("KOT sent to printer"),
+          duration: Duration(milliseconds: 1500),
+        ),
+      );
 
       if (MediaQuery.of(context).size.width <= 900 &&
           Navigator.canPop(context)) {
@@ -126,9 +129,12 @@ Future<void> holdOrder(BuildContext context, WidgetRef ref) async {
     // CLEAR CART AND CLOSE UI IMMEDIATELY
     ref.read(cartProvider.notifier).clearCart();
     if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Order held!")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Order held!"),
+          duration: Duration(milliseconds: 1500),
+        ),
+      );
 
       // Close the Cart modal if on a mobile view
       if (MediaQuery.of(context).size.width <= 900 &&
@@ -210,9 +216,12 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
     // CLEAR CART AND CLOSE UI IMMEDIATELY — zero wait
     ref.read(cartProvider.notifier).clearCart();
     if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Order completed!")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Order completed!"),
+          duration: Duration(milliseconds: 1500),
+        ),
+      );
 
       // Close the Cart modal if on a mobile view
       if (MediaQuery.of(context).size.width <= 900 &&

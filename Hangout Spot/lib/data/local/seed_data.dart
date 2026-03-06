@@ -85,8 +85,8 @@ class MenuSeeder {
     "TEA/COFFEE": [
       "Masala Tea (Half) — 15",
       "Masala Tea (Full) — 25",
-      "Adrak Tea (Half) — 15",
-      "Adrak Tea (Full) — 25",
+      "Adrak Tea (Half) — 20",
+      "Adrak Tea (Full) — 30",
       "Elaichi Tea (Half) — 20",
       "Elaichi Tea (Full) — 30",
       "Pudina Tea (Half) — 20",

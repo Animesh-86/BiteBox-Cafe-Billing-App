@@ -78,7 +78,13 @@ class ThermalPrintingService {
     final devices = await getBondedDevices();
     try {
       final device = devices.firstWhere((d) => d.address == savedMac);
-      await _bluetooth.connect(device);
+      await _bluetooth
+          .connect(device)
+          .timeout(
+            const Duration(seconds: 3),
+            onTimeout: () =>
+                logDebug("[_ensureConnected] Connection timed out"),
+          );
       return await isConnected;
     } catch (_) {
       return false;

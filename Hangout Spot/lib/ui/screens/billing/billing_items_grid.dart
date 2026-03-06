@@ -60,35 +60,9 @@ class BillingItemsGrid extends ConsumerWidget {
 
         return Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.all(10),
-              child: TextField(
-                onChanged: (value) =>
-                    ref.read(itemSearchQueryProvider.notifier).state = value,
-                decoration: InputDecoration(
-                  hintText: 'Search items...',
-                  prefixIcon: const Icon(Icons.search, size: 18),
-                  suffixIcon: query.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.close, size: 18),
-                          onPressed: () =>
-                              ref.read(itemSearchQueryProvider.notifier).state =
-                                  '',
-                        )
-                      : null,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  filled: true,
-                  fillColor:
-                      Theme.of(context).inputDecorationTheme.fillColor ??
-                      Colors.white.withOpacity(0.04),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                ),
-              ),
+            const Padding(
+              padding: EdgeInsets.all(10),
+              child: _BillingSearchField(),
             ),
             Expanded(
               child: filtered.isEmpty
@@ -506,6 +480,66 @@ class BillingItemLetterBadge extends StatelessWidget {
           fontSize: 24,
           fontWeight: FontWeight.w700,
           color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+        ),
+      ),
+    );
+  }
+}
+
+/// Stateful search field that keeps its TextEditingController in sync
+/// with the provider so that tapping X clears both the provider and the text.
+class _BillingSearchField extends ConsumerStatefulWidget {
+  const _BillingSearchField();
+
+  @override
+  ConsumerState<_BillingSearchField> createState() =>
+      _BillingSearchFieldState();
+}
+
+class _BillingSearchFieldState extends ConsumerState<_BillingSearchField> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _clearSearch() {
+    _controller.clear();
+    ref.read(itemSearchQueryProvider.notifier).state = '';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final query = ref.watch(itemSearchQueryProvider);
+    // Keep controller in sync if provider was changed externally
+    if (_controller.text != query) {
+      _controller.text = query;
+      _controller.selection = TextSelection.collapsed(offset: query.length);
+    }
+
+    return TextField(
+      controller: _controller,
+      onChanged: (value) =>
+          ref.read(itemSearchQueryProvider.notifier).state = value,
+      decoration: InputDecoration(
+        hintText: 'Search items...',
+        prefixIcon: const Icon(Icons.search, size: 18),
+        suffixIcon: query.isNotEmpty
+            ? IconButton(
+                icon: const Icon(Icons.close, size: 18),
+                onPressed: _clearSearch,
+              )
+            : null,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        filled: true,
+        fillColor:
+            Theme.of(context).inputDecorationTheme.fillColor ??
+            Colors.white.withOpacity(0.04),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 10,
         ),
       ),
     );

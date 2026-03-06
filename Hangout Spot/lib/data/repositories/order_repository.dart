@@ -322,16 +322,18 @@ class OrderRepository {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
-        // Convert cart items to JSON format
-        final itemsData = cart.items
+        // Fetch order items from DB to get proper IDs
+        final orderItems = await getOrderItems(orderId);
+        final itemsData = orderItems
             .map(
-              (ci) => {
-                'itemId': ci.item.id,
-                'itemName': ci.item.name,
-                'price': ci.item.price,
-                'quantity': ci.quantity,
-                'note': ci.note,
-                'discountAmount': ci.discountAmount,
+              (oi) => {
+                'id': oi.id,
+                'itemId': oi.itemId,
+                'itemName': oi.itemName,
+                'price': oi.price,
+                'quantity': oi.quantity,
+                'note': oi.note,
+                'discountAmount': oi.discountAmount,
               },
             )
             .toList();
@@ -391,6 +393,7 @@ class OrderRepository {
       final itemsData = items
           .map(
             (oi) => {
+              'id': oi.id,
               'itemId': oi.itemId,
               'itemName': oi.itemName,
               'price': oi.price,
@@ -626,6 +629,7 @@ class OrderRepository {
           final itemsData = orderItems
               .map(
                 (oi) => {
+                  'id': oi.id,
                   'itemId': oi.itemId,
                   'itemName': oi.itemName,
                   'price': oi.price,

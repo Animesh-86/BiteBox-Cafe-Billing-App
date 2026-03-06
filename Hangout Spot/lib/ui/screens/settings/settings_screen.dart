@@ -197,7 +197,7 @@ class SettingsScreen extends ConsumerWidget {
       {
         "title": "Cloud Backup",
         "icon": Icons.cloud_sync_rounded,
-        "subtitle": "Sync data and restore",
+        "subtitle": "Sync data to cloud",
         "screen": const BackupSettingsScreen(),
       },
       {

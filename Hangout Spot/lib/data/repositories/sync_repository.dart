@@ -2,10 +2,13 @@ import 'package:hangout_spot/utils/log_utils.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' hide Order;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
+import 'package:hangout_spot/data/local/db/menu_seeder.dart';
+import 'package:hangout_spot/data/constants/customer_defaults.dart';
 import 'package:drift/drift.dart';
 import '../providers/database_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 /// Keys for SharedPreferences that should be backed up to the cloud.
 const _backupPrefKeys = [
@@ -50,9 +53,13 @@ class SyncRepository {
       final user = _auth.currentUser;
       if (user == null) throw Exception("Not logged in");
 
-      // Fetch bounded data from local database
-      final categories = await _db.select(_db.categories).get();
-      final items = await _db.select(_db.items).get();
+      // Fetch bounded data from local database (exclude soft-deleted)
+      final categories = await (_db.select(
+        _db.categories,
+      )..where((t) => t.isDeleted.equals(false))).get();
+      final items = await (_db.select(
+        _db.items,
+      )..where((t) => t.isDeleted.equals(false))).get();
       final customers = await _db.select(_db.customers).get();
       final locations = await _db.select(_db.locations).get();
       final settings = await _db.select(_db.settings).get();
@@ -72,8 +79,38 @@ class SyncRepository {
       addToBatch('menu', 'categories', categories);
       addToBatch('menu', 'items', items);
 
-      // Customers
-      addToBatch('data', 'customers', customers);
+      // Customers — merge with cloud to preserve entries from other devices
+      // (fetch cloud list, union by ID with local winning on conflicts)
+      try {
+        final cloudCustDoc = await baseRef
+            .collection('data')
+            .doc('customers')
+            .get();
+        final cloudCustList = cloudCustDoc.exists
+            ? List<Map<String, dynamic>>.from(
+                cloudCustDoc.data()!['list'] ?? [],
+              )
+            : <Map<String, dynamic>>[];
+
+        final mergedMap = <String, Map<String, dynamic>>{};
+        for (final c in cloudCustList) {
+          final id = c['id'] as String?;
+          if (id != null) mergedMap[id] = c;
+        }
+        // Local entries overwrite cloud on conflict (local is fresher)
+        for (final c in customers) {
+          mergedMap[c.id] = c.toJson();
+        }
+
+        batch.set(baseRef.collection('data').doc('customers'), {
+          'list': mergedMap.values.toList(),
+          'lastUpdated': FieldValue.serverTimestamp(),
+        });
+      } catch (e) {
+        // Fallback to simple overwrite if merge fails
+        logDebug('⚠️ Customer merge failed, falling back to overwrite: $e');
+        addToBatch('data', 'customers', customers);
+      }
 
       // Config
       addToBatch('config', 'locations', locations);
@@ -161,6 +198,8 @@ class SyncRepository {
           for (final item in embeddedItems) {
             final itemMap = Map<String, dynamic>.from(item as Map);
             itemMap['orderId'] = data['id'];
+            // Generate id if missing (old Firestore data didn't include it)
+            itemMap['id'] ??= const Uuid().v4();
             orderItemsList.add(itemMap);
           }
         }
@@ -213,15 +252,45 @@ class SyncRepository {
         return result;
       }
 
+      // Deduplicate cloud categories/items before inserting
+      final dedupedCategories = <Map<String, dynamic>>[];
+      final seenCatNames = <String>{};
+      for (final c in categories) {
+        final name = (c['name'] as String? ?? '')
+            .toLowerCase()
+            .trim()
+            .replaceAll(RegExp(r'[^a-z0-9]'), '');
+        final isDeleted = c['isDeleted'] == true || c['is_deleted'] == true;
+        if (!isDeleted && seenCatNames.add(name)) {
+          dedupedCategories.add(c);
+        }
+      }
+
+      final dedupedItems = <Map<String, dynamic>>[];
+      final seenItemKeys = <String>{};
+      for (final it in items) {
+        final catId =
+            it['categoryId'] as String? ?? it['category_id'] as String? ?? '';
+        final name = (it['name'] as String? ?? '')
+            .toLowerCase()
+            .trim()
+            .replaceAll(RegExp(r'[^a-z0-9]'), '');
+        final isDeleted = it['isDeleted'] == true || it['is_deleted'] == true;
+        final key = '$catId|$name';
+        if (!isDeleted && seenItemKeys.add(key)) {
+          dedupedItems.add(it);
+        }
+      }
+
       await _db.batch((batch) {
         batch.insertAll(
           _db.categories,
-          _safeParse(categories, Category.fromJson, 'category'),
+          _safeParse(dedupedCategories, Category.fromJson, 'category'),
           mode: InsertMode.insertOrReplace,
         );
         batch.insertAll(
           _db.items,
-          _safeParse(items, Item.fromJson, 'item'),
+          _safeParse(dedupedItems, Item.fromJson, 'item'),
           mode: InsertMode.insertOrReplace,
         );
         batch.insertAll(
@@ -278,6 +347,27 @@ class SyncRepository {
 
       if (skipped > 0) {
         logDebug('⚠️ Restore completed with $skipped skipped records');
+      }
+
+      // Deduplicate categories & items that may exist in the cloud data
+      await MenuSeeder.deduplicateAll(_db);
+
+      // Re-seed default customers (Walk-in, Zomato, Swiggy) in case cloud
+      // data didn't include them
+      for (final seed in CustomerDefaults.seeded) {
+        await _db
+            .into(_db.customers)
+            .insertOnConflictUpdate(
+              CustomersCompanion(
+                id: Value(seed.id),
+                name: Value(seed.name),
+                phone: const Value(null),
+                discountPercent: const Value(0.0),
+                totalVisits: const Value(0),
+                totalSpent: const Value(0.0),
+                lastVisit: const Value(null),
+              ),
+            );
       }
 
       // Restore SharedPreferences from cloud

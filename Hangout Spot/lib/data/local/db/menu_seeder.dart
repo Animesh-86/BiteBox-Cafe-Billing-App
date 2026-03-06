@@ -34,22 +34,22 @@ class MenuSeeder {
       {'name': 'Water Bottle', 'color': 0xFF90CAF9},
     ];
 
-    // Cache existing categories for lookup (case-insensitive)
+    // Cache existing categories for lookup (case-insensitive, normalized)
     final categoryIds = <String, String>{
       for (final cat in existingCategories)
-        if (!cat.isDeleted) cat.name.toLowerCase().trim(): cat.id,
+        if (!cat.isDeleted) _normalizeForDedup(cat.name): cat.id,
     };
 
     // Ensure all categories exist
     var sortIndex = existingCategories.length;
     for (var i = 0; i < categories.length; i++) {
       final name = categories[i]['name'] as String;
-      final lowerName = name.toLowerCase().trim();
+      final normalizedName = _normalizeForDedup(name);
 
-      if (categoryIds.containsKey(lowerName)) continue;
+      if (categoryIds.containsKey(normalizedName)) continue;
 
       final id = uuid.v4();
-      categoryIds[lowerName] = id;
+      categoryIds[normalizedName] = id;
       await db
           .into(db.categories)
           .insert(
@@ -68,7 +68,7 @@ class MenuSeeder {
     final existingItems = await db.select(db.items).get();
     final existingKeys = <String>{};
     for (final item in existingItems) {
-      existingKeys.add('${item.categoryId}|${item.name.toLowerCase().trim()}');
+      existingKeys.add('${item.categoryId}|${_normalizeForDedup(item.name)}');
     }
 
     // --- Define Items ---
@@ -185,8 +185,8 @@ class MenuSeeder {
       // ☕ TEA / COFFEE
       {'category': 'Tea & Coffee', 'name': 'Masala Tea (Half)', 'price': 15},
       {'category': 'Tea & Coffee', 'name': 'Masala Tea (Full)', 'price': 25},
-      {'category': 'Tea & Coffee', 'name': 'Adrak Tea (Half)', 'price': 15},
-      {'category': 'Tea & Coffee', 'name': 'Adrak Tea (Full)', 'price': 25},
+      {'category': 'Tea & Coffee', 'name': 'Adrak Tea (Half)', 'price': 20},
+      {'category': 'Tea & Coffee', 'name': 'Adrak Tea (Full)', 'price': 30},
       {'category': 'Tea & Coffee', 'name': 'Elaichi Tea (Half)', 'price': 20},
       {'category': 'Tea & Coffee', 'name': 'Elaichi Tea (Full)', 'price': 30},
       {'category': 'Tea & Coffee', 'name': 'Pudina Tea (Half)', 'price': 20},
@@ -275,11 +275,11 @@ class MenuSeeder {
     for (final item in items) {
       final name = item['name'] as String;
       final catName = (item['category'] as String).toLowerCase().trim();
-      final catId = categoryIds[catName];
+      final catId = categoryIds[_normalizeForDedup(catName)];
       if (catId == null) continue;
 
       // Use category+name composite key to prevent cross-category false skips
-      final compositeKey = '$catId|${name.toLowerCase().trim()}';
+      final compositeKey = '$catId|${_normalizeForDedup(name)}';
       if (existingKeys.contains(compositeKey)) continue;
 
       await db
@@ -307,20 +307,37 @@ class MenuSeeder {
       logDebug('✅ Menu already seeded. Skipping default seeding.');
     }
   }
+
+  /// Public entry point to run deduplication on categories and items.
+  /// Called after restore to clean duplicates from cloud data.
+  static Future<void> deduplicateAll(AppDatabase db) async {
+    final catDupes = await _dedupeCategories(db);
+    final itemDupes = await _dedupeItems(db);
+    if (catDupes > 0 || itemDupes > 0) {
+      logDebug(
+        '🧹 Post-restore dedup: removed $catDupes category dupes, $itemDupes item dupes',
+      );
+    }
+  }
 }
 
-/// Consolidates duplicate categories (same case-insensitive name) into a single category.
-/// Re-parents items to the kept category and soft-deletes the duplicates.
+/// Normalize a name for dedup comparison: lowercase, trim, strip non-alphanumeric.
+String _normalizeForDedup(String name) {
+  return name.toLowerCase().trim().replaceAll(RegExp(r'[^a-z0-9]'), '');
+}
+
+/// Consolidates duplicate categories (same normalized name) into a single category.
+/// Re-parents items to the kept category and HARD-deletes the duplicates.
 Future<int> _dedupeCategories(AppDatabase db) async {
   final all = await db.select(db.categories).get();
   final seen = <String, String>{};
   final dupes = <String>[];
 
-  // Map lowercase name -> ID of the kept category
+  // Map normalized name -> ID of the kept category
   for (final cat in all) {
     if (cat.isDeleted) continue;
 
-    final key = cat.name.toLowerCase().trim();
+    final key = _normalizeForDedup(cat.name);
     if (seen.containsKey(key)) {
       final keptId = seen[key]!;
       dupes.add(cat.id);
@@ -334,17 +351,16 @@ Future<int> _dedupeCategories(AppDatabase db) async {
   }
 
   if (dupes.isNotEmpty) {
-    await (db.update(db.categories)..where((t) => t.id.isIn(dupes))).write(
-      const CategoriesCompanion(isDeleted: Value(true)),
-    );
+    // Hard-delete so they don't get backed up and restored again
+    await (db.delete(db.categories)..where((t) => t.id.isIn(dupes))).go();
     logDebug(
-      '🧹 Soft-deleted ${dupes.length} duplicate categories and migrated their items.',
+      '🧹 Hard-deleted ${dupes.length} duplicate categories and migrated their items.',
     );
   }
   return dupes.length;
 }
 
-/// Soft-deletes duplicate items (same categoryId + name), keeping the first one.
+/// Hard-deletes duplicate items (same categoryId + normalized name), keeping the first one.
 Future<int> _dedupeItems(AppDatabase db) async {
   final all = await db.select(db.items).get();
   final seen = <String, String>{};
@@ -352,7 +368,7 @@ Future<int> _dedupeItems(AppDatabase db) async {
 
   for (final item in all) {
     if (item.isDeleted) continue;
-    final key = '${item.categoryId}|${item.name.toLowerCase().trim()}';
+    final key = '${item.categoryId}|${_normalizeForDedup(item.name)}';
     if (seen.containsKey(key)) {
       dupes.add(item.id);
     } else {
@@ -361,10 +377,9 @@ Future<int> _dedupeItems(AppDatabase db) async {
   }
 
   if (dupes.isNotEmpty) {
-    await (db.update(db.items)..where((t) => t.id.isIn(dupes))).write(
-      const ItemsCompanion(isDeleted: Value(true)),
-    );
-    logDebug('🧹 Soft-deleted ${dupes.length} duplicate menu items');
+    // Hard-delete so they don't get backed up and restored again
+    await (db.delete(db.items)..where((t) => t.id.isIn(dupes))).go();
+    logDebug('🧹 Hard-deleted ${dupes.length} duplicate menu items');
   }
   return dupes.length;
 }
