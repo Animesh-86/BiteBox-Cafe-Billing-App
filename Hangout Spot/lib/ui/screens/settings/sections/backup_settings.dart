@@ -10,6 +10,7 @@ import 'package:hangout_spot/logic/locations/location_provider.dart';
 import 'package:hangout_spot/ui/screens/analytics/providers/analytics_data_provider.dart';
 import 'package:hangout_spot/services/realtime_order_service.dart';
 import 'package:hangout_spot/services/auto_sync_service.dart';
+import 'package:hangout_spot/data/providers/realtime_services_provider.dart';
 import 'package:hangout_spot/logic/billing/cart_provider.dart';
 import '../utils/password_reauth.dart';
 import '../widgets/settings_shared.dart';
@@ -77,6 +78,8 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('skip_auto_restore', false);
       await ref.read(syncRepositoryProvider).restoreData();
+      // Bump so dashboard live stats re-query the freshly restored data
+      ref.read(remoteSyncGenerationProvider.notifier).state++;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Restore completed successfully")),

@@ -270,6 +270,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ],
               ),
               actions: [
+                IconButton(
+                  icon: Icon(Icons.refresh_rounded, color: coffeeDark),
+                  tooltip: 'Refresh Stats',
+                  onPressed: () {
+                    ref.read(remoteSyncGenerationProvider.notifier).state++;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Dashboard refreshed'),
+                        duration: Duration(milliseconds: 800),
+                      ),
+                    );
+                  },
+                ),
                 Padding(
                   padding: const EdgeInsets.only(right: 16),
                   child: GestureDetector(

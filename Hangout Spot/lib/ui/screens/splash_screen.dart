@@ -2,7 +2,6 @@ import 'package:hangout_spot/utils/log_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/data/repositories/auth_repository.dart';
-import 'package:hangout_spot/data/repositories/menu_repository.dart';
 import 'package:hangout_spot/data/repositories/sync_repository.dart';
 import 'package:hangout_spot/data/local/seed_data.dart';
 import 'package:hangout_spot/ui/screens/main_screen.dart';
@@ -14,6 +13,7 @@ import 'package:hangout_spot/data/providers/inventory_providers.dart';
 import 'package:hangout_spot/services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:hangout_spot/data/providers/realtime_services_provider.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -51,8 +51,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
   Future<void> _seedData() async {
     try {
-      final menuRepo = ref.read(menuRepositoryProvider);
-      await MenuSeeder.seed(menuRepo);
+      // NOTE: Menu seeding is handled by MenuSeeder.seedDefaultMenu()
+      // inside app_database.dart during DB initialization.
+      // The old MenuSeeder.seed(menuRepo) was removed because it created
+      // duplicate items with different UUIDs and casing.
 
       final db = ref.read(appDatabaseProvider);
       await LocationSeeder.seed(db);
@@ -90,6 +92,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         try {
           final syncRepo = ref.read(syncRepositoryProvider);
           await syncRepo.restoreData();
+          // Bump so dashboard live stats show restored data
+          ref.read(remoteSyncGenerationProvider.notifier).state++;
 
           // Start real-time listener for order sync
           final orderService = ref.read(realTimeOrderServiceProvider);

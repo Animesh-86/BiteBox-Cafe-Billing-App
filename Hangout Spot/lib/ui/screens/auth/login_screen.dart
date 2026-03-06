@@ -6,6 +6,7 @@ import 'package:hangout_spot/ui/screens/main_screen.dart';
 import 'package:hangout_spot/data/repositories/sync_repository.dart';
 import 'package:hangout_spot/ui/screens/auth/forgot_password_screen.dart';
 import 'package:hangout_spot/services/realtime_order_service.dart';
+import 'package:hangout_spot/data/providers/realtime_services_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -72,6 +73,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             throw Exception('Auto-restore disabled');
           }
           await ref.read(syncRepositoryProvider).restoreData();
+          // Bump so dashboard live stats show restored data
+          ref.read(remoteSyncGenerationProvider.notifier).state++;
 
           // Start real-time order sync
           final orderService = ref.read(realTimeOrderServiceProvider);
