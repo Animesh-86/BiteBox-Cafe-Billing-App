@@ -1,9 +1,28 @@
+import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/data/repositories/analytics_repository.dart';
 import 'package:hangout_spot/data/providers/database_provider.dart';
 import 'package:hangout_spot/data/providers/realtime_services_provider.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/logic/billing/session_provider.dart';
+
+// Live customer count provider for current session
+final liveCustomerCountProvider = StreamProvider<int>((ref) {
+  final db = ref.watch(appDatabaseProvider);
+  final sessionManager = ref.watch(sessionManagerProvider);
+  final sessionDate = sessionManager.getCurrentSessionDate();
+  final sessionRange = sessionManager.getSessionRange(sessionDate);
+  final startOfDay = sessionRange['start'] ?? DateTime.now();
+  final endOfDay = sessionRange['end'] ?? DateTime.now();
+  final query = db.select(db.orders)
+    ..where((tbl) => tbl.createdAt.isBiggerOrEqualValue(startOfDay))
+    ..where((tbl) => tbl.createdAt.isSmallerThanValue(endOfDay))
+    ..where((tbl) => tbl.status.equals('completed'));
+
+  // For live "customers right now", treat every completed order in
+  // the session window as one customer, regardless of customerId.
+  return query.watch().map((orders) => orders.length);
+});
 
 // Data Models
 class AnalyticsData {
@@ -313,15 +332,16 @@ final analyticsDataProvider =
           );
         }
       } else if (params.filterName == 'Custom Range') {
-        // Push the end date to the end of the day to capture the whole day
+        startDate = DateTime(
+          params.startDate.year,
+          params.startDate.month,
+          params.startDate.day,
+        );
         endDate = DateTime(
           params.endDate.year,
           params.endDate.month,
           params.endDate.day,
-          23,
-          59,
-          59,
-        );
+        ).add(const Duration(days: 1));
       } else {
         // For 'This Week', 'This Month', etc., just let the end boundary be the current moment
         // We do not artificially add +1 day anymore to prevent bleeding into tomorrow

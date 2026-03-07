@@ -896,24 +896,72 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             ),
                             SizedBox(
                               width: cardWidth,
-                              child: FutureBuilder<int>(
-                                future: analytics
-                                    .getSessionUniqueCustomersCount(
-                                      startOfDay,
-                                      endOfDay,
-                                      locationId: currentLocationId,
+                              child: isCurrentSession
+                                  ? Consumer(
+                                      builder: (context, ref, child) {
+                                        final customerCountAsync = ref.watch(
+                                          liveCustomerCountProvider,
+                                        );
+                                        return customerCountAsync.when(
+                                          data: (count) => _StatCard(
+                                            title: "Customers",
+                                            value: "$count",
+                                            icon: Icons.people,
+                                            iconColor:
+                                                theme.brightness ==
+                                                    Brightness.dark
+                                                ? theme.colorScheme.secondary
+                                                : const Color(0xFFEDAD4C),
+                                            isLive: true,
+                                          ),
+                                          loading: () => _StatCard(
+                                            title: "Customers",
+                                            value:
+                                                customerCountAsync
+                                                        .valueOrNull !=
+                                                    null
+                                                ? "${customerCountAsync.valueOrNull}"
+                                                : "...",
+                                            icon: Icons.people,
+                                            iconColor:
+                                                theme.brightness ==
+                                                    Brightness.dark
+                                                ? theme.colorScheme.secondary
+                                                : const Color(0xFFEDAD4C),
+                                            isLive: true,
+                                          ),
+                                          error: (_, __) => _StatCard(
+                                            title: "Customers",
+                                            value: "...",
+                                            icon: Icons.people,
+                                            iconColor:
+                                                theme.brightness ==
+                                                    Brightness.dark
+                                                ? theme.colorScheme.secondary
+                                                : const Color(0xFFEDAD4C),
+                                          ),
+                                        );
+                                      },
+                                    )
+                                  : FutureBuilder<int>(
+                                      future: analytics
+                                          .getSessionUniqueCustomersCount(
+                                            startOfDay,
+                                            endOfDay,
+                                            locationId: currentLocationId,
+                                          ),
+                                      builder: (context, snapshot) => _StatCard(
+                                        title: "Customers",
+                                        value: snapshot.hasData
+                                            ? "${snapshot.data}"
+                                            : "...",
+                                        icon: Icons.people,
+                                        iconColor:
+                                            theme.brightness == Brightness.dark
+                                            ? theme.colorScheme.secondary
+                                            : const Color(0xFFEDAD4C),
+                                      ),
                                     ),
-                                builder: (context, snapshot) => _StatCard(
-                                  title: "Customers",
-                                  value: snapshot.hasData
-                                      ? "${snapshot.data}"
-                                      : "...",
-                                  icon: Icons.people,
-                                  iconColor: theme.brightness == Brightness.dark
-                                      ? theme.colorScheme.secondary
-                                      : const Color(0xFFEDAD4C),
-                                ),
-                              ),
                             ),
                           ],
                         );

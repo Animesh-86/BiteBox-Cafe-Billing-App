@@ -1,4 +1,5 @@
 import 'package:hangout_spot/utils/log_utils.dart';
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/data/providers/database_provider.dart';
@@ -69,91 +70,10 @@ class SessionManager {
     return 'SESSION-${sessionDate.year}-${sessionDate.month.toString().padLeft(2, '0')}-${sessionDate.day.toString().padLeft(2, '0')}';
   }
 
-  /// Get next invoice number for current session
-  /// Uses Firestore transaction to prevent duplicate invoice numbers across devices
+  /// Get next invoice number for current session.
+  /// Optimized for speed: purely local, no network calls.
   Future<String> getNextInvoiceNumber() async {
     final sessionDate = getCurrentSessionDate();
-    final sessionId = getCurrentSessionId();
-
-    try {
-      // Use Firestore transaction for atomic counter increment
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        final counterRef = FirebaseFirestore.instance
-            .collection('cafes')
-            .doc(user.uid)
-            .collection('counters')
-            .doc(sessionId);
-
-        // Get actual actual order count for the session (self-healing for the bug)
-        final sessionStart = DateTime(
-          sessionDate.year,
-          sessionDate.month,
-          sessionDate.day,
-          openingHour,
-        );
-
-        DateTime sessionEnd;
-        if (closingHour <= openingHour) {
-          sessionEnd = DateTime(
-            sessionDate.year,
-            sessionDate.month,
-            sessionDate.day,
-            closingHour,
-          ).add(const Duration(days: 1));
-        } else {
-          sessionEnd = DateTime(
-            sessionDate.year,
-            sessionDate.month,
-            sessionDate.day,
-            closingHour,
-          );
-        }
-        final localCount =
-            await (_db.select(_db.orders)
-                  ..where(
-                    (tbl) => tbl.createdAt.isBiggerOrEqualValue(sessionStart),
-                  )
-                  ..where(
-                    (tbl) => tbl.createdAt.isSmallerThanValue(sessionEnd),
-                  ))
-                .get()
-                .then((list) => list.length);
-
-        final result = await FirebaseFirestore.instance.runTransaction((
-          transaction,
-        ) async {
-          final snapshot = await transaction.get(counterRef);
-
-          int nextNumber;
-          if (!snapshot.exists || localCount == 0) {
-            // First order of the session (or self-heal if local count is 0)
-            nextNumber = 1001;
-            transaction.set(counterRef, {
-              'count': nextNumber,
-              'sessionDate': sessionDate.toIso8601String(),
-              'lastUpdated': FieldValue.serverTimestamp(),
-            });
-          } else {
-            // Self-heal: Ensure count is not lower than actual orders + 1000
-            final currentCount = snapshot.data()?['count'] ?? 1000;
-            nextNumber = currentCount + 1;
-            transaction.update(counterRef, {
-              'count': nextNumber,
-              'lastUpdated': FieldValue.serverTimestamp(),
-            });
-          }
-
-          return nextNumber;
-        });
-
-        return '#$result';
-      }
-    } catch (e) {
-      logDebug('⚠️ Firestore counter failed, falling back to local: $e');
-    }
-
-    // Fallback to local counting (legacy behavior for offline mode)
     final sessionStart = DateTime(
       sessionDate.year,
       sessionDate.month,

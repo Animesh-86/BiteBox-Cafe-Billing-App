@@ -52,6 +52,7 @@ class AutoSyncService {
     _scheduleTimer(Duration(minutes: minutes));
     _startConnectivityListener();
     logDebug('🔄 Auto-Sync started (every $minutes min, connectivity-aware)');
+    // Real-time customer sync listener should be started in app main/init, not here.
   }
 
   /// Stop the running timer (e.g. on logout or when user disables auto-sync).
