@@ -976,7 +976,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           // Assuming current request just wants top stats date-filtered.
                           // Keeping stream as-is for "Live/Recent Activity" context.
 
-                          final orders = snapshot.data!.take(5).toList();
+                          final orders = snapshot.data!.toList();
                           return Column(
                             children: orders.map((order) {
                               final timeAgo = _getTimeAgo(order.createdAt);

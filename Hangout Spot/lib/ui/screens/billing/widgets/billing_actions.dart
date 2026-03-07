@@ -349,19 +349,7 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
         )
         .toList();
 
-    // Update customer stats and reward points (fire-and-forget)
-    if (customerId != null) {
-      orderRepo
-          .updateCustomerStats(customerId, grandTotal)
-          .catchError((e) => logDebug("Customer stats update failed: $e"));
-
-      final rewardBaseAmount = grandTotal + manualDiscount;
-      orderRepo
-          .processRewardForOrder(orderId, rewardBaseAmount, customerId)
-          .catchError((e) => logDebug("Reward processing failed: $e"));
-    }
-
-    // PRINT bill — await to ensure it completes
+    // PRINT bill first — await to ensure it completes
     try {
       await thermalPrinter.printBill(
         order,
@@ -373,6 +361,18 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
       );
     } catch (e) {
       logDebug("Thermal bill print failed: $e");
+    }
+
+    // Update customer stats and reward points (fire-and-forget)
+    if (customerId != null) {
+      orderRepo
+          .updateCustomerStats(customerId, grandTotal)
+          .catchError((e) => logDebug("Customer stats update failed: $e"));
+
+      final rewardBaseAmount = grandTotal + manualDiscount;
+      orderRepo
+          .processRewardForOrder(orderId, rewardBaseAmount, customerId)
+          .catchError((e) => logDebug("Reward processing failed: $e"));
     }
 
     // Auto-Send to WhatsApp (fire-and-forget)
