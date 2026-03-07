@@ -4,6 +4,7 @@ import 'package:hangout_spot/services/live_invoice_counter_service.dart';
 import 'package:hangout_spot/services/shared_cart_service.dart';
 import 'package:hangout_spot/data/repositories/analytics_repository.dart';
 import 'package:hangout_spot/logic/locations/location_provider.dart';
+import 'package:hangout_spot/logic/billing/session_provider.dart';
 
 /// Providers for Firebase Realtime Database services
 
@@ -29,34 +30,63 @@ final sharedCartServiceProvider = Provider<SharedCartService>((ref) {
   return SharedCartService();
 });
 
-/// Stream provider for today's revenue (live)
+/// Stream provider for today's revenue (live, shift-aware)
 final liveRevenueProvider = StreamProvider<double>((ref) async* {
-  // Watch for sync generation changes
-  ref.watch(remoteSyncGenerationProvider);
+  final sessionManager = ref.read(sessionManagerProvider);
   final analytics = ref.read(analyticsRepositoryProvider);
   final locationId = ref.watch(currentLocationIdProvider).valueOrNull;
-  yield await analytics.getTodaySales(locationId: locationId);
+
+  // Re-run whenever remote sync changes to pick up new orders
+  ref.watch(remoteSyncGenerationProvider);
+
+  final sessionDate = sessionManager.getCurrentSessionDate();
+  final range = sessionManager.getSessionRange(sessionDate);
+  final start = range['start']!;
+  final end = range['end']!;
+
+  yield await analytics.getSessionSales(
+    start,
+    end,
+    locationId: locationId,
+  );
 });
 
-/// Stream provider for today's order count (live)
+/// Stream provider for today's order count (live, shift-aware)
 final liveOrderCountProvider = StreamProvider<int>((ref) async* {
-  ref.watch(remoteSyncGenerationProvider);
+  final sessionManager = ref.read(sessionManagerProvider);
   final analytics = ref.read(analyticsRepositoryProvider);
   final locationId = ref.watch(currentLocationIdProvider).valueOrNull;
-  yield await analytics.getTodayOrdersCount(locationId: locationId);
+
+  ref.watch(remoteSyncGenerationProvider);
+
+  final sessionDate = sessionManager.getCurrentSessionDate();
+  final range = sessionManager.getSessionRange(sessionDate);
+  final start = range['start']!;
+  final end = range['end']!;
+
+  yield await analytics.getSessionOrdersCount(
+    start,
+    end,
+    locationId: locationId,
+  );
 });
 
-/// Stream provider for today's item count (live)
+/// Stream provider for today's item count (live, shift-aware)
 final liveItemCountProvider = StreamProvider<int>((ref) async* {
-  ref.watch(remoteSyncGenerationProvider);
+  final sessionManager = ref.read(sessionManagerProvider);
   final analytics = ref.read(analyticsRepositoryProvider);
   final locationId = ref.watch(currentLocationIdProvider).valueOrNull;
-  final now = DateTime.now();
-  final startOfDay = DateTime(now.year, now.month, now.day);
-  final endOfDay = startOfDay.add(const Duration(days: 1));
+
+  ref.watch(remoteSyncGenerationProvider);
+
+  final sessionDate = sessionManager.getCurrentSessionDate();
+  final range = sessionManager.getSessionRange(sessionDate);
+  final start = range['start']!;
+  final end = range['end']!;
+
   yield await analytics.getSessionItemsSold(
-    startOfDay,
-    endOfDay,
+    start,
+    end,
     locationId: locationId,
   );
 });

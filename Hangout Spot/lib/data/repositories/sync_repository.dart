@@ -33,6 +33,9 @@ const _backupPrefKeys = [
   'reward_earning_rate',
   'reward_redemption_rate',
   'last_active_outlet_id',
+  // Operating hours (shift window) so all devices share the same timing
+  'opening_hour',
+  'closing_hour',
 ];
 
 class SyncRepository {
