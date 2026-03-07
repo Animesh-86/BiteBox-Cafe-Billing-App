@@ -33,6 +33,31 @@ class OrderRepository {
        _liveInvoiceCounter = liveInvoiceCounter,
        _inventoryRepo = inventoryRepository;
 
+  /// Title-cases a string (e.g. "GRILLED SANDWICH" → "Grilled Sandwich").
+  static String _titleCase(String s) {
+    if (s.isEmpty) return s;
+    return s
+        .split(' ')
+        .map(
+          (w) => w.isEmpty
+              ? ''
+              : '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}',
+        )
+        .join(' ');
+  }
+
+  /// Returns item name with category suffix when the name alone is ambiguous.
+  static String _itemDisplayName(String itemName, String categoryName) {
+    if (categoryName.isEmpty) return itemName;
+    final nameL = itemName.toLowerCase();
+    final catWords = categoryName.toLowerCase().split(RegExp(r'[\s&]+'));
+    final found = catWords
+        .where((w) => w.length > 2)
+        .any((w) => nameL.contains(w));
+    if (found) return itemName;
+    return '$itemName ${_titleCase(categoryName)}';
+  }
+
   // Stream of Held/Pending Orders
   Stream<List<Order>> watchPendingOrders({String? locationId}) {
     final query = _db.select(_db.orders)
@@ -145,6 +170,11 @@ class OrderRepository {
       );
     }
 
+    // Look up category names so stored item names include category context
+    // Fetch ALL categories for robust lookup (avoids isIn query edge-cases)
+    final allCategories = await _db.select(_db.categories).get();
+    final catMap = {for (final c in allCategories) c.id: c.name};
+
     await _db.transaction(() async {
       // If updating an existing Pending order, delete it first (simplest way to update items)
       if (cart.orderId != null) {
@@ -184,7 +214,12 @@ class OrderRepository {
                 id: Value(const Uuid().v4()),
                 orderId: Value(orderId),
                 itemId: Value(ci.item.id),
-                itemName: Value(ci.item.name),
+                itemName: Value(
+                  _itemDisplayName(
+                    ci.item.name,
+                    catMap[ci.item.categoryId] ?? '',
+                  ),
+                ),
                 price: Value(ci.item.price),
                 quantity: Value(ci.quantity),
                 note: Value(ci.note),

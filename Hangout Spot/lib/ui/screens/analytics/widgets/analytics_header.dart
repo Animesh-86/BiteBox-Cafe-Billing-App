@@ -120,10 +120,7 @@ class AnalyticsHeader extends ConsumerWidget {
                     Navigator.pop(context);
                     _selectDateRange(context);
                   },
-                  icon: Icon(
-                    Icons.calendar_month_rounded,
-                    color: Colors.black,
-                  ),
+                  icon: Icon(Icons.calendar_month_rounded, color: Colors.black),
                   label: Text(
                     'Custom Range',
                     style: TextStyle(
@@ -167,14 +164,18 @@ class AnalyticsHeader extends ConsumerWidget {
               : AnalyticsTheme.cardBackground(context),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: AnalyticsTheme.primaryGold(context).withOpacity(isSelected ? 1 : 0.3),
+            color: AnalyticsTheme.primaryGold(
+              context,
+            ).withOpacity(isSelected ? 1 : 0.3),
             width: 1,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? Colors.black : AnalyticsTheme.primaryText(context),
+            color: isSelected
+                ? Colors.black
+                : AnalyticsTheme.primaryText(context),
             fontSize: 14,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
           ),
@@ -221,7 +222,9 @@ class AnalyticsHeader extends ConsumerWidget {
                   decoration: BoxDecoration(
                     color: currentOutlet == null
                         ? AnalyticsTheme.primaryGold(context).withOpacity(0.2)
-                        : AnalyticsTheme.secondaryBeige(context).withOpacity(0.1),
+                        : AnalyticsTheme.secondaryBeige(
+                            context,
+                          ).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
@@ -263,7 +266,9 @@ class AnalyticsHeader extends ConsumerWidget {
                     decoration: BoxDecoration(
                       color: location.id == currentOutlet?.id
                           ? AnalyticsTheme.primaryGold(context).withOpacity(0.2)
-                          : AnalyticsTheme.secondaryBeige(context).withOpacity(0.1),
+                          : AnalyticsTheme.secondaryBeige(
+                              context,
+                            ).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
@@ -345,7 +350,10 @@ class AnalyticsHeader extends ConsumerWidget {
       decoration: BoxDecoration(
         color: AnalyticsTheme.cardBackground(context).withOpacity(0.5),
         border: Border(
-          bottom: BorderSide(color: AnalyticsTheme.borderColor(context), width: 1),
+          bottom: BorderSide(
+            color: AnalyticsTheme.borderColor(context),
+            width: 1,
+          ),
         ),
       ),
       child: Column(
@@ -354,22 +362,12 @@ class AnalyticsHeader extends ConsumerWidget {
           // Top Row: Menu | Title | Export
           Row(
             children: [
-              Container(
-                decoration: BoxDecoration(
-                  color: AnalyticsTheme.cardBackground(context),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AnalyticsTheme.borderColor(context)),
-                ),
-                child: IconButton(
-                  icon: Icon(Icons.menu_rounded),
-                  color: AnalyticsTheme.primaryGold(context),
-                  onPressed: onMenuPressed,
-                  constraints: const BoxConstraints(
-                    minWidth: 40,
-                    minHeight: 40,
-                  ),
-                  padding: EdgeInsets.zero,
-                ),
+              IconButton(
+                icon: Icon(Icons.menu_rounded),
+                color: AnalyticsTheme.primaryGold(context),
+                onPressed: onMenuPressed,
+                constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                padding: EdgeInsets.zero,
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -384,40 +382,30 @@ class AnalyticsHeader extends ConsumerWidget {
                 ),
               ),
               if (isExporting)
-                Container(
+                SizedBox(
                   width: 40,
                   height: 40,
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AnalyticsTheme.cardBackground(context),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AnalyticsTheme.borderColor(context)),
-                  ),
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      AnalyticsTheme.primaryGold(context),
+                  child: Padding(
+                    padding: const EdgeInsets.all(10),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        AnalyticsTheme.primaryGold(context),
+                      ),
                     ),
                   ),
                 )
               else if (onExportPressed != null)
-                Container(
-                  decoration: BoxDecoration(
-                    color: AnalyticsTheme.cardBackground(context),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AnalyticsTheme.borderColor(context)),
+                IconButton(
+                  icon: Icon(Icons.download_rounded),
+                  color: AnalyticsTheme.primaryGold(context),
+                  tooltip: 'Export to Excel',
+                  onPressed: onExportPressed,
+                  constraints: const BoxConstraints(
+                    minWidth: 40,
+                    minHeight: 40,
                   ),
-                  child: IconButton(
-                    icon: Icon(Icons.download_rounded),
-                    color: AnalyticsTheme.primaryGold(context),
-                    tooltip: 'Export to Excel',
-                    onPressed: onExportPressed,
-                    constraints: const BoxConstraints(
-                      minWidth: 40,
-                      minHeight: 40,
-                    ),
-                    padding: EdgeInsets.zero,
-                  ),
+                  padding: EdgeInsets.zero,
                 )
               else
                 const SizedBox(width: 40, height: 40),
@@ -439,7 +427,9 @@ class AnalyticsHeader extends ConsumerWidget {
                     decoration: AnalyticsTheme.glassCard(context).copyWith(
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: AnalyticsTheme.primaryGold(context).withOpacity(0.3),
+                        color: AnalyticsTheme.primaryGold(
+                          context,
+                        ).withOpacity(0.3),
                       ),
                     ),
                     child: Row(
@@ -482,7 +472,9 @@ class AnalyticsHeader extends ConsumerWidget {
                                   child: Text(
                                     activeOutlet.address!,
                                     style: TextStyle(
-                                      color: AnalyticsTheme.secondaryText(context),
+                                      color: AnalyticsTheme.secondaryText(
+                                        context,
+                                      ),
                                       fontSize: 10,
                                     ),
                                     maxLines: 1,
@@ -515,7 +507,9 @@ class AnalyticsHeader extends ConsumerWidget {
                     decoration: AnalyticsTheme.glassCard(context).copyWith(
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: AnalyticsTheme.primaryGold(context).withOpacity(0.3),
+                        color: AnalyticsTheme.primaryGold(
+                          context,
+                        ).withOpacity(0.3),
                       ),
                     ),
                     child: Row(

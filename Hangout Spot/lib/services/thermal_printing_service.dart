@@ -365,6 +365,7 @@ class ThermalPrintingService {
     List<OrderItem> items, {
     String? storeName,
     String? storeAddress,
+    Map<String, String>? itemCategories,
   }) async {
     if (!await _ensureConnected()) return;
 
@@ -399,29 +400,15 @@ class ThermalPrintingService {
 
     // Items
     for (var item in items) {
-      // Word-wrap item name at word boundaries (16 chars/line for size2 on 58mm)
-      for (final line in _wordWrap(item.itemName, 16)) {
-        bytes += generator.text(
-          line,
-          styles: const PosStyles(
-            height: PosTextSize.size2,
-            width: PosTextSize.size2,
-            bold: true,
-          ),
-        );
+      // Print category name above item if available
+      final category = itemCategories?[item.itemId];
+      if (category != null && category.isNotEmpty) {
+        bytes += generator.text('[$category]');
       }
-
-      // Print quantity
-      bytes += generator.text(
-        'Qty: ${item.quantity}',
-        styles: const PosStyles(height: PosTextSize.size2, bold: true),
-      );
-
+      bytes += generator.text(item.itemName);
+      bytes += generator.text('Qty: ${item.quantity}');
       if (item.note != null && item.note!.isNotEmpty) {
-        bytes += generator.text(
-          'Note: ${item.note}',
-          styles: const PosStyles(fontType: PosFontType.fontB),
-        );
+        bytes += generator.text('Note: ${item.note}');
       }
       bytes += generator.hr();
     }

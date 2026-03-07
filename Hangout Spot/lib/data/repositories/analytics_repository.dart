@@ -139,7 +139,8 @@ class AnalyticsRepository {
       ..addColumns([_db.orders.customerId.count(distinct: true)])
       ..where(_db.orders.createdAt.isBiggerOrEqualValue(startOfDay))
       ..where(_db.orders.status.equals('completed'))
-      ..where(_db.orders.customerId.isNotNull());
+      ..where(_db.orders.customerId.isNotNull())
+      ..where(_db.orders.customerId.equals(CustomerDefaults.walkInId).not());
     if (locationId != null) {
       namedQuery.where(_db.orders.locationId.equals(locationId));
     }
@@ -151,7 +152,10 @@ class AnalyticsRepository {
       ..addColumns([_db.orders.id.count()])
       ..where(_db.orders.createdAt.isBiggerOrEqualValue(startOfDay))
       ..where(_db.orders.status.equals('completed'))
-      ..where(_db.orders.customerId.isNull());
+      ..where(
+        _db.orders.customerId.isNull() |
+            _db.orders.customerId.equals(CustomerDefaults.walkInId),
+      );
     if (locationId != null) {
       walkInQuery.where(_db.orders.locationId.equals(locationId));
     }
@@ -170,7 +174,8 @@ class AnalyticsRepository {
       ..where(_db.orders.createdAt.isBiggerOrEqualValue(start))
       ..where(_db.orders.createdAt.isSmallerThanValue(end))
       ..where(_db.orders.status.equals('completed'))
-      ..where(_db.orders.customerId.isNotNull());
+      ..where(_db.orders.customerId.isNotNull())
+      ..where(_db.orders.customerId.equals(CustomerDefaults.walkInId).not());
     if (locationId != null) {
       namedQuery.where(_db.orders.locationId.equals(locationId));
     }
@@ -183,7 +188,10 @@ class AnalyticsRepository {
       ..where(_db.orders.createdAt.isBiggerOrEqualValue(start))
       ..where(_db.orders.createdAt.isSmallerThanValue(end))
       ..where(_db.orders.status.equals('completed'))
-      ..where(_db.orders.customerId.isNull());
+      ..where(
+        _db.orders.customerId.isNull() |
+            _db.orders.customerId.equals(CustomerDefaults.walkInId),
+      );
     if (locationId != null) {
       walkInQuery.where(_db.orders.locationId.equals(locationId));
     }

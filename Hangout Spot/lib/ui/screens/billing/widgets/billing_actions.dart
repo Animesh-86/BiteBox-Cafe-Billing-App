@@ -25,6 +25,33 @@ Future<bool> _isBillWhatsAppEnabled() async {
   return prefs.getBool(BILL_WHATSAPP_ENABLED_KEY) ?? true;
 }
 
+/// Title-cases a string (e.g. "GRILLED SANDWICH" → "Grilled Sandwich").
+String _titleCase(String s) {
+  if (s.isEmpty) return s;
+  return s
+      .split(' ')
+      .map(
+        (w) => w.isEmpty
+            ? ''
+            : '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}',
+      )
+      .join(' ');
+}
+
+/// Returns a display name for the item that includes category context
+/// when the item name alone would be ambiguous (e.g. "Veg Cheese" → "Veg Cheese Grilled Sandwich").
+String _displayName(String itemName, String categoryName) {
+  if (categoryName.isEmpty) return itemName;
+  final nameL = itemName.toLowerCase();
+  // Check if any significant word from the category is already in the item name
+  final catWords = categoryName.toLowerCase().split(RegExp(r'[\s&]+'));
+  final found = catWords
+      .where((w) => w.length > 2)
+      .any((w) => nameL.contains(w));
+  if (found) return itemName;
+  return '$itemName ${_titleCase(categoryName)}';
+}
+
 Future<void> printKot(BuildContext context, WidgetRef ref) async {
   final cart = ref.read(cartProvider);
   if (cart.items.isEmpty) {
@@ -57,20 +84,40 @@ Future<void> printKot(BuildContext context, WidgetRef ref) async {
       isSynced: false,
     );
 
-    final items = cart.items
-        .map(
-          (ci) => OrderItem(
-            id: const Uuid().v4(),
-            orderId: orderId,
-            itemId: ci.item.id,
-            itemName: ci.item.name,
-            price: ci.item.price,
-            quantity: ci.quantity,
-            discountAmount: ci.discountAmount,
-            note: ci.note,
-          ),
-        )
-        .toList();
+    // Look up category names so KOT prints clear item names
+    // Fetch ALL categories for robust lookup (avoids isIn query edge-cases)
+    final db = ref.read(appDatabaseProvider);
+    final allCategories = await db.select(db.categories).get();
+    final catMap = {for (final c in allCategories) c.id: c.name};
+    logDebug('[KOT] Found ${allCategories.length} categories');
+
+    // Build itemId → category name map for the thermal printer
+    final itemCategoryMap = <String, String>{};
+    for (final ci in cart.items) {
+      final catName = catMap[ci.item.categoryId] ?? '';
+      itemCategoryMap[ci.item.id] = _titleCase(catName);
+      logDebug(
+        '[KOT] Item "${ci.item.name}" catId=${ci.item.categoryId} catName="$catName"',
+      );
+    }
+
+    final items = cart.items.map((ci) {
+      final displayName = _displayName(
+        ci.item.name,
+        catMap[ci.item.categoryId] ?? '',
+      );
+      logDebug('[KOT] Final print name: "$displayName"');
+      return OrderItem(
+        id: const Uuid().v4(),
+        orderId: orderId,
+        itemId: ci.item.id,
+        itemName: displayName,
+        price: ci.item.price,
+        quantity: ci.quantity,
+        discountAmount: ci.discountAmount,
+        note: ci.note,
+      );
+    }).toList();
 
     // Capture provider refs BEFORE popping (WidgetRef dies after pop)
     final thermalPrinter = ref.read(thermalPrintingServiceProvider);
@@ -91,17 +138,18 @@ Future<void> printKot(BuildContext context, WidgetRef ref) async {
       }
     }
 
-    // 1. Try Thermal Print in Background (Non-blocking, uses captured refs)
+    // Try Thermal Print (uses captured refs)
     try {
       final activeOutlet = await activeOutletFuture;
-      thermalPrinter.printKot(
+      await thermalPrinter.printKot(
         order,
         items,
         storeName: activeOutlet?.name,
         storeAddress: activeOutlet?.address,
+        itemCategories: itemCategoryMap,
       );
     } catch (e) {
-      logDebug("Thermal print failed: $e");
+      logDebug("Thermal KOT print failed: $e");
     }
   } catch (e) {
     if (context.mounted) {
@@ -204,6 +252,8 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
     final shareService = ref.read(shareServiceProvider);
     // Pre-fetch active outlet (usually cached, very fast)
     final activeOutletFuture = ref.read(activeOutletProvider.future);
+    // Capture sync notifier BEFORE pop (WidgetRef dies after Navigator.pop)
+    final syncNotifier = ref.read(remoteSyncGenerationProvider.notifier);
     // Pre-fetch reward balance if customer selected
     Future<double?>? rewardBalanceFuture;
     if (customer != null) {
@@ -211,6 +261,17 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
           .read(customerRewardBalanceProvider(customer.id).future)
           .then<double?>((v) => v)
           .catchError((_) => null as double?);
+    }
+
+    // Look up category names so bill prints clear item names
+    // Fetch ALL categories for robust lookup (avoids isIn query edge-cases)
+    final allCategories = await db.select(db.categories).get();
+    final catMap = {for (final c in allCategories) c.id: c.name};
+    logDebug('[BILL] Found ${allCategories.length} categories');
+    for (final ci in cart.items) {
+      logDebug(
+        '[BILL] Item "${ci.item.name}" catId=${ci.item.categoryId} catName="${catMap[ci.item.categoryId] ?? '(none)'}"',
+      );
     }
 
     // CLEAR CART AND CLOSE UI IMMEDIATELY — zero wait
@@ -244,7 +305,9 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
     );
 
     // Bump sync generation so dashboard live stats re-query local DB
-    ref.read(remoteSyncGenerationProvider.notifier).state++;
+    try {
+      syncNotifier.state++;
+    } catch (_) {}
 
     // Build Order from in-memory cart data + fast PK lookup for invoice number
     // (a single indexed SELECT by primary key is ~1ms — negligible)
@@ -274,7 +337,10 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
             id: const Uuid().v4(),
             orderId: orderId,
             itemId: ci.item.id,
-            itemName: ci.item.name,
+            itemName: _displayName(
+              ci.item.name,
+              catMap[ci.item.categoryId] ?? '',
+            ),
             price: ci.item.price,
             quantity: ci.quantity,
             discountAmount: ci.discountAmount,
@@ -295,19 +361,19 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
           .catchError((e) => logDebug("Reward processing failed: $e"));
     }
 
-    // PRINT instantly — data is constructed from memory, no DB round-trip
-    thermalPrinter
-        .printBill(
-          order,
-          items,
-          customer,
-          storeName: activeOutlet?.name,
-          storeAddress: activeOutlet?.address,
-          customerRewardBalance: rewardBalance,
-        )
-        .catchError((e) {
-          logDebug("Thermal print failed: $e");
-        });
+    // PRINT bill — await to ensure it completes
+    try {
+      await thermalPrinter.printBill(
+        order,
+        items,
+        customer,
+        storeName: activeOutlet?.name,
+        storeAddress: activeOutlet?.address,
+        customerRewardBalance: rewardBalance,
+      );
+    } catch (e) {
+      logDebug("Thermal bill print failed: $e");
+    }
 
     // Auto-Send to WhatsApp (fire-and-forget)
     _isBillWhatsAppEnabled()
@@ -326,6 +392,7 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
     //   await showPostCheckoutActions(context, ref, orderId, customer);
     // }
   } catch (e) {
+    logDebug("Checkout background error: $e");
     if (context.mounted) {
       ScaffoldMessenger.of(
         context,

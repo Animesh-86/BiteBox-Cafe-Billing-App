@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/data/models/inventory_models.dart';
 import 'package:hangout_spot/data/providers/inventory_providers.dart';
-import 'package:hangout_spot/logic/billing/session_provider.dart'
-    as billing_session;
 import 'package:hangout_spot/services/notification_service.dart';
 import 'package:uuid/uuid.dart';
 
@@ -91,7 +89,7 @@ class InventoryRemindersScreen extends ConsumerWidget {
     return Card(
       child: ListTile(
         title: const Text('Daily inventory update reminder'),
-        subtitle: const Text('Remind before session ends'),
+        subtitle: const Text('Scheduled daily at 1:00 AM'),
         trailing: FilledButton(
           onPressed: () => _createDailyUpdateReminder(context, ref),
           child: const Text('Enable'),
@@ -269,11 +267,7 @@ class InventoryRemindersScreen extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
   ) async {
-    final sessionManager = ref.read(billing_session.sessionManagerProvider);
-    final defaultTime = TimeOfDay(
-      hour: (sessionManager.closingHour - 1) % 24,
-      minute: 0,
-    );
+    const defaultTime = TimeOfDay(hour: 1, minute: 0);
 
     final reminder = InventoryReminder(
       id: const Uuid().v4(),

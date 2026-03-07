@@ -114,7 +114,9 @@ class ManageMenuScreen extends ConsumerWidget {
                   },
                   icon: Icon(Icons.add_circle_outline, size: 16, color: coffee),
                   label: Text(
-                    'Add Item',
+                    selectedCat == null || selectedCat == 'all'
+                        ? 'Add Item'
+                        : 'Add ${_getCategoryName(ref, selectedCat)}',
                     style: TextStyle(color: coffee, fontSize: 12),
                   ),
                   style: TextButton.styleFrom(
