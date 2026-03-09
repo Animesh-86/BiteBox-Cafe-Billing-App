@@ -261,16 +261,32 @@ class InventoryRepository {
 
     for (final item in defaults) {
       final id = _slugify(item['name'] as String);
-      await _itemsRef().doc(id).set({
-        'name': item['name'],
-        'category': item['category'],
-        'unit': item['unit'],
-        'currentQty': item['currentQty'],
-        'minQty': item['minQty'],
-        'price': item['price'],
-        'isActive': true,
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      final docRef = _itemsRef().doc(id);
+      final snapshot = await docRef.get();
+
+      if (!snapshot.exists) {
+        // First-time creation: write everything including the initial qty.
+        await docRef.set({
+          'name': item['name'],
+          'category': item['category'],
+          'unit': item['unit'],
+          'currentQty': item['currentQty'],
+          'minQty': item['minQty'],
+          'price': item['price'],
+          'isActive': true,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      } else {
+        // Doc already exists: only update metadata, never touch currentQty.
+        await docRef.set({
+          'name': item['name'],
+          'category': item['category'],
+          'unit': item['unit'],
+          'price': item['price'],
+          'isActive': true,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
     }
   }
 
