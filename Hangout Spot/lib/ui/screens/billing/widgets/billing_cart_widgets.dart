@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/data/repositories/customer_repository.dart';
 import 'package:hangout_spot/data/repositories/sync_repository.dart';
+import 'package:hangout_spot/data/constants/customer_defaults.dart';
 import 'package:hangout_spot/logic/billing/cart_provider.dart';
 import 'package:hangout_spot/logic/rewards/reward_provider.dart';
 import 'package:hangout_spot/ui/screens/billing/widgets/billing_actions.dart';
@@ -239,6 +240,7 @@ class _CartCustomerSectionState extends ConsumerState<CartCustomerSection> {
 
   String _query = '';
   bool _showSuggestions = false;
+  bool _showSavedFields = false;
 
   bool get _isEditing => _nameFocus.hasFocus || _phoneFocus.hasFocus;
 
@@ -251,12 +253,15 @@ class _CartCustomerSectionState extends ConsumerState<CartCustomerSection> {
     final cart = ref.read(cartProvider);
     _nameController.text = cart.customer?.name ?? '';
     _phoneController.text = cart.customer?.phone ?? '';
+    _showSavedFields = _isSavedCustomer(cart.customer);
 
     _cartListener = ref.listenManual<CartState>(cartProvider, (prev, next) {
       if (_isEditing) return;
       final customer = next.customer;
       _nameController.text = customer?.name ?? '';
       _phoneController.text = customer?.phone ?? '';
+      if (mounted)
+        setState(() => _showSavedFields = _isSavedCustomer(customer));
     });
   }
 
@@ -341,9 +346,83 @@ class _CartCustomerSectionState extends ConsumerState<CartCustomerSection> {
     setState(() => _showSuggestions = false);
   }
 
+  /// Returns true if [customer] is a real saved customer (not a default/platform one).
+  bool _isSavedCustomer(Customer? customer) {
+    if (customer == null) return false;
+    return !CustomerDefaults.seeded.any((s) => s.id == customer.id);
+  }
+
+  /// Returns the active order type key based on the current cart customer.
+  String _orderTypeOf(Customer? customer) {
+    if (customer == null || customer.id == CustomerDefaults.walkInId) {
+      return 'walkin';
+    }
+    if (customer.id == CustomerDefaults.zomatoId) return 'zomato';
+    if (customer.id == CustomerDefaults.swiggyId) return 'swiggy';
+    return 'saved';
+  }
+
+  Future<void> _handleOrderTypeChip(String type) async {
+    final repo = ref.read(customerRepositoryProvider);
+    final notifier = ref.read(cartProvider.notifier);
+    _nameController.clear();
+    _phoneController.clear();
+
+    if (type == 'walkin') {
+      notifier.clearCustomerSelection();
+      setState(() {
+        _showSavedFields = false;
+        _showSuggestions = false;
+      });
+      return;
+    }
+
+    if (type == 'saved') {
+      // If a default customer was selected, clear it so fields are blank.
+      if (!_isSavedCustomer(ref.read(cartProvider).customer)) {
+        notifier.clearCustomerSelection();
+      }
+      setState(() {
+        _showSavedFields = true;
+        _showSuggestions = false;
+      });
+      return;
+    }
+
+    // Zomato / Swiggy
+    final id = type == 'zomato'
+        ? CustomerDefaults.zomatoId
+        : CustomerDefaults.swiggyId;
+    final customer = await repo.getCustomerById(id);
+    if (customer != null) notifier.setCustomer(customer);
+    setState(() {
+      _showSavedFields = false;
+      _showSuggestions = false;
+    });
+  }
+
+  Widget _orderChip(
+    String activeType,
+    String value,
+    String label,
+    IconData icon,
+  ) {
+    final selected = activeType == value;
+    return ChoiceChip(
+      label: Text(label),
+      avatar: Icon(icon, size: 14),
+      selected: selected,
+      onSelected: (_) => _handleOrderTypeChip(value),
+      visualDensity: VisualDensity.compact,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      labelStyle: Theme.of(context).textTheme.labelSmall,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cart = ref.watch(cartProvider);
+    final activeType = _orderTypeOf(cart.customer);
     final repo = ref.read(customerRepositoryProvider);
     final query = _query.trim();
 
@@ -391,7 +470,10 @@ class _CartCustomerSectionState extends ConsumerState<CartCustomerSection> {
                     ref.read(cartProvider.notifier).clearCustomerSelection();
                     _nameController.clear();
                     _phoneController.clear();
-                    setState(() => _showSuggestions = false);
+                    setState(() {
+                      _showSuggestions = false;
+                      _showSavedFields = false;
+                    });
                   },
                   child: const Text('Clear'),
                 ),
@@ -406,51 +488,28 @@ class _CartCustomerSectionState extends ConsumerState<CartCustomerSection> {
             ],
           ),
           const SizedBox(height: 8),
-          if (widget.compact)
-            Column(
-              children: [
-                TextField(
-                  controller: _nameController,
-                  focusNode: _nameFocus,
-                  decoration: _compactDecoration('Name'),
-                  style: Theme.of(context).textTheme.bodySmall,
-                  textInputAction: TextInputAction.next,
-                  onChanged: (value) {
-                    setState(() {
-                      _query = value;
-                      _showSuggestions = value.trim().isNotEmpty;
-                    });
-                  },
-                ),
-                SizedBox(height: fieldSpacing),
-                TextField(
-                  controller: _phoneController,
-                  focusNode: _phoneFocus,
-                  decoration: _compactDecoration('Phone'),
-                  style: Theme.of(context).textTheme.bodySmall,
-                  keyboardType: TextInputType.phone,
-                  textInputAction: TextInputAction.done,
-                  onChanged: (value) {
-                    setState(() {
-                      _query = value;
-                      _showSuggestions = value.trim().isNotEmpty;
-                    });
-                  },
-                  onSubmitted: (_) => _saveOrSelectCustomer(),
-                ),
-              ],
-            )
-          else
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
+          // Order type quick-select
+          Row(
+            children: [
+              _orderChip(activeType, 'walkin', 'Walk-in', Icons.person_outline),
+              const SizedBox(width: 6),
+              _orderChip(activeType, 'saved', 'Saved', Icons.loyalty_outlined),
+              const SizedBox(width: 6),
+              _orderChip(activeType, 'zomato', 'Zomato', Icons.delivery_dining),
+              const SizedBox(width: 6),
+              _orderChip(activeType, 'swiggy', 'Swiggy', Icons.moped_outlined),
+            ],
+          ),
+          if (_showSavedFields) ...[
+            const SizedBox(height: 8),
+            if (widget.compact)
+              Column(
+                children: [
+                  TextField(
                     controller: _nameController,
                     focusNode: _nameFocus,
-                    decoration: const InputDecoration(
-                      labelText: 'Name',
-                      border: OutlineInputBorder(),
-                    ),
+                    decoration: _compactDecoration('Name'),
+                    style: Theme.of(context).textTheme.bodySmall,
                     textInputAction: TextInputAction.next,
                     onChanged: (value) {
                       setState(() {
@@ -459,16 +518,12 @@ class _CartCustomerSectionState extends ConsumerState<CartCustomerSection> {
                       });
                     },
                   ),
-                ),
-                SizedBox(width: fieldSpacing),
-                Expanded(
-                  child: TextField(
+                  SizedBox(height: fieldSpacing),
+                  TextField(
                     controller: _phoneController,
                     focusNode: _phoneFocus,
-                    decoration: const InputDecoration(
-                      labelText: 'Phone',
-                      border: OutlineInputBorder(),
-                    ),
+                    decoration: _compactDecoration('Phone'),
+                    style: Theme.of(context).textTheme.bodySmall,
                     keyboardType: TextInputType.phone,
                     textInputAction: TextInputAction.done,
                     onChanged: (value) {
@@ -479,136 +534,179 @@ class _CartCustomerSectionState extends ConsumerState<CartCustomerSection> {
                     },
                     onSubmitted: (_) => _saveOrSelectCustomer(),
                   ),
+                ],
+              )
+            else
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _nameController,
+                      focusNode: _nameFocus,
+                      decoration: const InputDecoration(
+                        labelText: 'Name',
+                        border: OutlineInputBorder(),
+                      ),
+                      textInputAction: TextInputAction.next,
+                      onChanged: (value) {
+                        setState(() {
+                          _query = value;
+                          _showSuggestions = value.trim().isNotEmpty;
+                        });
+                      },
+                    ),
+                  ),
+                  SizedBox(width: fieldSpacing),
+                  Expanded(
+                    child: TextField(
+                      controller: _phoneController,
+                      focusNode: _phoneFocus,
+                      decoration: const InputDecoration(
+                        labelText: 'Phone',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.phone,
+                      textInputAction: TextInputAction.done,
+                      onChanged: (value) {
+                        setState(() {
+                          _query = value;
+                          _showSuggestions = value.trim().isNotEmpty;
+                        });
+                      },
+                      onSubmitted: (_) => _saveOrSelectCustomer(),
+                    ),
+                  ),
+                ],
+              ),
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                FilledButton.icon(
+                  onPressed: _saveOrSelectCustomer,
+                  icon: const Icon(Icons.check, size: 14),
+                  label: const Text('Use Customer'),
+                  style: FilledButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    minimumSize: const Size(0, 0),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
                 ),
+                const SizedBox(width: 8),
+                if (cart.customer != null)
+                  Flexible(
+                    child: Row(
+                      children: [
+                        Text(
+                          '${cart.customer!.name} (${cart.customer!.totalVisits} visits)',
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(color: billingMutedText(context)),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(width: 6),
+                        FutureBuilder<bool>(
+                          future: ref.watch(
+                            isRewardSystemEnabledProvider.future,
+                          ),
+                          builder: (context, snapshot) {
+                            if (!snapshot.hasData || !snapshot.data!) {
+                              return const SizedBox.shrink();
+                            }
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: ref
+                                  .watch(
+                                    customerRewardBalanceProvider(
+                                      cart.customer!.id,
+                                    ),
+                                  )
+                                  .when(
+                                    data: (balance) => Text(
+                                      '${balance.toInt()} pts',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelSmall
+                                          ?.copyWith(
+                                            color: Colors.orange,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                    ),
+                                    loading: () => Text(
+                                      '... pts',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelSmall
+                                          ?.copyWith(
+                                            color: Colors.orange,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                    ),
+                                    error: (_, __) => Text(
+                                      '0 pts',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelSmall
+                                          ?.copyWith(
+                                            color: Colors.orange,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                    ),
+                                  ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
               ],
             ),
-          const SizedBox(height: 8),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              FilledButton.icon(
-                onPressed: _saveOrSelectCustomer,
-                icon: const Icon(Icons.check, size: 14),
-                label: const Text('Use Customer'),
-                style: FilledButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  minimumSize: const Size(0, 0),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-              ),
-              const SizedBox(width: 8),
-              if (cart.customer != null)
-                Flexible(
-                  child: Row(
-                    children: [
-                      Text(
-                        '${cart.customer!.name} (${cart.customer!.totalVisits} visits)',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: billingMutedText(context),
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(width: 6),
-                      FutureBuilder<bool>(
-                        future: ref.watch(isRewardSystemEnabledProvider.future),
-                        builder: (context, snapshot) {
-                          if (!snapshot.hasData || !snapshot.data!) {
-                            return const SizedBox.shrink();
-                          }
-                          return Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: ref
-                                .watch(
-                                  customerRewardBalanceProvider(
-                                    cart.customer!.id,
-                                  ),
-                                )
-                                .when(
-                                  data: (balance) => Text(
-                                    '${balance.toInt()} pts',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .labelSmall
-                                        ?.copyWith(
-                                          color: Colors.orange,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                  ),
-                                  loading: () => Text(
-                                    '... pts',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .labelSmall
-                                        ?.copyWith(
-                                          color: Colors.orange,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                  ),
-                                  error: (_, __) => Text(
-                                    '0 pts',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .labelSmall
-                                        ?.copyWith(
-                                          color: Colors.orange,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                  ),
-                                ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-          StreamBuilder<List<Customer>>(
-            stream: suggestionsStream,
-            builder: (context, snapshot) {
-              final customers = snapshot.data ?? [];
-              if (!_showSuggestions || customers.isEmpty) {
-                return const SizedBox.shrink();
-              }
+            StreamBuilder<List<Customer>>(
+              stream: suggestionsStream,
+              builder: (context, snapshot) {
+                final customers = snapshot.data ?? [];
+                if (!_showSuggestions || customers.isEmpty) {
+                  return const SizedBox.shrink();
+                }
 
-              final limited = customers.take(6).toList();
-              return Container(
-                margin: const EdgeInsets.only(top: 8),
-                decoration: BoxDecoration(
-                  color: billingSurface(context, darkOpacity: 0.08),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: billingOutline(context)),
-                ),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemBuilder: (context, index) {
-                    final customer = limited[index];
-                    return ListTile(
-                      dense: true,
-                      title: Text(customer.name),
-                      subtitle: Text(customer.phone ?? 'No phone'),
-                      trailing: Text('${customer.totalVisits} visits'),
-                      onTap: () => _selectCustomer(customer),
-                    );
-                  },
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemCount: limited.length,
-                ),
-              );
-            },
-          ),
+                final limited = customers.take(6).toList();
+                return Container(
+                  margin: const EdgeInsets.only(top: 8),
+                  decoration: BoxDecoration(
+                    color: billingSurface(context, darkOpacity: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: billingOutline(context)),
+                  ),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemBuilder: (context, index) {
+                      final customer = limited[index];
+                      return ListTile(
+                        dense: true,
+                        title: Text(customer.name),
+                        subtitle: Text(customer.phone ?? 'No phone'),
+                        trailing: Text('${customer.totalVisits} visits'),
+                        onTap: () => _selectCustomer(customer),
+                      );
+                    },
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemCount: limited.length,
+                  ),
+                );
+              },
+            ),
+          ], // end if (_showSavedFields)
         ],
       ),
     );

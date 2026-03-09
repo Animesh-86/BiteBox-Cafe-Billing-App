@@ -100,7 +100,8 @@ class SessionManager {
 
     final query = _db.select(_db.orders)
       ..where((tbl) => tbl.createdAt.isBiggerOrEqualValue(sessionStart))
-      ..where((tbl) => tbl.createdAt.isSmallerThanValue(sessionEnd));
+      ..where((tbl) => tbl.createdAt.isSmallerThanValue(sessionEnd))
+      ..where((tbl) => tbl.status.isNotValue('pending'));
 
     final count = await query.get();
     final nextNumber = 1001 + count.length;
@@ -145,7 +146,8 @@ class SessionManager {
                 )
                 ..where(
                   (tbl) => tbl.createdAt.isSmallerOrEqualValue(sessionEnd),
-                ))
+                )
+                ..where((tbl) => tbl.status.isNotValue('pending')))
               .get()
               .then((list) => list.length);
 
@@ -169,23 +171,7 @@ class SessionManager {
           return '#${1000 + localCount + 1}';
         }
 
-        // Fallback to max existing invoice that starts with '#' (covers previous completed orders)
-        final maxInvoice =
-            await (_db.selectOnly(_db.orders)
-                  ..addColumns([_db.orders.invoiceNumber])
-                  ..where(_db.orders.invoiceNumber.like('#%'))
-                  ..orderBy([OrderingTerm.desc(_db.orders.invoiceNumber)])
-                  ..limit(1))
-                .getSingleOrNull();
-
-        if (maxInvoice != null) {
-          final inv = maxInvoice.read(_db.orders.invoiceNumber) ?? '';
-          final digits = int.tryParse(inv.replaceAll(RegExp(r'[^0-9]'), ''));
-          if (digits != null) {
-            return '#${digits + 1}';
-          }
-        }
-
+        // No orders in this session yet → reset to first invoice number
         return '#1001';
       }
     } catch (e) {
@@ -219,7 +205,8 @@ class SessionManager {
 
     final query = _db.select(_db.orders)
       ..where((tbl) => tbl.createdAt.isBiggerOrEqualValue(sessionStartFallback))
-      ..where((tbl) => tbl.createdAt.isSmallerThanValue(sessionEndFallback));
+      ..where((tbl) => tbl.createdAt.isSmallerThanValue(sessionEndFallback))
+      ..where((tbl) => tbl.status.isNotValue('pending'));
 
     final count = await query.get();
     final nextNumber = 1001 + count.length;
@@ -228,13 +215,37 @@ class SessionManager {
 
   /// Get all orders for current session
   Stream<List<Order>> watchSessionOrders() {
-    // Show most recent orders (no session cut-off) to avoid empty dashboard edge cases
+    final sessionDate = getCurrentSessionDate();
+    final sessionStart = DateTime(
+      sessionDate.year,
+      sessionDate.month,
+      sessionDate.day,
+      openingHour,
+    );
+    final DateTime sessionEnd;
+    if (closingHour <= openingHour) {
+      sessionEnd = DateTime(
+        sessionDate.year,
+        sessionDate.month,
+        sessionDate.day,
+        closingHour,
+      ).add(const Duration(days: 1));
+    } else {
+      sessionEnd = DateTime(
+        sessionDate.year,
+        sessionDate.month,
+        sessionDate.day,
+        closingHour,
+      );
+    }
+
     return (_db.select(_db.orders)
+          ..where((tbl) => tbl.createdAt.isBiggerOrEqualValue(sessionStart))
+          ..where((tbl) => tbl.createdAt.isSmallerThanValue(sessionEnd))
           ..orderBy([
             (t) =>
                 OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc),
-          ])
-          ..limit(20))
+          ]))
         .watch();
   }
 

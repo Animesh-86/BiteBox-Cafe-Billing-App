@@ -17,6 +17,7 @@ import 'package:hangout_spot/ui/screens/billing/widgets/billing_shared_widgets.d
 import 'package:uuid/uuid.dart';
 import 'package:hangout_spot/utils/constants/app_keys.dart';
 import 'package:hangout_spot/data/providers/realtime_services_provider.dart';
+import 'package:hangout_spot/data/repositories/sync_repository.dart';
 
 import 'package:hangout_spot/services/thermal_printing_service.dart';
 
@@ -247,6 +248,7 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
     final manualDiscount = cart.manualDiscount;
     final customerId = customer?.id;
     final orderRepo = ref.read(orderRepositoryProvider);
+    final syncRepo = ref.read(syncRepositoryProvider);
     final db = ref.read(appDatabaseProvider);
     final thermalPrinter = ref.read(thermalPrintingServiceProvider);
     final shareService = ref.read(shareServiceProvider);
@@ -366,7 +368,7 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
     // Update customer stats and reward points (fire-and-forget)
     if (customerId != null) {
       orderRepo
-          .updateCustomerStats(customerId, grandTotal)
+          .updateCustomerStats(customerId, grandTotal, syncRepo: syncRepo)
           .catchError((e) => logDebug("Customer stats update failed: $e"));
 
       final rewardBaseAmount = grandTotal + manualDiscount;

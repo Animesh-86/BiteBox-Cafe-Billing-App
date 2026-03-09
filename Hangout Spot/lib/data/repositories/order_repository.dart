@@ -625,7 +625,8 @@ class OrderRepository {
         );
       });
 
-      // NOTE: Customer stats sync handled by AutoSyncService schedule
+      syncRepo
+          ?.syncCustomersNow(); // immediately propagate stats to other devices
     } catch (e) {
       // Customer not found, skip update
       LoggingService.logError('Error updating customer stats', e);

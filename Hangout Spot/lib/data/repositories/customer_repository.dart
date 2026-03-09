@@ -62,7 +62,7 @@ class CustomerRepository {
       }
     }
     await _db.into(_db.customers).insert(customer);
-    // Sync is handled by AutoSyncService on a schedule.
+    syncRepo?.syncCustomersNow(); // immediately propagate to other devices
   }
 
   Future<void> updateCustomer(
@@ -70,7 +70,7 @@ class CustomerRepository {
     SyncRepository? syncRepo,
   }) async {
     await _db.update(_db.customers).replace(customer);
-    // Sync is handled by AutoSyncService on a schedule.
+    syncRepo?.syncCustomersNow();
   }
 
   Future<void> deleteCustomer(String id, {SyncRepository? syncRepo}) async {
@@ -78,7 +78,7 @@ class CustomerRepository {
       throw Exception('Default customers cannot be deleted');
     }
     await (_db.delete(_db.customers)..where((t) => t.id.equals(id))).go();
-    // Sync is handled by AutoSyncService on a schedule.
+    syncRepo?.syncCustomersNow();
   }
 
   Future<void> ensureDefaultCustomers() async {
@@ -128,7 +128,7 @@ class CustomerRepository {
             ),
           );
     });
-    // Sync is handled by AutoSyncService on a schedule.
+    syncRepo?.syncCustomersNow();
   }
 
   Future<void> revertVisitStats(
@@ -155,7 +155,7 @@ class CustomerRepository {
             customer.copyWith(totalVisits: newVisits, totalSpent: newSpent),
           );
     });
-    // Sync is handled by AutoSyncService on a schedule.
+    syncRepo?.syncCustomersNow();
   }
 }
 

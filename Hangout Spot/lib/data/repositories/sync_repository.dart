@@ -134,6 +134,39 @@ class SyncRepository {
     }
   }
 
+  /// Immediately push the local customer list to Firestore (merge with cloud).
+  /// Called after any customer mutation so other devices receive the update
+  /// without waiting for the next AutoSync tick.
+  Future<void> syncCustomersNow() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    try {
+      final customers = await _db.select(_db.customers).get();
+      final baseRef = _firestore.collection('cafes').doc(user.uid);
+      final cloudDoc = await baseRef.collection('data').doc('customers').get();
+      final cloudList = cloudDoc.exists
+          ? List<Map<String, dynamic>>.from(cloudDoc.data()!['list'] ?? [])
+          : <Map<String, dynamic>>[];
+
+      final mergedMap = <String, Map<String, dynamic>>{};
+      for (final c in cloudList) {
+        final id = c['id'] as String?;
+        if (id != null) mergedMap[id] = c;
+      }
+      for (final c in customers) {
+        mergedMap[c.id] = c.toJson();
+      }
+
+      await baseRef.collection('data').doc('customers').set({
+        'list': mergedMap.values.toList(),
+        'lastUpdated': FieldValue.serverTimestamp(),
+      });
+      logDebug('✅ syncCustomersNow: pushed ${customers.length} customers');
+    } catch (e) {
+      logDebug('⚠️ syncCustomersNow failed: $e');
+    }
+  }
+
   /// Persist selected SharedPreferences keys to Firestore.
   Future<void> _backupSharedPreferences(DocumentReference baseRef) async {
     try {
