@@ -160,6 +160,10 @@ class _LoyaltySettingsScreenState extends ConsumerState<LoyaltySettingsScreen> {
                                         .setRedemptionRate(redemption);
 
                                     ref.invalidate(rewardSettingsProvider);
+                                    // Clear controllers so they repopulate
+                                    // with the confirmed saved values
+                                    _earningRateController.clear();
+                                    _redemptionRateController.clear();
                                     if (mounted) {
                                       ScaffoldMessenger.of(
                                         context,

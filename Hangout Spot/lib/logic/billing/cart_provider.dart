@@ -65,6 +65,7 @@ class CartState {
   final double manualDiscount;
   final double promoDiscount;
   final double rewardDiscount;
+  final double rewardPointsRedeemed; // points staged for redemption — written to DB only on checkout
   final bool canUndo;
   final bool canRedo;
 
@@ -79,6 +80,7 @@ class CartState {
     this.manualDiscount = 0.0,
     this.promoDiscount = 0.0,
     this.rewardDiscount = 0.0,
+    this.rewardPointsRedeemed = 0.0,
     this.canUndo = false,
     this.canRedo = false,
   });
@@ -126,6 +128,7 @@ class CartState {
     double? manualDiscount,
     double? promoDiscount,
     double? rewardDiscount,
+    double? rewardPointsRedeemed,
     bool? canUndo,
     bool? canRedo,
   }) {
@@ -140,6 +143,7 @@ class CartState {
       manualDiscount: manualDiscount ?? this.manualDiscount,
       promoDiscount: promoDiscount ?? this.promoDiscount,
       rewardDiscount: rewardDiscount ?? this.rewardDiscount,
+      rewardPointsRedeemed: rewardPointsRedeemed ?? this.rewardPointsRedeemed,
       canUndo: canUndo ?? this.canUndo,
       canRedo: canRedo ?? this.canRedo,
     );
@@ -156,6 +160,7 @@ class CartState {
     'manualDiscount': manualDiscount,
     'promoDiscount': promoDiscount,
     'rewardDiscount': rewardDiscount,
+    'rewardPointsRedeemed': rewardPointsRedeemed,
   };
 
   factory CartState.fromJson(Map<String, dynamic> json) {
@@ -176,6 +181,7 @@ class CartState {
       manualDiscount: (json['manualDiscount'] ?? 0.0).toDouble(),
       promoDiscount: (json['promoDiscount'] ?? 0.0).toDouble(),
       rewardDiscount: (json['rewardDiscount'] ?? 0.0).toDouble(),
+      rewardPointsRedeemed: (json['rewardPointsRedeemed'] ?? 0.0).toDouble(),
     );
   }
 }
@@ -382,21 +388,17 @@ class CartNotifier extends StateNotifier<CartState> {
   }
 
   Future<void> _clearCustomerInSavedCarts() async {
+    // BUG-23: only clear the customer from THIS outlet's cart, not every outlet.
     try {
       final prefs = await SharedPreferences.getInstance();
-      final keys = prefs.getKeys();
-      for (final key in keys) {
-        if (key.startsWith('cart_state_v1_') || key == 'cart_state_temp') {
-          final jsonStr = prefs.getString(key);
-          if (jsonStr == null) continue;
-          try {
-            final Map<String, dynamic> map = json.decode(jsonStr);
-            map['customer'] = null;
-            await prefs.setString(key, json.encode(map));
-          } catch (_) {
-            // Ignore malformed cache entries
-          }
-        }
+      final jsonStr = prefs.getString(_storageKey);
+      if (jsonStr == null) return;
+      try {
+        final Map<String, dynamic> map = json.decode(jsonStr);
+        map['customer'] = null;
+        await prefs.setString(_storageKey, json.encode(map));
+      } catch (_) {
+        // Ignore malformed cache entries
       }
     } catch (_) {
       // Ignore storage errors
@@ -470,7 +472,7 @@ class CartNotifier extends StateNotifier<CartState> {
     );
   }
 
-  void applyRewardDiscount(double discountAmount) {
+  void applyRewardDiscount(double discountAmount, double pointsRedeemed) {
     final itemDiscounts = state.items.fold(
       0.0,
       (sum, item) => sum + item.discountAmount,
@@ -492,11 +494,11 @@ class CartNotifier extends StateNotifier<CartState> {
       0.0,
       maxReward,
     );
-    _applyState(state.copyWith(rewardDiscount: nextReward));
+    _applyState(state.copyWith(rewardDiscount: nextReward, rewardPointsRedeemed: pointsRedeemed));
   }
 
   void cancelRewardDiscount() {
-    _applyState(state.copyWith(rewardDiscount: 0.0));
+    _applyState(state.copyWith(rewardDiscount: 0.0, rewardPointsRedeemed: 0.0));
   }
 
   void setPromoDiscount(double discount) {

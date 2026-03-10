@@ -305,32 +305,15 @@ final analyticsDataProvider =
       DateTime endDate = params.endDate;
 
       if (params.filterName == 'Today' || params.filterName == 'Yesterday') {
-        final referenceDate = params.filterName == 'Today'
-            ? DateTime.now()
-            : DateTime.now().subtract(const Duration(days: 1));
-
-        startDate = DateTime(
-          referenceDate.year,
-          referenceDate.month,
-          referenceDate.day,
-          sessionManager.openingHour,
-        );
-
-        if (sessionManager.closingHour <= sessionManager.openingHour) {
-          endDate = DateTime(
-            referenceDate.year,
-            referenceDate.month,
-            referenceDate.day,
-            sessionManager.closingHour,
-          ).add(const Duration(days: 1));
-        } else {
-          endDate = DateTime(
-            referenceDate.year,
-            referenceDate.month,
-            referenceDate.day,
-            sessionManager.closingHour,
-          );
-        }
+        // Use getSessionRange so the window exactly matches the dashboard's
+        // session boundary (open-to-open for overnight shifts).
+        final referenceDate = params.filterName == 'Yesterday'
+            ? sessionManager.getCurrentSessionDate()
+                .subtract(const Duration(days: 1))
+            : sessionManager.getCurrentSessionDate();
+        final range = sessionManager.getSessionRange(referenceDate);
+        startDate = range['start']!;
+        endDate = range['end']!;
       } else if (params.filterName == 'Custom Range') {
         startDate = DateTime(
           params.startDate.year,

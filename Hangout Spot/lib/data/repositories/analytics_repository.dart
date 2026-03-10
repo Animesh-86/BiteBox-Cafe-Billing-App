@@ -213,12 +213,16 @@ class AnalyticsRepository {
         ),
       ])
       ..limit(5);
+
+    // Always join orders to filter by status='completed' (BUG-16)
+    query.join([
+      innerJoin(_db.orders, _db.orders.id.equalsExp(_db.orderItems.orderId)),
+    ]);
+    query.where(_db.orders.status.equals('completed'));
     if (locationId != null) {
-      query.join([
-        innerJoin(_db.orders, _db.orders.id.equalsExp(_db.orderItems.orderId)),
-      ]);
       query.where(_db.orders.locationId.equals(locationId));
     }
+
     final result = await query.get();
     return result.map((row) {
       return MapEntry(
@@ -249,6 +253,9 @@ class AnalyticsRepository {
 
   Future<Order?> getHighestValueOrder() async {
     final query = _db.select(_db.orders)
+      ..where(
+        (t) => t.status.equals('completed'),
+      ) // BUG-17: exclude cancelled/pending
       ..orderBy([
         (t) => OrderingTerm(expression: t.totalAmount, mode: OrderingMode.desc),
       ])
@@ -776,9 +783,15 @@ class AnalyticsRepository {
     required DateTime rangeStart,
     required DateTime rangeEnd,
     String? locationId,
+
+    /// Pass the session-aware window start (e.g. from SessionManager) so the
+    /// "today" query uses the shift boundary instead of calendar midnight. (BUG-18)
+    DateTime? sessionWindowStart,
   }) async {
     final now = DateTime.now();
-    final todayStart = DateTime(now.year, now.month, now.day);
+    // Use the provided shift-aware start if available, else fall back to midnight.
+    final todayStart =
+        sessionWindowStart ?? DateTime(now.year, now.month, now.day);
     final todayEnd = todayStart.add(const Duration(days: 1));
 
     final todaySales = await getSessionSales(

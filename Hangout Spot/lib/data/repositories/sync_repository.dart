@@ -36,7 +36,27 @@ const _backupPrefKeys = [
   // Operating hours (shift window) so all devices share the same timing
   'opening_hour',
   'closing_hour',
+  // Printer receipt settings
+  'printer_show_thank_you',
+  'printer_footer',
+  'printer_show_upi',
+  'printer_upi_id',
+  'printer_show_logo',
+  // KOT slip settings
+  'kot_show_time',
+  'kot_show_order_no',
+  'kot_notes',
+  // WhatsApp bill template
+  'wa_greeting',
+  'wa_show_invoice',
+  'wa_show_items',
+  'wa_show_total',
+  'wa_show_payment',
+  'wa_closing',
 ];
+
+/// SharedPreferences keys that are stored as int (not String or bool).
+const _intPrefKeys = {'opening_hour', 'closing_hour'};
 
 class SyncRepository {
   final AppDatabase _db;
@@ -100,9 +120,25 @@ class SyncRepository {
           final id = c['id'] as String?;
           if (id != null) mergedMap[id] = c;
         }
-        // Local entries overwrite cloud on conflict (local is fresher)
+        // Merge local into cloud, keeping higher aggregate stats.
         for (final c in customers) {
-          mergedMap[c.id] = c.toJson();
+          final localMap = Map<String, dynamic>.from(c.toJson());
+          final cloudEntry = mergedMap[c.id];
+          if (cloudEntry != null) {
+            final cloudVisits =
+                (cloudEntry['totalVisits'] as num? ?? 0).toInt();
+            final cloudSpent =
+                (cloudEntry['totalSpent'] as num? ?? 0.0).toDouble();
+            localMap['totalVisits'] =
+                (localMap['totalVisits'] as int? ?? 0) > cloudVisits
+                    ? localMap['totalVisits']
+                    : cloudVisits;
+            localMap['totalSpent'] =
+                (localMap['totalSpent'] as double? ?? 0.0) > cloudSpent
+                    ? localMap['totalSpent']
+                    : cloudSpent;
+          }
+          mergedMap[c.id] = localMap;
         }
 
         batch.set(baseRef.collection('data').doc('customers'), {
@@ -154,7 +190,24 @@ class SyncRepository {
         if (id != null) mergedMap[id] = c;
       }
       for (final c in customers) {
-        mergedMap[c.id] = c.toJson();
+        final localMap = Map<String, dynamic>.from(c.toJson());
+        final cloudEntry = mergedMap[c.id];
+        if (cloudEntry != null) {
+          // For aggregate counters, keep the higher value so a device with
+          // stale local data cannot overwrite fresher data from another device.
+          final cloudVisits = (cloudEntry['totalVisits'] as num? ?? 0).toInt();
+          final cloudSpent =
+              (cloudEntry['totalSpent'] as num? ?? 0.0).toDouble();
+          localMap['totalVisits'] =
+              (localMap['totalVisits'] as int? ?? 0) > cloudVisits
+                  ? localMap['totalVisits']
+                  : cloudVisits;
+          localMap['totalSpent'] =
+              (localMap['totalSpent'] as double? ?? 0.0) > cloudSpent
+                  ? localMap['totalSpent']
+                  : cloudSpent;
+        }
+        mergedMap[c.id] = localMap;
       }
 
       await baseRef.collection('data').doc('customers').set({
@@ -164,6 +217,41 @@ class SyncRepository {
       logDebug('✅ syncCustomersNow: pushed ${customers.length} customers');
     } catch (e) {
       logDebug('⚠️ syncCustomersNow failed: $e');
+    }
+  }
+
+  /// Immediately push the local menu (categories + items) to Firestore.
+  /// Called after any menu mutation so other devices receive the update
+  /// without waiting for the next AutoSync tick.
+  Future<void> syncMenuNow() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    try {
+      final categories = await (_db.select(
+        _db.categories,
+      )..where((t) => t.isDeleted.equals(false))).get();
+      final items = await (_db.select(
+        _db.items,
+      )..where((t) => t.isDeleted.equals(false))).get();
+
+      final baseRef = _firestore.collection('cafes').doc(user.uid);
+      final batch = _firestore.batch();
+
+      batch.set(baseRef.collection('menu').doc('categories'), {
+        'list': categories.map((e) => e.toJson()).toList(),
+        'lastUpdated': FieldValue.serverTimestamp(),
+      });
+      batch.set(baseRef.collection('menu').doc('items'), {
+        'list': items.map((e) => e.toJson()).toList(),
+        'lastUpdated': FieldValue.serverTimestamp(),
+      });
+
+      await batch.commit();
+      logDebug(
+        '✅ syncMenuNow: pushed ${categories.length} categories, ${items.length} items',
+      );
+    } catch (e) {
+      logDebug('⚠️ syncMenuNow failed: $e');
     }
   }
 
@@ -178,6 +266,9 @@ class SyncRepository {
         // Also check bool values
         final boolValue = prefs.getBool(key);
         if (boolValue != null) prefsMap[key] = boolValue.toString();
+        // Also check int values (e.g. opening_hour, closing_hour)
+        final intValue = prefs.getInt(key);
+        if (intValue != null) prefsMap[key] = intValue.toString();
       }
       if (prefsMap.isNotEmpty) {
         await baseRef.collection('config').doc('preferences').set({
@@ -429,7 +520,17 @@ class SyncRepository {
 
       final prefs = await SharedPreferences.getInstance();
       for (final entry in data.entries) {
-        await prefs.setString(entry.key, entry.value.toString());
+        final raw = entry.value.toString();
+        // Restore with the correct type so existing code using getBool/getInt
+        // continues to work after a cloud restore.
+        if (raw == 'true' || raw == 'false') {
+          await prefs.setBool(entry.key, raw == 'true');
+        } else if (_intPrefKeys.contains(entry.key)) {
+          final intVal = int.tryParse(raw);
+          if (intVal != null) await prefs.setInt(entry.key, intVal);
+        } else {
+          await prefs.setString(entry.key, raw);
+        }
       }
       logDebug('✅ SharedPreferences restored (${data.length} keys)');
     } catch (e) {

@@ -11,16 +11,24 @@ class CustomerRepository {
   CustomerRepository(this._db);
 
   Stream<List<Customer>> watchCustomers(String query) {
+    // Exclude platform/default customers (Walk-in, Zomato, Swiggy) from search
+    // results — they are selected via dedicated chips, not the customer lookup.
+    final platformIds = CustomerDefaults.seeded.map((s) => s.id).toList();
     if (query.isEmpty) {
-      return (_db.select(_db.customers)..orderBy([
-            (t) =>
-                OrderingTerm(expression: t.lastVisit, mode: OrderingMode.desc),
-          ]))
+      return (_db.select(_db.customers)
+            ..where((t) => t.id.isNotIn(platformIds))
+            ..orderBy([
+              (t) =>
+                  OrderingTerm(expression: t.lastVisit, mode: OrderingMode.desc),
+            ]))
           .watch();
     }
-    return (_db.select(
-          _db.customers,
-        )..where((tbl) => tbl.name.contains(query) | tbl.phone.contains(query)))
+    return (_db.select(_db.customers)
+          ..where(
+            (tbl) =>
+                tbl.id.isNotIn(platformIds) &
+                (tbl.name.contains(query) | tbl.phone.contains(query)),
+          ))
         .watch();
   }
 
@@ -28,6 +36,12 @@ class CustomerRepository {
     return (_db.select(
       _db.customers,
     )..where((t) => t.id.equals(id))).getSingleOrNull();
+  }
+
+  Stream<Customer?> watchCustomerById(String id) {
+    return (_db.select(
+      _db.customers,
+    )..where((t) => t.id.equals(id))).watchSingleOrNull();
   }
 
   Future<Customer?> getCustomerByPhone(String phone) {
@@ -69,6 +83,18 @@ class CustomerRepository {
     Customer customer, {
     SyncRepository? syncRepo,
   }) async {
+    // Check for duplicate phone when phone is being changed
+    if (customer.phone != null && customer.phone!.isNotEmpty) {
+      final existing = await (_db.select(_db.customers)
+            ..where((t) => t.phone.equals(customer.phone!))
+            ..where((t) => t.id.isNotValue(customer.id)))
+          .getSingleOrNull();
+      if (existing != null) {
+        throw Exception(
+          'Phone ${customer.phone} is already used by ${existing.name}',
+        );
+      }
+    }
     await _db.update(_db.customers).replace(customer);
     syncRepo?.syncCustomersNow();
   }
@@ -114,7 +140,8 @@ class CustomerRepository {
     await _db.transaction(() async {
       final customer = await (_db.select(
         _db.customers,
-      )..where((t) => t.id.equals(id))).getSingle();
+      )..where((t) => t.id.equals(id))).getSingleOrNull();
+      if (customer == null) return; // deleted mid-transaction, skip gracefully
       final newVisits = customer.totalVisits + 1;
       final newSpent = customer.totalSpent + amount;
 
@@ -148,11 +175,17 @@ class CustomerRepository {
       final newSpent = customer.totalSpent >= amount
           ? customer.totalSpent - amount
           : 0.0;
+      // Clear lastVisit when no visits remain so the field stays accurate
+      final newLastVisit = newVisits == 0 ? const Value<DateTime?>(null) : Value<DateTime?>(customer.lastVisit);
 
       await _db
           .update(_db.customers)
           .replace(
-            customer.copyWith(totalVisits: newVisits, totalSpent: newSpent),
+            customer.copyWith(
+              totalVisits: newVisits,
+              totalSpent: newSpent,
+              lastVisit: newLastVisit,
+            ),
           );
     });
     syncRepo?.syncCustomersNow();

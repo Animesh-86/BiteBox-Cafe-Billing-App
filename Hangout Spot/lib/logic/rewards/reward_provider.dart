@@ -129,6 +129,7 @@ class RewardNotifier extends StateNotifier<void> {
   Future<bool> redeemReward({
     required String customerId,
     required double pointsToRedeem,
+    String? orderId,
     String? description,
   }) async {
     // Get customer's current balance
@@ -138,12 +139,13 @@ class RewardNotifier extends StateNotifier<void> {
       return false; // Insufficient points
     }
 
-    // Create redemption transaction
+    // Create redemption transaction — link to orderId so it can be refunded on cancel
     final transaction = RewardTransactionsCompanion(
       id: Value(const Uuid().v4()),
       customerId: Value(customerId),
       type: const Value('redeem'),
       amount: Value(pointsToRedeem),
+      orderId: orderId != null ? Value(orderId) : const Value.absent(),
       description: Value(description ?? 'Redeemed $pointsToRedeem points'),
     );
 
@@ -176,7 +178,7 @@ class RewardNotifier extends StateNotifier<void> {
     required double amount,
     String? description,
   }) async {
-    final type = amount > 0 ? 'earn' : 'adjustment';
+    final type = amount > 0 ? 'earn' : 'redeem';
 
     final transaction = RewardTransactionsCompanion(
       id: Value(const Uuid().v4()),

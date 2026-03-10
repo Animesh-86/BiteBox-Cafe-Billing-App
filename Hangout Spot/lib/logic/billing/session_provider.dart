@@ -1,17 +1,13 @@
-import 'package:hangout_spot/utils/log_utils.dart';
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/data/providers/database_provider.dart';
 import 'package:drift/drift.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart' hide Order;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../main.dart'; // To access sharedPreferencesProvider
 
 /// Session Provider - manages cafe opening/closing hours and order numbering
-/// Cafe operates 2 PM to 2 AM next day
-/// After 2 AM, a new session starts and order numbers reset to 1001
+/// Default: opens 2 PM, closes 5 AM next day (overnight shift).
 
 class SessionManager {
   final AppDatabase _db;
@@ -23,45 +19,67 @@ class SessionManager {
 
   SessionManager(this._db, this._prefs);
 
-  /// Get current session date
-  /// Session starts at 2 PM and ends at 5 AM next day
-  /// So a session is identified by the date it started (2 PM date)
+  // ─── Private helpers ───────────────────────────────────────────────────────
+
+  /// Returns the exclusive end DateTime for a session.
+  ///
+  /// **Overnight shifts** (`closingHour ≤ openingHour`, e.g. 2 PM → 5 AM):
+  ///   The window runs from `openingHour` on `sessionDate` to `openingHour`
+  ///   on the *next* calendar day.  Using `openingHour` (not `closingHour`)
+  ///   as the end closes the dead-zone that existed between the official
+  ///   closing time and the next opening — orders placed in that gap were
+  ///   previously invisible on the dashboard.
+  ///
+  /// **Same-day shifts** (`closingHour > openingHour`, e.g. 8 AM → 8 PM):
+  ///   The window ends at `closingHour` on the same day.
+  DateTime _sessionEnd(DateTime sessionDate) {
+    if (closingHour <= openingHour) {
+      // Overnight: session runs open → open (next day) to cover the gap.
+      return DateTime(
+        sessionDate.year,
+        sessionDate.month,
+        sessionDate.day,
+        openingHour,
+      ).add(const Duration(days: 1));
+    } else {
+      return DateTime(
+        sessionDate.year,
+        sessionDate.month,
+        sessionDate.day,
+        closingHour,
+      );
+    }
+  }
+
+  // ─── Public API ────────────────────────────────────────────────────────────
+
+  /// Returns the calendar date that identifies the current session.
+  ///
+  /// For overnight shifts any time *before* `openingHour` today belongs to
+  /// yesterday's session — this closes the gap where orders placed after the
+  /// official close but before the next open were previously orphaned.
   DateTime getCurrentSessionDate() {
     final now = DateTime.now();
     final bool crossesMidnight = closingHour <= openingHour;
 
     if (crossesMidnight) {
-      // e.g. 2 PM to 5 AM next day
-      if (now.hour < closingHour || now.hour >= openingHour) {
-        if (now.hour >= openingHour) {
-          return DateTime(now.year, now.month, now.day);
-        } else {
-          // It's after midnight but before closing (e.g. 2 AM), so session belongs to yesterday
-          return DateTime(
-            now.year,
-            now.month,
-            now.day,
-          ).subtract(const Duration(days: 1));
-        }
-      }
-    } else {
-      // Standard day shift, e.g. 8 AM to 8 PM
-      if (now.hour >= openingHour && now.hour < closingHour) {
+      // Overnight shift (e.g. opens 2 PM, closes 5 AM).
+      // Any hour before today's opening → still in yesterday's session.
+      if (now.hour >= openingHour) {
         return DateTime(now.year, now.month, now.day);
       } else {
-        // We are currently outside the operating hours.
-        // We can snap to the most recent logical session
-        if (now.hour < openingHour) {
-          return DateTime(
-            now.year,
-            now.month,
-            now.day,
-          ).subtract(const Duration(days: 1));
-        }
+        return DateTime(now.year, now.month, now.day)
+            .subtract(const Duration(days: 1));
       }
+    } else {
+      // Same-day shift (e.g. 8 AM – 8 PM).
+      if (now.hour < openingHour) {
+        // Before today's opening → last session was yesterday.
+        return DateTime(now.year, now.month, now.day)
+            .subtract(const Duration(days: 1));
+      }
+      return DateTime(now.year, now.month, now.day);
     }
-
-    return DateTime(now.year, now.month, now.day);
   }
 
   /// Get the session ID for the current session
@@ -80,23 +98,7 @@ class SessionManager {
       sessionDate.day,
       openingHour,
     );
-
-    DateTime sessionEnd;
-    if (closingHour <= openingHour) {
-      sessionEnd = DateTime(
-        sessionDate.year,
-        sessionDate.month,
-        sessionDate.day,
-        closingHour,
-      ).add(const Duration(days: 1));
-    } else {
-      sessionEnd = DateTime(
-        sessionDate.year,
-        sessionDate.month,
-        sessionDate.day,
-        closingHour,
-      );
-    }
+    final sessionEnd = _sessionEnd(sessionDate);
 
     final query = _db.select(_db.orders)
       ..where((tbl) => tbl.createdAt.isBiggerOrEqualValue(sessionStart))
@@ -109,103 +111,23 @@ class SessionManager {
   }
 
   /// Peek at the next invoice number for current session without incrementing it
-  /// Used for UI display purposes to prevent burning sequence numbers on rebuilds
+  /// Used for UI display purposes to prevent burning sequence numbers on rebuilds.
+  /// Always uses local SQLite count — the Firestore path for counters is RTDB
+  /// (not Firestore), so we skip the cloud check entirely.  (BUG-15)
   Future<String> peekNextInvoiceNumber() async {
     final sessionDate = getCurrentSessionDate();
-    final sessionId = getCurrentSessionId();
 
-    try {
-      final sessionStart = DateTime(
-        sessionDate.year,
-        sessionDate.month,
-        sessionDate.day,
-        openingHour,
-      );
-
-      DateTime sessionEnd;
-      if (closingHour <= openingHour) {
-        sessionEnd = DateTime(
-          sessionDate.year,
-          sessionDate.month,
-          sessionDate.day,
-          closingHour,
-        ).add(const Duration(days: 1));
-      } else {
-        sessionEnd = DateTime(
-          sessionDate.year,
-          sessionDate.month,
-          sessionDate.day,
-          closingHour,
-        );
-      }
-
-      final localCount =
-          await (_db.select(_db.orders)
-                ..where(
-                  (tbl) => tbl.createdAt.isBiggerOrEqualValue(sessionStart),
-                )
-                ..where(
-                  (tbl) => tbl.createdAt.isSmallerOrEqualValue(sessionEnd),
-                )
-                ..where((tbl) => tbl.status.isNotValue('pending')))
-              .get()
-              .then((list) => list.length);
-
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        final counterRef = FirebaseFirestore.instance
-            .collection('cafes')
-            .doc(user.uid)
-            .collection('counters')
-            .doc(sessionId);
-
-        final snapshot = await counterRef.get();
-        if (snapshot.exists) {
-          final currentCount = snapshot.data()?['count'] ?? 1000;
-          final nextNumber = currentCount + 1;
-          return '#$nextNumber';
-        }
-
-        // If Firestore counter missing but we have local orders, derive from local.
-        if (localCount > 0) {
-          return '#${1000 + localCount + 1}';
-        }
-
-        // No orders in this session yet → reset to first invoice number
-        return '#1001';
-      }
-    } catch (e) {
-      logDebug('⚠️ Firestore peek failed, falling back to local: $e');
-    }
-
-    // Fallback to local counting
-    final sessionStartFallback = DateTime(
+    final sessionStart = DateTime(
       sessionDate.year,
       sessionDate.month,
       sessionDate.day,
       openingHour,
     );
-
-    DateTime sessionEndFallback;
-    if (closingHour <= openingHour) {
-      sessionEndFallback = DateTime(
-        sessionDate.year,
-        sessionDate.month,
-        sessionDate.day,
-        closingHour,
-      ).add(const Duration(days: 1));
-    } else {
-      sessionEndFallback = DateTime(
-        sessionDate.year,
-        sessionDate.month,
-        sessionDate.day,
-        closingHour,
-      );
-    }
+    final sessionEnd = _sessionEnd(sessionDate);
 
     final query = _db.select(_db.orders)
-      ..where((tbl) => tbl.createdAt.isBiggerOrEqualValue(sessionStartFallback))
-      ..where((tbl) => tbl.createdAt.isSmallerThanValue(sessionEndFallback))
+      ..where((tbl) => tbl.createdAt.isBiggerOrEqualValue(sessionStart))
+      ..where((tbl) => tbl.createdAt.isSmallerThanValue(sessionEnd))
       ..where((tbl) => tbl.status.isNotValue('pending'));
 
     final count = await query.get();
@@ -213,31 +135,15 @@ class SessionManager {
     return '#$nextNumber';
   }
 
-  /// Get all orders for current session
-  Stream<List<Order>> watchSessionOrders() {
-    final sessionDate = getCurrentSessionDate();
+  /// Get all orders for a specific session date (for dashboard date switching).
+  Stream<List<Order>> watchOrdersForSession(DateTime sessionDate) {
     final sessionStart = DateTime(
       sessionDate.year,
       sessionDate.month,
       sessionDate.day,
       openingHour,
     );
-    final DateTime sessionEnd;
-    if (closingHour <= openingHour) {
-      sessionEnd = DateTime(
-        sessionDate.year,
-        sessionDate.month,
-        sessionDate.day,
-        closingHour,
-      ).add(const Duration(days: 1));
-    } else {
-      sessionEnd = DateTime(
-        sessionDate.year,
-        sessionDate.month,
-        sessionDate.day,
-        closingHour,
-      );
-    }
+    final sessionEnd = _sessionEnd(sessionDate);
 
     return (_db.select(_db.orders)
           ..where((tbl) => tbl.createdAt.isBiggerOrEqualValue(sessionStart))
@@ -249,28 +155,17 @@ class SessionManager {
         .watch();
   }
 
+  /// Get all orders for current session (delegates to watchOrdersForSession).
+  Stream<List<Order>> watchSessionOrders() {
+    return watchOrdersForSession(getCurrentSessionDate());
+  }
+
   /// Get session info (for display)
   Map<String, dynamic> getSessionInfo() {
     final now = DateTime.now();
     final sessionDate = getCurrentSessionDate();
     final nextSessionDate = sessionDate.add(const Duration(days: 1));
-
-    DateTime sessionEnd;
-    if (closingHour <= openingHour) {
-      sessionEnd = DateTime(
-        sessionDate.year,
-        sessionDate.month,
-        sessionDate.day,
-        closingHour,
-      ).add(const Duration(days: 1));
-    } else {
-      sessionEnd = DateTime(
-        sessionDate.year,
-        sessionDate.month,
-        sessionDate.day,
-        closingHour,
-      );
-    }
+    final sessionEnd = _sessionEnd(sessionDate);
 
     return {
       'sessionId': getCurrentSessionId(),
@@ -288,23 +183,6 @@ class SessionManager {
   }
 
   Map<String, DateTime> getSessionRange(DateTime sessionDate) {
-    DateTime sessionEnd;
-    if (closingHour <= openingHour) {
-      sessionEnd = DateTime(
-        sessionDate.year,
-        sessionDate.month,
-        sessionDate.day,
-        closingHour,
-      ).add(const Duration(days: 1));
-    } else {
-      sessionEnd = DateTime(
-        sessionDate.year,
-        sessionDate.month,
-        sessionDate.day,
-        closingHour,
-      );
-    }
-
     return {
       'start': DateTime(
         sessionDate.year,
@@ -312,7 +190,7 @@ class SessionManager {
         sessionDate.day,
         openingHour,
       ),
-      'end': sessionEnd,
+      'end': _sessionEnd(sessionDate),
     };
   }
 }

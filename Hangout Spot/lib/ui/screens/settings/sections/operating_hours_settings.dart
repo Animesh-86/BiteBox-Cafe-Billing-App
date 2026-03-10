@@ -90,6 +90,17 @@ class _OperatingHoursSettingsScreenState
           _closingHour = picked.hour;
         }
       });
+      // Shift times operate in whole hours — silently inform the user if they
+      // selected a time with minutes so they aren't confused by the rounding.
+      if (picked.minute != 0 && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Time saved as ${_formatTime(picked.hour)} (minutes are not used)',
+            ),
+          ),
+        );
+      }
     }
   }
 

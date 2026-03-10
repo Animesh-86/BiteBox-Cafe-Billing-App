@@ -14,6 +14,7 @@ import 'package:hangout_spot/services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:hangout_spot/data/providers/realtime_services_provider.dart';
+import 'package:hangout_spot/services/customer_sync_listener_service.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -153,6 +154,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
       // Start periodic auto-sync (reads enabled/interval from SharedPreferences)
       ref.read(autoSyncServiceProvider).start();
+
+      // Start real-time Firestore listener so customer changes from any device
+      // are immediately reflected in the local DB on this device.
+      ref.read(customerSyncListenerServiceProvider).start();
 
       // Restore session tracking so the heartbeat and remote-logout
       // listener keep working after a cold restart.

@@ -240,7 +240,6 @@ class _CartCustomerSectionState extends ConsumerState<CartCustomerSection> {
 
   String _query = '';
   bool _showSuggestions = false;
-  bool _showSavedFields = false;
 
   bool get _isEditing => _nameFocus.hasFocus || _phoneFocus.hasFocus;
 
@@ -253,15 +252,15 @@ class _CartCustomerSectionState extends ConsumerState<CartCustomerSection> {
     final cart = ref.read(cartProvider);
     _nameController.text = cart.customer?.name ?? '';
     _phoneController.text = cart.customer?.phone ?? '';
-    _showSavedFields = _isSavedCustomer(cart.customer);
 
     _cartListener = ref.listenManual<CartState>(cartProvider, (prev, next) {
       if (_isEditing) return;
       final customer = next.customer;
-      _nameController.text = customer?.name ?? '';
-      _phoneController.text = customer?.phone ?? '';
-      if (mounted)
-        setState(() => _showSavedFields = _isSavedCustomer(customer));
+      // Only sync fields when a platform (Zomato/Swiggy) customer is set or cleared
+      if (customer == null || !_isSavedCustomer(customer)) {
+        _nameController.text = '';
+        _phoneController.text = '';
+      }
     });
   }
 
@@ -346,6 +345,19 @@ class _CartCustomerSectionState extends ConsumerState<CartCustomerSection> {
     setState(() => _showSuggestions = false);
   }
 
+  /// Called when the user types in Name or Phone. Clears any platform customer
+  /// (Zomato/Swiggy) that was quick-selected so typing starts a fresh search.
+  void _onSearchChanged(String value) {
+    final activeType = _orderTypeOf(ref.read(cartProvider).customer);
+    if (activeType == 'zomato' || activeType == 'swiggy') {
+      ref.read(cartProvider.notifier).clearCustomerSelection();
+    }
+    setState(() {
+      _query = value;
+      _showSuggestions = value.trim().isNotEmpty;
+    });
+  }
+
   /// Returns true if [customer] is a real saved customer (not a default/platform one).
   bool _isSavedCustomer(Customer? customer) {
     if (customer == null) return false;
@@ -367,38 +379,20 @@ class _CartCustomerSectionState extends ConsumerState<CartCustomerSection> {
     final notifier = ref.read(cartProvider.notifier);
     _nameController.clear();
     _phoneController.clear();
+    setState(() => _showSuggestions = false);
 
-    if (type == 'walkin') {
+    // Tap the already-active chip → deselect back to walk-in
+    final current = _orderTypeOf(ref.read(cartProvider).customer);
+    if (current == type) {
       notifier.clearCustomerSelection();
-      setState(() {
-        _showSavedFields = false;
-        _showSuggestions = false;
-      });
       return;
     }
 
-    if (type == 'saved') {
-      // If a default customer was selected, clear it so fields are blank.
-      if (!_isSavedCustomer(ref.read(cartProvider).customer)) {
-        notifier.clearCustomerSelection();
-      }
-      setState(() {
-        _showSavedFields = true;
-        _showSuggestions = false;
-      });
-      return;
-    }
-
-    // Zomato / Swiggy
     final id = type == 'zomato'
         ? CustomerDefaults.zomatoId
         : CustomerDefaults.swiggyId;
     final customer = await repo.getCustomerById(id);
     if (customer != null) notifier.setCustomer(customer);
-    setState(() {
-      _showSavedFields = false;
-      _showSuggestions = false;
-    });
   }
 
   Widget _orderChip(
@@ -470,10 +464,7 @@ class _CartCustomerSectionState extends ConsumerState<CartCustomerSection> {
                     ref.read(cartProvider.notifier).clearCustomerSelection();
                     _nameController.clear();
                     _phoneController.clear();
-                    setState(() {
-                      _showSuggestions = false;
-                      _showSavedFields = false;
-                    });
+                    setState(() => _showSuggestions = false);
                   },
                   child: const Text('Clear'),
                 ),
@@ -488,35 +479,25 @@ class _CartCustomerSectionState extends ConsumerState<CartCustomerSection> {
             ],
           ),
           const SizedBox(height: 8),
-          // Order type quick-select
+          // Platform quick-select
           Row(
             children: [
-              _orderChip(activeType, 'walkin', 'Walk-in', Icons.person_outline),
-              const SizedBox(width: 6),
-              _orderChip(activeType, 'saved', 'Saved', Icons.loyalty_outlined),
-              const SizedBox(width: 6),
               _orderChip(activeType, 'zomato', 'Zomato', Icons.delivery_dining),
               const SizedBox(width: 6),
               _orderChip(activeType, 'swiggy', 'Swiggy', Icons.moped_outlined),
             ],
           ),
-          if (_showSavedFields) ...[
-            const SizedBox(height: 8),
-            if (widget.compact)
-              Column(
-                children: [
-                  TextField(
+          const SizedBox(height: 8),
+          if (widget.compact)
+            Column(
+              children: [
+                TextField(
                     controller: _nameController,
                     focusNode: _nameFocus,
                     decoration: _compactDecoration('Name'),
                     style: Theme.of(context).textTheme.bodySmall,
                     textInputAction: TextInputAction.next,
-                    onChanged: (value) {
-                      setState(() {
-                        _query = value;
-                        _showSuggestions = value.trim().isNotEmpty;
-                      });
-                    },
+                    onChanged: _onSearchChanged,
                   ),
                   SizedBox(height: fieldSpacing),
                   TextField(
@@ -526,12 +507,7 @@ class _CartCustomerSectionState extends ConsumerState<CartCustomerSection> {
                     style: Theme.of(context).textTheme.bodySmall,
                     keyboardType: TextInputType.phone,
                     textInputAction: TextInputAction.done,
-                    onChanged: (value) {
-                      setState(() {
-                        _query = value;
-                        _showSuggestions = value.trim().isNotEmpty;
-                      });
-                    },
+                    onChanged: _onSearchChanged,
                     onSubmitted: (_) => _saveOrSelectCustomer(),
                   ),
                 ],
@@ -548,12 +524,7 @@ class _CartCustomerSectionState extends ConsumerState<CartCustomerSection> {
                         border: OutlineInputBorder(),
                       ),
                       textInputAction: TextInputAction.next,
-                      onChanged: (value) {
-                        setState(() {
-                          _query = value;
-                          _showSuggestions = value.trim().isNotEmpty;
-                        });
-                      },
+                      onChanged: _onSearchChanged,
                     ),
                   ),
                   SizedBox(width: fieldSpacing),
@@ -567,12 +538,7 @@ class _CartCustomerSectionState extends ConsumerState<CartCustomerSection> {
                       ),
                       keyboardType: TextInputType.phone,
                       textInputAction: TextInputAction.done,
-                      onChanged: (value) {
-                        setState(() {
-                          _query = value;
-                          _showSuggestions = value.trim().isNotEmpty;
-                        });
-                      },
+                      onChanged: _onSearchChanged,
                       onSubmitted: (_) => _saveOrSelectCustomer(),
                     ),
                   ),
@@ -601,11 +567,25 @@ class _CartCustomerSectionState extends ConsumerState<CartCustomerSection> {
                   Flexible(
                     child: Row(
                       children: [
-                        Text(
-                          '${cart.customer!.name} (${cart.customer!.totalVisits} visits)',
-                          style: Theme.of(context).textTheme.labelSmall
-                              ?.copyWith(color: billingMutedText(context)),
-                          overflow: TextOverflow.ellipsis,
+                        // Live stream so visits update immediately after checkout
+                        // or when synced from another device.
+                        StreamBuilder<Customer?>(
+                          stream: ref
+                              .read(customerRepositoryProvider)
+                              .watchCustomerById(cart.customer!.id),
+                          builder: (context, snap) {
+                            final live = snap.data ?? cart.customer!;
+                            return Text(
+                              '${live.name} (${live.totalVisits} visits)',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelSmall
+                                  ?.copyWith(
+                                    color: billingMutedText(context),
+                                  ),
+                              overflow: TextOverflow.ellipsis,
+                            );
+                          },
                         ),
                         const SizedBox(width: 6),
                         FutureBuilder<bool>(
@@ -706,8 +686,7 @@ class _CartCustomerSectionState extends ConsumerState<CartCustomerSection> {
                 );
               },
             ),
-          ], // end if (_showSavedFields)
-        ],
+          ],
       ),
     );
   }
@@ -811,16 +790,7 @@ class CartFooter extends ConsumerWidget {
                     ),
                     SizedBox(
                       width: 80,
-                      child: TextField(
-                        controller: TextEditingController(
-                          text: cart.paidUPI > 0
-                              ? cart.paidUPI.toStringAsFixed(2)
-                              : '',
-                        ),
-                        readOnly: true,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: billingText(context),
-                        ),
+                      child: InputDecorator(
                         decoration: InputDecoration(
                           labelText: 'UPI',
                           labelStyle: TextStyle(
@@ -835,6 +805,13 @@ class CartFooter extends ConsumerWidget {
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(6),
                           ),
+                        ),
+                        child: Text(
+                          cart.paidUPI > 0
+                              ? cart.paidUPI.toStringAsFixed(2)
+                              : '',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: billingText(context)),
                         ),
                       ),
                     ),

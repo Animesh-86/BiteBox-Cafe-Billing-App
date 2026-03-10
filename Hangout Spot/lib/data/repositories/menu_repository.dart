@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 
 import '../local/db/app_database.dart';
 import '../providers/database_provider.dart';
+import '../repositories/sync_repository.dart';
 
 import 'package:hangout_spot/data/models/inventory_models.dart';
 import 'package:hangout_spot/data/repositories/inventory_repository.dart';
@@ -12,8 +13,10 @@ import 'package:hangout_spot/data/providers/inventory_providers.dart';
 class MenuRepository {
   final AppDatabase _db;
   final InventoryRepository _inventoryRepo;
+  final SyncRepository? _syncRepo;
 
-  MenuRepository(this._db, this._inventoryRepo);
+  MenuRepository(this._db, this._inventoryRepo, {SyncRepository? syncRepo})
+    : _syncRepo = syncRepo;
 
   // Categories
   Stream<List<Category>> watchCategories() {
@@ -34,20 +37,23 @@ class MenuRepository {
         });
   }
 
-  Future<void> addCategory(CategoriesCompanion category) {
-    return _db
+  Future<void> addCategory(CategoriesCompanion category) async {
+    await _db
         .into(_db.categories)
         .insert(category, mode: InsertMode.insertOrReplace);
+    _syncRepo?.syncMenuNow();
   }
 
-  Future<void> updateCategory(Category category) {
-    return _db.update(_db.categories).replace(category);
+  Future<void> updateCategory(Category category) async {
+    await _db.update(_db.categories).replace(category);
+    _syncRepo?.syncMenuNow();
   }
 
-  Future<void> deleteCategory(String id) {
-    return (_db.update(_db.categories)..where((t) => t.id.equals(id))).write(
+  Future<void> deleteCategory(String id) async {
+    await (_db.update(_db.categories)..where((t) => t.id.equals(id))).write(
       const CategoriesCompanion(isDeleted: Value(true)),
     );
+    _syncRepo?.syncMenuNow();
   }
 
   // Items
@@ -95,22 +101,13 @@ class MenuRepository {
         } catch (_) {}
       }
     }
+
+    _syncRepo?.syncMenuNow();
   }
 
   Future<void> updateItem(Item item, {String? categoryName}) async {
     await _db.update(_db.items).replace(item);
-
-    // Auto-sync specific beverages to Inventory mapping
-    if (categoryName != null) {
-      final name = categoryName.toLowerCase();
-      if (name == 'cold drink' || name == 'water bottle') {
-        try {
-          // Assume the user is just editing the definition of the beverage.
-          // Note: Full syncing here implies the Inventory name also edits if it matches by an ID.
-          // Since they don't share identical relational row IDs, we enforce a unidirectional sync on Add/Delete for simplicity.
-        } catch (_) {}
-      }
-    }
+    _syncRepo?.syncMenuNow();
   }
 
   Future<void> deleteItem(String id) async {
@@ -149,6 +146,8 @@ class MenuRepository {
         }
       }
     }
+
+    _syncRepo?.syncMenuNow();
   }
 
   Future<bool> hasCategories() async {
@@ -160,7 +159,8 @@ class MenuRepository {
 final menuRepositoryProvider = Provider<MenuRepository>((ref) {
   final db = ref.watch(appDatabaseProvider);
   final inventoryRepo = ref.watch(inventoryRepositoryProvider);
-  return MenuRepository(db, inventoryRepo);
+  final syncRepo = ref.watch(syncRepositoryProvider);
+  return MenuRepository(db, inventoryRepo, syncRepo: syncRepo);
 });
 
 final categoriesStreamProvider = StreamProvider((ref) {

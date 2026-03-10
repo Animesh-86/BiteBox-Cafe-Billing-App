@@ -653,18 +653,43 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
       actions: [
         if (widget.item != null)
           TextButton.icon(
-            onPressed: () {
-              ref.read(menuRepositoryProvider).deleteItem(widget.item!.id);
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('${widget.item!.name} deleted'),
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+            // BUG-31: show confirmation before permanently deleting the item.
+            onPressed: () async {
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: Text('Delete ${widget.item!.name}?'),
+                  content: const Text(
+                    'This item will be permanently removed from the menu.',
                   ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Cancel'),
+                    ),
+                    FilledButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.red[400],
+                      ),
+                      child: const Text('Delete'),
+                    ),
+                  ],
                 ),
               );
+              if (confirmed == true && context.mounted) {
+                ref.read(menuRepositoryProvider).deleteItem(widget.item!.id);
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('${widget.item!.name} deleted'),
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                );
+              }
             },
             icon: const Icon(Icons.delete_outline, size: 18),
             label: const Text("Delete"),
@@ -686,6 +711,12 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
               final repo = ref.read(menuRepositoryProvider);
 
               if (widget.item == null) {
+                // BUG-1: look up the category name and pass it so inventory
+                // auto-sync for cold drinks / water bottles works correctly.
+                final selectedCategoryName = widget.categories
+                    .where((c) => c.id == _selectedCategoryId)
+                    .map((c) => c.name)
+                    .firstOrNull;
                 repo.addItem(
                   ItemsCompanion(
                     id: drift.Value(const Uuid().v4()),
@@ -699,6 +730,7 @@ class _ItemDialogState extends ConsumerState<_ItemDialog> {
                           : _imageUrlController.text.trim(),
                     ),
                   ),
+                  categoryName: selectedCategoryName,
                 );
               } else {
                 repo.updateItem(

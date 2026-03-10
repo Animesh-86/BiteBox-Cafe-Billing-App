@@ -649,6 +649,19 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
   }
 
   Widget _buildComboIntelligence(AnalyticsData data) {
+    if (data.bundleSuggestions.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Text(
+          'No combo data yet — more orders needed.',
+          style: TextStyle(
+            color: AnalyticsTheme.secondaryText(context),
+            fontSize: 13,
+          ),
+        ),
+      );
+    }
+
     final colors = [
       AnalyticsTheme.primaryGold(context),
       Colors.grey,
@@ -663,60 +676,116 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
       ) {
         final index = entry.key;
         final bundle = entry.value;
+        final comboLabel = '${bundle.item1} + ${bundle.item2}';
 
         return Padding(
-          padding: const EdgeInsets.only(bottom: 16),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: colors[index % colors.length].withOpacity(0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Text(
-                    '${index + 1}',
+          padding: const EdgeInsets.only(bottom: 12),
+          // Tap any row to see the full combo name in a dialog (for long names
+          // that are still truncated on small / large-font screens).
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () {
+              showDialog<void>(
+                context: context,
+                builder: (_) => AlertDialog(
+                  title: Text(
+                    '#${index + 1} Combo',
                     style: TextStyle(
                       color: colors[index % colors.length],
-                      fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Text(
-                  '${bundle.item1} + ${bundle.item2}',
-                  style: TextStyle(
-                    color: AnalyticsTheme.primaryText(context),
-                    fontSize: 14,
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        comboLabel,
+                        style: TextStyle(
+                          color: AnalyticsTheme.primaryText(context),
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Ordered together ${bundle.count} time${bundle.count == 1 ? '' : 's'}',
+                        style: TextStyle(
+                          color: AnalyticsTheme.secondaryText(context),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('OK'),
+                    ),
+                  ],
                 ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: AnalyticsTheme.secondaryBeige(context).withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  '${bundle.count}x',
-                  style: TextStyle(
-                    color: AnalyticsTheme.secondaryBeige(context),
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
+              );
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: colors[index % colors.length].withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${index + 1}',
+                        style: TextStyle(
+                          color: colors[index % colors.length],
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      comboLabel,
+                      style: TextStyle(
+                        color: AnalyticsTheme.primaryText(context),
+                        fontSize: 13,
+                      ),
+                      // 2 lines so medium-length names don't get cut off;
+                      // a tap reveals the full text for very long names.
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AnalyticsTheme.secondaryBeige(
+                        context,
+                      ).withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${bundle.count}x',
+                      style: TextStyle(
+                        color: AnalyticsTheme.secondaryBeige(context),
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         );
       }).toList(),

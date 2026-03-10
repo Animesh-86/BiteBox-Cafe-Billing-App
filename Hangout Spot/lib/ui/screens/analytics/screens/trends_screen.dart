@@ -459,70 +459,81 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
       );
     }
 
+    final displayItems = data.itemShare.take(5).toList();
     final total = data.itemShare.fold<int>(
       0,
       (sum, item) => sum + item.quantity,
     );
+    final chartColors = AnalyticsTheme.chartColors(context);
 
-    return SizedBox(
-      height: 250,
-      child: Row(
-        children: [
-          Expanded(
-            flex: 2,
-            child: PieChart(
-              PieChartData(
-                sectionsSpace: 2,
-                centerSpaceRadius: 50,
-                sections: List.generate(
-                  data.itemShare.length > 5 ? 5 : data.itemShare.length,
-                  (index) {
-                    final item = data.itemShare[index];
-                    final percentage = (item.quantity / total * 100);
+    // Use LayoutBuilder so the pie and legend scale with available width
+    // instead of using a fixed height that breaks on large system font sizes.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth;
+        // Pie occupies 40% of available width, clamped to reasonable bounds.
+        final pieSize = (availableWidth * 0.40).clamp(110.0, 170.0);
+        final centerRadius = pieSize * 0.22;
+        final sectionRadius = pieSize * 0.20;
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // ── Donut chart ────────────────────────────────────────────────
+            SizedBox(
+              width: pieSize,
+              height: pieSize,
+              child: PieChart(
+                PieChartData(
+                  sectionsSpace: 2,
+                  centerSpaceRadius: centerRadius,
+                  sections: List.generate(displayItems.length, (index) {
+                    final item = displayItems[index];
+                    final percentage = item.quantity / total * 100;
                     return PieChartSectionData(
                       value: item.quantity.toDouble(),
                       title: '${percentage.toStringAsFixed(0)}%',
-                      color:
-                          AnalyticsTheme.chartColors(context)[index %
-                              AnalyticsTheme.chartColors(context).length],
-                      radius: 40,
+                      color: chartColors[index % chartColors.length],
+                      radius: sectionRadius,
                       titleStyle: TextStyle(
-                        fontSize: 12,
+                        fontSize: 10,
                         fontWeight: FontWeight.bold,
                         color: AnalyticsTheme.onAccentText(context),
                       ),
                     );
-                  },
+                  }),
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 20),
-          Expanded(
-            flex: 2,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(
-                data.itemShare.length > 5 ? 5 : data.itemShare.length,
-                (index) {
-                  final item = data.itemShare[index];
-                  final percentage = (item.quantity / total * 100);
+            const SizedBox(width: 16),
+            // ── Legend ────────────────────────────────────────────────────
+            // Expanded fills remaining width; mainAxisSize.min so it doesn't
+            // force its parent Row to be taller than necessary.
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: List.generate(displayItems.length, (index) {
+                  final item = displayItems[index];
+                  final percentage = item.quantity / total * 100;
                   return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
+                    // Reduced vertical padding so items fit on small screens.
+                    padding: const EdgeInsets.only(bottom: 8),
                     child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          width: 12,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            color:
-                                AnalyticsTheme.chartColors(context)[index %
-                                    AnalyticsTheme.chartColors(context).length],
-                            shape: BoxShape.circle,
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              color: chartColors[index % chartColors.length],
+                              shape: BoxShape.circle,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -531,13 +542,13 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
                                 item.itemName,
                                 style: TextStyle(
                                   color: AnalyticsTheme.primaryText(context),
-                                  fontSize: 12,
+                                  fontSize: 11,
                                 ),
-                                maxLines: 1,
+                                maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                               ),
                               Text(
-                                '${percentage.toStringAsFixed(0)}%',
+                                '${item.quantity} sold · ${percentage.toStringAsFixed(0)}%',
                                 style: TextStyle(
                                   color: AnalyticsTheme.secondaryText(context),
                                   fontSize: 10,
@@ -549,12 +560,12 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
                       ],
                     ),
                   );
-                },
+                }),
               ),
             ),
-          ),
-        ],
-      ),
+          ],
+        );
+      },
     );
   }
 
@@ -720,84 +731,108 @@ class _TrendsScreenState extends ConsumerState<TrendsScreen> {
     );
   }
 
+  // Replaced the vertical BarChart (which could only show the first word of
+  // each item name as an x-axis label) with a horizontal bar list.
+  // Full item names are shown on the left; bars + counts on the right.
+  // This layout adapts to any screen width and system font size.
   Widget _buildTopSellingChart(AnalyticsData data) {
     final topItems = data.itemShare.take(5).toList();
+    if (topItems.isEmpty) {
+      return _buildEmptyState(
+        icon: Icons.bar_chart_rounded,
+        title: 'No Sales Data',
+        subtitle: 'Complete some orders to see top sellers',
+      );
+    }
 
-    return SizedBox(
-      height: 250,
-      child: BarChart(
-        BarChartData(
-          gridData: FlGridData(
-            show: true,
-            drawVerticalLine: false,
-            horizontalInterval: 5,
-            getDrawingHorizontalLine: (value) {
-              return FlLine(color: AnalyticsTheme.dividerColor(context), strokeWidth: 1);
-            },
-          ),
-          titlesData: FlTitlesData(
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                getTitlesWidget: (value, meta) {
-                  if (value.toInt() >= 0 && value.toInt() < topItems.length) {
-                    return Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        topItems[value.toInt()].itemName.split(' ').first,
-                        style: TextStyle(
-                          color: AnalyticsTheme.secondaryText(context),
-                          fontSize: 10,
+    final maxQty = topItems
+        .map((e) => e.quantity)
+        .reduce((a, b) => a > b ? a : b)
+        .toDouble();
+
+    final barColors = AnalyticsTheme.chartColors(context);
+
+    return Column(
+      children: List.generate(topItems.length, (index) {
+        final item = topItems[index];
+        final fraction = maxQty > 0 ? item.quantity / maxQty : 0.0;
+        final color = barColors[index % barColors.length];
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Rank number
+              SizedBox(
+                width: 20,
+                child: Text(
+                  '${index + 1}',
+                  style: TextStyle(
+                    color: AnalyticsTheme.secondaryText(context),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Item name — up to 2 lines so long names are readable
+              Expanded(
+                flex: 5,
+                child: Text(
+                  item.itemName,
+                  style: TextStyle(
+                    color: AnalyticsTheme.primaryText(context),
+                    fontSize: 12,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Proportional bar
+              Expanded(
+                flex: 6,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return Align(
+                      alignment: Alignment.centerLeft,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 500),
+                        curve: Curves.easeOut,
+                        width: (constraints.maxWidth * fraction).clamp(
+                          4.0,
+                          constraints.maxWidth,
+                        ),
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: color,
+                          borderRadius: BorderRadius.circular(4),
                         ),
                       ),
                     );
-                  }
-                  return Text('');
-                },
-              ),
-            ),
-            leftTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 30,
-                getTitlesWidget: (value, meta) {
-                  return Text(
-                    value.toInt().toString(),
-                    style: TextStyle(
-                      color: AnalyticsTheme.secondaryText(context),
-                      fontSize: 10,
-                    ),
-                  );
-                },
-              ),
-            ),
-            rightTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            topTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-          ),
-          borderData: FlBorderData(show: false),
-          barGroups: List.generate(
-            topItems.length,
-            (index) => BarChartGroupData(
-              x: index,
-              barRods: [
-                BarChartRodData(
-                  toY: topItems[index].quantity.toDouble(),
-                  color: AnalyticsTheme.chartBlue,
-                  width: 20,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(4),
-                    topRight: Radius.circular(4),
-                  ),
+                  },
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 8),
+              // Quantity count
+              SizedBox(
+                width: 32,
+                child: Text(
+                  '${item.quantity}',
+                  style: TextStyle(
+                    color: AnalyticsTheme.secondaryText(context),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  textAlign: TextAlign.right,
+                ),
+              ),
+            ],
           ),
-        ),
-      ),
+        );
+      }),
     );
   }
 

@@ -17,6 +17,7 @@ import 'package:hangout_spot/data/repositories/customer_repository.dart';
 import 'package:hangout_spot/data/repositories/sync_repository.dart';
 import 'package:hangout_spot/data/providers/inventory_providers.dart';
 import 'package:hangout_spot/data/constants/customer_defaults.dart';
+import 'package:hangout_spot/utils/constants/app_keys.dart';
 
 class OrderRepository {
   final AppDatabase _db;
@@ -140,23 +141,14 @@ class OrderRepository {
             _liveInvoiceCounter?.generateHoldInvoiceNumber() ??
             'HOLD-${DateTime.now().millisecondsSinceEpoch}';
       } else {
-        // For COMPLETED orders, use real sequential invoice number
-        if (sessionManager != null) {
-          invoiceNum = await sessionManager.getNextInvoiceNumber();
-        } else {
-          // Fallback: unique but non-sequential (avoids collision via UUID suffix)
-          invoiceNum =
-              "INV-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}-${const Uuid().v4().substring(0, 4)}";
-        }
+        // BUG-14/26/37: Use RTDB atomic counter for collision-free multi-device
+        // invoice generation. Falls back to local SQLite count when offline.
+        invoiceNum = await _getNextCompletedInvoice(sessionManager);
       }
     } else if (status == 'completed' && invoiceNum.startsWith('HOLD-')) {
-      // Converting a HOLD order to COMPLETED
-      if (sessionManager != null) {
-        invoiceNum = await sessionManager.getNextInvoiceNumber();
-      } else {
-        invoiceNum =
-            "INV-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}-${const Uuid().v4().substring(0, 4)}";
-      }
+      // Converting a HOLD order to COMPLETED — assign a real sequential number.
+      // BUG-14/26/37: Same atomic RTDB counter used here.
+      invoiceNum = await _getNextCompletedInvoice(sessionManager);
     }
 
     // Get active outlet (required for order creation)
@@ -284,6 +276,8 @@ class OrderRepository {
     String paymentMode, {
     SyncRepository? syncRepo,
   }) async {
+    int totalItems = 0;
+
     await _db.transaction(() async {
       final order = await (_db.select(
         _db.orders,
@@ -296,7 +290,7 @@ class OrderRepository {
         _db.orderItems,
       )..where((t) => t.orderId.equals(orderId))).get();
 
-      final totalItems = items.fold<int>(0, (sum, item) => sum + item.quantity);
+      totalItems = items.fold<int>(0, (sum, item) => sum + item.quantity);
 
       await (_db.update(_db.orders)..where((t) => t.id.equals(orderId))).write(
         OrdersCompanion(
@@ -305,24 +299,52 @@ class OrderRepository {
           isSynced: const Value(false), // Mark unsynced to push payment update
         ),
       );
+      // recordSale is called AFTER the transaction with the updated order
+      // to ensure it uses the correct paymentMode. (BUG-10)
+    });
 
-      // Record to Live Analytics with item count
-      if (_liveAnalytics != null) {
-        await _liveAnalytics.recordSale(order, itemCount: totalItems);
+    // Re-read the order AFTER the write so recordSale gets the correct paymentMode
+    if (_liveAnalytics != null) {
+      final updatedOrder = await (_db.select(
+        _db.orders,
+      )..where((t) => t.id.equals(orderId))).getSingleOrNull();
+      if (updatedOrder != null) {
+        await _liveAnalytics.recordSale(updatedOrder, itemCount: totalItems);
         logDebug(
-          '✅ Recorded to Live Analytics: ${order.invoiceNumber} (Items: $totalItems)',
+          '✅ Recorded to Live Analytics: ${updatedOrder.invoiceNumber} (Items: $totalItems)',
         );
       }
-    });
+    }
 
     // Push the payment update to Firestore immediately
     _tryPushOrderUpdate(orderId).ignore();
   }
 
+  /// Returns the next invoice number for a completed order.
+  /// Prefers the RTDB atomic counter (collision-free on multi-device) and
+  /// falls back to the local SQLite-based sequential count when offline.
+  Future<String> _getNextCompletedInvoice(SessionManager? sessionManager) async {
+    if (_liveInvoiceCounter != null && sessionManager != null) {
+      try {
+        final sessionId = sessionManager.getCurrentSessionId();
+        return await _liveInvoiceCounter.getNextInvoiceNumber(
+          sessionId: sessionId,
+          prefix: '#',
+        );
+      } catch (e) {
+        logDebug('⚠️ RTDB invoice counter failed, falling back to local: $e');
+      }
+    }
+    if (sessionManager != null) {
+      return await sessionManager.getNextInvoiceNumber();
+    }
+    // Last-resort fallback: non-sequential but unique.
+    return "INV-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}-${const Uuid().v4().substring(0, 4)}";
+  }
+
   Future<void> _decrementInventoryForCart(CartState cart) async {
     final repo = _inventoryRepo;
     if (repo == null) return;
-    await repo.ensureDefaultBeverageInventory();
     const allowedNames = {
       'coca cola',
       'sprite',
@@ -331,13 +353,25 @@ class OrderRepository {
       'water bottle (small)',
       'water bottle (large)',
     };
+    // BUG-12: Only initialise beverage inventory when the cart actually has
+    // beverages — avoids 6 Firestore reads on every non-beverage order.
+    final hasBeverages = cart.items.any(
+      (ci) =>
+          ci.quantity > 0 &&
+          allowedNames.contains(ci.item.name.toLowerCase()),
+    );
+    if (!hasBeverages) return;
+    await repo.ensureDefaultBeverageInventory();
     for (final ci in cart.items) {
       if (ci.quantity <= 0) continue;
       final nameKey = ci.item.name.toLowerCase();
       if (!allowedNames.contains(nameKey)) continue;
       try {
+        // BUG-13: Firestore stores names in Title-Case ("Coca Cola").
+        // Pass title-cased name so findItemByName exact-match succeeds
+        // regardless of how the cafe owner named the item in the menu.
         await repo.adjustStockByName(
-          name: ci.item.name,
+          name: _titleCase(ci.item.name),
           delta: -ci.quantity.toDouble(),
           reason: 'order_sale',
         );
@@ -502,19 +536,43 @@ class OrderRepository {
     // Attempt immediate push of cancellation outside of database transaction
     // to prevent Firebase Realtime Database thread locks from hanging SQLite.
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        // Revert analytics
-        if (order != null) {
+      // Revert customer stats and reward points for completed orders only.
+      // Pending/held orders were never committed so no stats to revert.
+      if (order != null && order.status == 'completed') {
+        // Revert live analytics (only for completed orders that were recorded)
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
           await _liveAnalytics?.revertSale(order, itemCount: itemCount);
-          if (customerRepo != null && order.customerId != null) {
-            await customerRepo.revertVisitStats(
-              order.customerId!,
-              order.totalAmount,
-              syncRepo: syncRepo,
-            );
-          }
         }
+
+        if (customerRepo != null && order.customerId != null) {
+          await customerRepo.revertVisitStats(
+            order.customerId!,
+            order.totalAmount,
+            syncRepo: syncRepo,
+          );
+        }
+
+        // Delete the 'earn' reward transaction for this order so the
+        // customer's earned balance is reverted.
+        await (_db.delete(_db.rewardTransactions)
+              ..where(
+                (t) =>
+                    t.orderId.equals(orderId) & t.type.equals('earn'),
+              ))
+            .go();
+
+        // Delete the 'redeem' reward transaction for this order so any
+        // points the customer redeemed at checkout are refunded. (BUG-29)
+        await (_db.delete(_db.rewardTransactions)
+              ..where(
+                (t) =>
+                    t.orderId.equals(orderId) & t.type.equals('redeem'),
+              ))
+            .go();
+
+        // Restock inventory for any beverage items on the order. (BUG-11)
+        await revertOrderItems(orderId);
       }
     } catch (e) {
       logDebug('Failed to push live order cancellation bounds: $e');
@@ -525,8 +583,43 @@ class OrderRepository {
   }
 
   Future<void> revertOrderItems(String orderId) async {
-    // TODO: Implement logic to revert inventory for a cancelled order
-    // This would involve fetching order items and calling inventoryRepo.adjustStockByName with positive delta
+    final repo = _inventoryRepo;
+    if (repo == null) return;
+
+    const allowedNames = {
+      'coca cola',
+      'sprite',
+      'fanta',
+      'thumbs up',
+      'water bottle (small)',
+      'water bottle (large)',
+    };
+
+    final orderItems = await getOrderItems(orderId);
+
+    for (final oi in orderItems) {
+      if (oi.quantity <= 0) continue;
+
+      // Prefer original item name from menu over display name (which may have
+      // category suffix). This ensures proper matching in Firestore inventory.
+      final menuItem = await (_db.select(
+        _db.items,
+      )..where((t) => t.id.equals(oi.itemId))).getSingleOrNull();
+      final originalName = menuItem?.name ?? oi.itemName;
+
+      if (!allowedNames.contains(originalName.toLowerCase())) continue;
+
+      try {
+        await repo.adjustStockByName(
+          // BUG-13: normalise to Title-Case to match what Firestore stores.
+          name: _titleCase(originalName),
+          delta: oi.quantity.toDouble(), // positive = restock
+          reason: 'order_cancel',
+        );
+      } catch (e) {
+        logDebug('⚠️ Inventory revert skipped for $originalName: $e');
+      }
+    }
   }
 
   // Deprecated: Hard delete is removed to preserve invoice sequence
@@ -548,7 +641,7 @@ class OrderRepository {
     // Check if reward system is enabled by querying settings
     final settings =
         await (_db.select(_db.settings)
-              ..where((tbl) => tbl.key.equals('reward_system_enabled')))
+              ..where((tbl) => tbl.key.equals(REWARD_FEATURE_TOGGLE_KEY)))
             .getSingleOrNull();
 
     if (settings != null && settings.value != 'true') {
@@ -597,8 +690,10 @@ class OrderRepository {
     double orderAmount, {
     SyncRepository? syncRepo,
   }) async {
-    if (customerId == CustomerDefaults.walkInId)
-      return; // No stats for walk-in customer
+    if (customerId == CustomerDefaults.walkInId ||
+        customerId == CustomerDefaults.zomatoId ||
+        customerId == CustomerDefaults.swiggyId)
+      return; // No stats for platform/anonymous customers
 
     try {
       await _db.transaction(() async {

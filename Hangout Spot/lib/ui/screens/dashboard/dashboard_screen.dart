@@ -26,11 +26,25 @@ class DashboardScreen extends ConsumerStatefulWidget {
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   DateTime? _selectedDate; // Null means 'current session date'
+  ProviderSubscription<AsyncValue<List<InventoryItem>>>? _lowStockSubscription;
 
   @override
   void initState() {
     super.initState();
     NotificationService.instance.requestPermissions();
+    _lowStockSubscription = ref.listenManual(
+      inventoryItemsStreamProvider,
+      (previous, next) async {
+        final items = next.valueOrNull ?? [];
+        await _handleLowStockNotifications(items);
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _lowStockSubscription?.close();
+    super.dispose();
   }
 
   Future<void> _pickDate(BuildContext context) async {
@@ -117,36 +131,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     final currentDate = _selectedDate ?? sessionManager.getCurrentSessionDate();
 
-    // Calculate start and end based on SESSION WINDOW
-    final startOfDay = DateTime(
-      currentDate.year,
-      currentDate.month,
-      currentDate.day,
-      sessionManager.openingHour,
-      0,
-      0,
-    );
-
-    DateTime endOfDay;
-    if (sessionManager.closingHour <= sessionManager.openingHour) {
-      endOfDay = DateTime(
-        currentDate.year,
-        currentDate.month,
-        currentDate.day,
-        sessionManager.closingHour,
-        0,
-        0,
-      ).add(const Duration(days: 1));
-    } else {
-      endOfDay = DateTime(
-        currentDate.year,
-        currentDate.month,
-        currentDate.day,
-        sessionManager.closingHour,
-        0,
-        0,
-      );
-    }
+    // Compute session window using the canonical helper so any change to the
+    // session-boundary logic in SessionManager is reflected here automatically.
+    final sessionRange = sessionManager.getSessionRange(currentDate);
+    final startOfDay = sessionRange['start']!;
+    final endOfDay = sessionRange['end']!;
 
     final width = MediaQuery.of(context).size.width;
     final isWide = width > 900;
@@ -165,11 +154,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         : const Color(0xFFEDAD4C);
 
     final inventoryAsync = ref.watch(inventoryItemsStreamProvider);
-
-    ref.listen(inventoryItemsStreamProvider, (previous, next) async {
-      final items = next.valueOrNull ?? [];
-      await _handleLowStockNotifications(items);
-    });
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -997,7 +981,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         ],
                       ),
                       child: StreamBuilder<List<Order>>(
-                        stream: sessionManager.watchSessionOrders(),
+                        stream: sessionManager.watchOrdersForSession(
+                          currentDate,
+                        ),
                         builder: (context, snapshot) {
                           if (!snapshot.hasData || snapshot.data!.isEmpty) {
                             return Padding(
@@ -1013,16 +999,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               ),
                             );
                           }
-
-                          // Filter orders if needed or just show latest 5
-                          // Note: watchSessionOrders might just show current session orders
-                          // If user wants historical, meaningful 'watch' might need refactor in future.
-                          // For now, let's keep showing session orders but filtered by _selectedDate if possible?
-                          // `watchSessionOrders` likely watches the *current* session ID in pure Drift.
-                          // If we want to support date filtering on the stream, we'd need a different query.
-                          // Use `analytics` or verify if session filtering matches date.
-                          // Assuming current request just wants top stats date-filtered.
-                          // Keeping stream as-is for "Live/Recent Activity" context.
 
                           final orders = snapshot.data!.toList();
                           return Column(
