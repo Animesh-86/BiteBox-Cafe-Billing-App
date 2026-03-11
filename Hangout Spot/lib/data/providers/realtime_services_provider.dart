@@ -32,8 +32,8 @@ final sharedCartServiceProvider = Provider<SharedCartService>((ref) {
 
 /// Stream provider for today's revenue (live, shift-aware)
 final liveRevenueProvider = StreamProvider<double>((ref) async* {
-  final sessionManager = ref.read(sessionManagerProvider);
-  final analytics = ref.read(analyticsRepositoryProvider);
+  final sessionManager = ref.watch(sessionManagerProvider);
+  final analytics = ref.watch(analyticsRepositoryProvider);
   final locationId = ref.watch(currentLocationIdProvider).valueOrNull;
 
   // Re-run whenever remote sync changes to pick up new orders
@@ -53,8 +53,8 @@ final liveRevenueProvider = StreamProvider<double>((ref) async* {
 
 /// Stream provider for today's order count (live, shift-aware)
 final liveOrderCountProvider = StreamProvider<int>((ref) async* {
-  final sessionManager = ref.read(sessionManagerProvider);
-  final analytics = ref.read(analyticsRepositoryProvider);
+  final sessionManager = ref.watch(sessionManagerProvider);
+  final analytics = ref.watch(analyticsRepositoryProvider);
   final locationId = ref.watch(currentLocationIdProvider).valueOrNull;
 
   ref.watch(remoteSyncGenerationProvider);
@@ -73,8 +73,8 @@ final liveOrderCountProvider = StreamProvider<int>((ref) async* {
 
 /// Stream provider for today's item count (live, shift-aware)
 final liveItemCountProvider = StreamProvider<int>((ref) async* {
-  final sessionManager = ref.read(sessionManagerProvider);
-  final analytics = ref.read(analyticsRepositoryProvider);
+  final sessionManager = ref.watch(sessionManagerProvider);
+  final analytics = ref.watch(analyticsRepositoryProvider);
   final locationId = ref.watch(currentLocationIdProvider).valueOrNull;
 
   ref.watch(remoteSyncGenerationProvider);

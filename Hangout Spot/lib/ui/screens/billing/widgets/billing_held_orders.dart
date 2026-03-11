@@ -312,6 +312,11 @@ class HeldOrdersDialog extends ConsumerWidget {
                                           .cancelOrder(
                                             order.id,
                                             syncRepo: syncRepo,
+                                            onCancelled: () {
+                                              ref.invalidate(
+                                                orderRepositoryProvider,
+                                              );
+                                            },
                                           );
                                     }
                                   },

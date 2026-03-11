@@ -1,6 +1,7 @@
 import 'package:hangout_spot/utils/log_utils.dart';
 import 'dart:async';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hangout_spot/data/repositories/sync_repository.dart';
@@ -30,6 +31,16 @@ class AutoSyncService {
   /// Firebase RTDB connectivity listener
   StreamSubscription? _connectivitySub;
   bool _wasDisconnected = false;
+
+  // OFFLINE-1 fix: track failure state so the Settings screen / sync badge can
+  // show "Sync failed" instead of silently discarding the error.
+  int _consecutiveFailures = 0;
+  String? _lastSyncError;
+  DateTime? _lastSyncSuccessAt;
+
+  int get consecutiveFailures => _consecutiveFailures;
+  String? get lastSyncError => _lastSyncError;
+  DateTime? get lastSyncSuccessAt => _lastSyncSuccessAt;
 
   AutoSyncService(this._syncRepo, this._orderRepo);
 
@@ -92,7 +103,11 @@ class AutoSyncService {
     _connectivitySub?.cancel();
     _wasDisconnected = false;
 
-    final connectedRef = FirebaseDatabase.instance.ref('.info/connected');
+    final connectedRef = FirebaseDatabase.instanceFor(
+      app: Firebase.app(),
+      databaseURL:
+          'https://hangout-spot-pos-default-rtdb.asia-southeast1.firebasedatabase.app',
+    ).ref('.info/connected');
     _connectivitySub = connectedRef.onValue.listen((event) {
       final connected = event.snapshot.value as bool? ?? false;
 
@@ -118,9 +133,22 @@ class AutoSyncService {
       // 2. Backup bounded data (menu, customers, config, prefs)
       await _syncRepo.backupData();
 
+      _consecutiveFailures = 0;
+      _lastSyncError = null;
+      _lastSyncSuccessAt = DateTime.now();
       logDebug('✅ Auto-sync tick completed');
     } catch (e) {
-      logDebug('⚠️ Auto-sync tick failed: $e');
+      _consecutiveFailures++;
+      _lastSyncError = e.toString();
+      logDebug(
+        '⚠️ Auto-sync tick failed (consecutive: $_consecutiveFailures): $e',
+      );
+      if (_consecutiveFailures >= 3) {
+        logDebug(
+          '🔴 Auto-sync has failed $_consecutiveFailures times in a row. '
+          'Check connectivity or cloud configuration.',
+        );
+      }
     } finally {
       _isSyncing = false;
     }

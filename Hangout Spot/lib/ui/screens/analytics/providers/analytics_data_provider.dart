@@ -19,9 +19,11 @@ final liveCustomerCountProvider = StreamProvider<int>((ref) {
     ..where((tbl) => tbl.createdAt.isSmallerThanValue(endOfDay))
     ..where((tbl) => tbl.status.equals('completed'));
 
-  // For live "customers right now", treat every completed order in
-  // the session window as one customer, regardless of customerId.
-  return query.watch().map((orders) => orders.length);
+  // BUG-6 fix: count distinct customer IDs so one customer making 3 orders
+  // is counted once, not three times.
+  return query.watch().map(
+    (orders) => orders.map((o) => o.customerId ?? '').toSet().length,
+  );
 });
 
 // Data Models

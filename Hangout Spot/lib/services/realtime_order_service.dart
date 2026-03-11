@@ -1,4 +1,5 @@
 import 'package:hangout_spot/utils/log_utils.dart';
+import 'package:hangout_spot/utils/timestamp_utils.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart' hide Order;
 import 'package:firebase_auth/firebase_auth.dart';
@@ -88,7 +89,7 @@ class RealTimeOrderService {
   // Returns true if local DB was modified.
   Future<bool> _syncSingleOrder(Map<String, dynamic> orderMap) async {
     try {
-      final cloudOrder = Order.fromJson(orderMap);
+      final cloudOrder = Order.fromJson(sanitiseDateFields(orderMap));
 
       // Check if order exists locally
       final localOrder = await (_db.select(
@@ -107,7 +108,25 @@ class RealTimeOrderService {
         return true;
       } else {
         // Existing Order - Use timestamp to resolve conflicts
+
+        // BUG-1 fix: guard locally-cancelled orders. A cashier's explicit
+        // cancellation must never be silently reverted by a stale cloud snapshot
+        // that arrived after the local change. Only the cloud's own 'cancelled'
+        // status can override a local cancellation.
+        if (localOrder.status == 'cancelled' &&
+            cloudOrder.status != 'cancelled') {
+          logDebug(
+            '⏭️ Skipping update – protecting local cancellation: '
+            '${cloudOrder.invoiceNumber}',
+          );
+          return false;
+        }
+
         final cloudModified = orderMap['lastModified'];
+        // BUG-1 fix: local orders don't have a persisted lastModified field,
+        // so fall back to createdAt as an approximation. This is still
+        // imperfect but the cancellation guard above covers the highest-risk
+        // case. A proper fix requires adding a lastModified column to orders.
         final localModified = localOrder.createdAt;
 
         bool shouldUpdate = false;
@@ -182,31 +201,36 @@ class RealTimeOrderService {
         return;
       }
 
-      // Delete existing orderItems for this order
-      await (_db.delete(
-        _db.orderItems,
-      )..where((t) => t.orderId.equals(orderId))).go();
+      // OFFLINE-3 fix: wrap delete+insert in a transaction so a mid-sync app
+      // kill never leaves an order with no items (which would show as empty on
+      // the dashboard and break totals).
+      await _db.transaction(() async {
+        // Delete existing orderItems for this order
+        await (_db.delete(
+          _db.orderItems,
+        )..where((t) => t.orderId.equals(orderId))).go();
 
-      // Insert items from cloud
-      for (final itemData in itemsData) {
-        final itemMap = itemData as Map<String, dynamic>;
-        await _db
-            .into(_db.orderItems)
-            .insert(
-              OrderItemsCompanion(
-                id: Value(const Uuid().v4()),
-                orderId: Value(orderId),
-                itemId: Value(itemMap['itemId'] as String),
-                itemName: Value(itemMap['itemName'] as String),
-                price: Value((itemMap['price'] as num).toDouble()),
-                quantity: Value(itemMap['quantity'] as int),
-                note: Value(itemMap['note'] as String? ?? ''),
-                discountAmount: Value(
-                  (itemMap['discountAmount'] as num?)?.toDouble() ?? 0.0,
+        // Insert items from cloud
+        for (final itemData in itemsData) {
+          final itemMap = itemData as Map<String, dynamic>;
+          await _db
+              .into(_db.orderItems)
+              .insert(
+                OrderItemsCompanion(
+                  id: Value(const Uuid().v4()),
+                  orderId: Value(orderId),
+                  itemId: Value(itemMap['itemId'] as String),
+                  itemName: Value(itemMap['itemName'] as String),
+                  price: Value((itemMap['price'] as num).toDouble()),
+                  quantity: Value(itemMap['quantity'] as int),
+                  note: Value(itemMap['note'] as String? ?? ''),
+                  discountAmount: Value(
+                    (itemMap['discountAmount'] as num?)?.toDouble() ?? 0.0,
+                  ),
                 ),
-              ),
-            );
-      }
+              );
+        }
+      });
 
       logDebug('✅ Restored ${itemsData.length} items for order: $orderId');
     } catch (e) {

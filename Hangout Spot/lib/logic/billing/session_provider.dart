@@ -136,7 +136,10 @@ class SessionManager {
   }
 
   /// Get all orders for a specific session date (for dashboard date switching).
-  Stream<List<Order>> watchOrdersForSession(DateTime sessionDate) {
+  Stream<List<Order>> watchOrdersForSession(
+    DateTime sessionDate, {
+    String? locationId,
+  }) {
     final sessionStart = DateTime(
       sessionDate.year,
       sessionDate.month,
@@ -145,9 +148,13 @@ class SessionManager {
     );
     final sessionEnd = _sessionEnd(sessionDate);
 
-    return (_db.select(_db.orders)
-          ..where((tbl) => tbl.createdAt.isBiggerOrEqualValue(sessionStart))
-          ..where((tbl) => tbl.createdAt.isSmallerThanValue(sessionEnd))
+    final query = _db.select(_db.orders)
+      ..where((tbl) => tbl.createdAt.isBiggerOrEqualValue(sessionStart))
+      ..where((tbl) => tbl.createdAt.isSmallerThanValue(sessionEnd));
+    if (locationId != null && locationId.trim().isNotEmpty) {
+      query.where((tbl) => tbl.locationId.equals(locationId));
+    }
+    return (query
           ..orderBy([
             (t) =>
                 OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc),

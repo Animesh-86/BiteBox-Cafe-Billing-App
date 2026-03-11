@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
+import 'package:hangout_spot/data/repositories/customer_repository.dart';
 import 'package:hangout_spot/data/repositories/order_repository.dart';
+import 'package:hangout_spot/logic/rewards/reward_provider.dart';
 import 'package:hangout_spot/services/share_service.dart';
 import 'package:intl/intl.dart';
 import 'package:hangout_spot/logic/locations/location_provider.dart';
@@ -14,6 +16,11 @@ class CustomerProfileScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Watch the customer reactively so visit count / totalSpent updates live.
+    final liveCustomer =
+        ref.watch(customerByIdStreamProvider(customer.id)).valueOrNull ??
+        customer;
+
     final prefs = ref.watch(sharedPreferencesProvider);
     final isBillWhatsAppEnabled =
         prefs.getBool(BILL_WHATSAPP_ENABLED_KEY) ?? true;
@@ -24,11 +31,11 @@ class CustomerProfileScreen extends ConsumerWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: Text(customer.name)),
+      appBar: AppBar(title: Text(liveCustomer.name)),
       body: Column(
         children: [
           _ProfileHeader(
-            customer: customer,
+            customer: liveCustomer,
             isBillWhatsAppEnabled: isBillWhatsAppEnabled,
           ),
           const Divider(),
@@ -109,7 +116,7 @@ class CustomerProfileScreen extends ConsumerWidget {
                                         .shareInvoiceWhatsApp(
                                           order,
                                           items,
-                                          customer,
+                                          liveCustomer,
                                         );
                                   },
                                 ),
@@ -140,6 +147,10 @@ class _ProfileHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    // Watch the reward balance live so it reflects earned/redeemed points.
+    final rewardBalance =
+        ref.watch(customerRewardBalanceProvider(customer.id)).valueOrNull ?? 0.0;
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Row(
@@ -204,6 +215,15 @@ class _ProfileHeader extends ConsumerWidget {
                 '₹${customer.totalSpent.toStringAsFixed(0)}',
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
+              if (rewardBalance > 0)
+                Text(
+                  '${rewardBalance.toStringAsFixed(0)} pts',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: theme.colorScheme.tertiary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
             ],
           ),
         ],

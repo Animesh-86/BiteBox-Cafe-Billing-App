@@ -233,6 +233,8 @@ class AnalyticsRepository {
   }
 
   Future<MapEntry<String, int>?> getMostOrderedItem() async {
+    // BUG-4 fix: join orders table and filter to status='completed' so
+    // cancelled/pending orders don't inflate the item count.
     final query = _db.selectOnly(_db.orderItems)
       ..addColumns([_db.orderItems.itemName, _db.orderItems.quantity.sum()])
       ..groupBy([_db.orderItems.itemName])
@@ -243,6 +245,10 @@ class AnalyticsRepository {
         ),
       ])
       ..limit(1);
+    query.join([
+      innerJoin(_db.orders, _db.orders.id.equalsExp(_db.orderItems.orderId)),
+    ]);
+    query.where(_db.orders.status.equals('completed'));
     final result = await query.getSingleOrNull();
     if (result == null) return null;
     return MapEntry(
@@ -298,7 +304,10 @@ class AnalyticsRepository {
     }
     final result = await query.getSingle();
     final sum = result.read(_db.orders.totalAmount.sum()) ?? 0.0;
-    final days = end.difference(start).inDays + 1;
+    // EDGE-3 fix: end is an exclusive upper bound in the WHERE clause so the
+    // correct day count is difference.inDays (not +1). Adding 1 would divide
+    // a 7-day range by 8 and understate the average by ~12%.
+    final days = end.difference(start).inDays;
     if (days <= 0) return sum;
     return sum / days;
   }

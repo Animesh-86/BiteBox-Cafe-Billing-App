@@ -17,7 +17,12 @@ class SharedCartService {
   final FirebaseAuth _auth;
 
   SharedCartService({DatabaseReference? database, FirebaseAuth? auth})
-    : _database = database ?? FirebaseDatabase.instance.ref(),
+    : _database = database ??
+          FirebaseDatabase.instanceFor(
+            app: (auth ?? FirebaseAuth.instance).app,
+            databaseURL:
+                'https://hangout-spot-pos-default-rtdb.asia-southeast1.firebasedatabase.app',
+          ).ref(),
       _auth = auth ?? FirebaseAuth.instance;
 
   /// Get reference to user's active carts node

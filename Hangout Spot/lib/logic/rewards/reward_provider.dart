@@ -98,6 +98,17 @@ class RewardNotifier extends StateNotifier<void> {
     required double orderAmount,
     required String orderId,
   }) async {
+    // ISSUE-13 fix: idempotency guard — skip if we already have an earn
+    // transaction for this orderId, so a retry never double-rewards.
+    if (orderId.isNotEmpty) {
+      final already = await (_db.select(_db.rewardTransactions)
+            ..where(
+              (t) => t.orderId.equals(orderId) & t.type.equals('earn'),
+            ))
+          .getSingleOrNull();
+      if (already != null) return;
+    }
+
     // Get earning rate from settings
     final settings = await (_db.select(
       _db.settings,
@@ -132,25 +143,35 @@ class RewardNotifier extends StateNotifier<void> {
     String? orderId,
     String? description,
   }) async {
-    // Get customer's current balance
-    final balance = await _getCustomerBalance(customerId);
+    // ISSUE-15 fix: enforce minimum redemption threshold as a safety net
+    // even if the caller already checked (defence-in-depth).
+    if (pointsToRedeem < MIN_REDEMPTION_POINTS) return false;
 
-    if (balance < pointsToRedeem) {
-      return false; // Insufficient points
-    }
+    // ISSUE-12 fix: wrap balance check + insert in a single DB transaction so
+    // two concurrent callers can never both pass the balance check and each
+    // insert a redemption, resulting in a negative balance.
+    bool success = false;
+    await _db.transaction(() async {
+      final balance = await _getCustomerBalance(customerId);
 
-    // Create redemption transaction — link to orderId so it can be refunded on cancel
-    final transaction = RewardTransactionsCompanion(
-      id: Value(const Uuid().v4()),
-      customerId: Value(customerId),
-      type: const Value('redeem'),
-      amount: Value(pointsToRedeem),
-      orderId: orderId != null ? Value(orderId) : const Value.absent(),
-      description: Value(description ?? 'Redeemed $pointsToRedeem points'),
-    );
+      if (balance < pointsToRedeem) {
+        return; // Insufficient points — leave success = false
+      }
 
-    await _db.into(_db.rewardTransactions).insert(transaction);
-    return true;
+      // Create redemption transaction — link to orderId so it can be refunded on cancel
+      final transaction = RewardTransactionsCompanion(
+        id: Value(const Uuid().v4()),
+        customerId: Value(customerId),
+        type: const Value('redeem'),
+        amount: Value(pointsToRedeem),
+        orderId: orderId != null ? Value(orderId) : const Value.absent(),
+        description: Value(description ?? 'Redeemed $pointsToRedeem points'),
+      );
+
+      await _db.into(_db.rewardTransactions).insert(transaction);
+      success = true;
+    });
+    return success;
   }
 
   /// Cancel a reward redemption, refunding the points

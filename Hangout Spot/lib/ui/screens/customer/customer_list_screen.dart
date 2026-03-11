@@ -89,7 +89,11 @@ class _CustomerListScreenState extends ConsumerState<CustomerListScreen> {
                 (c) => c.id == customer.id,
               );
               return ListTile(
-                leading: CircleAvatar(child: Text(customer.name[0])),
+                leading: CircleAvatar(
+                  child: Text(
+                    customer.name.isEmpty ? '?' : customer.name[0],
+                  ),
+                ),
                 title: Text(customer.name),
                 subtitle: Text(customer.phone ?? 'No phone'),
                 trailing: widget.isSelectionMode
@@ -349,42 +353,54 @@ class _CustomerListScreenState extends ConsumerState<CustomerListScreen> {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () {
+            onPressed: () async {
               if (nameController.text.isNotEmpty) {
                 final repo = ref.read(customerRepositoryProvider);
                 final syncRepo = ref.read(syncRepositoryProvider);
-                if (customer == null) {
-                  repo.addCustomer(
-                    CustomersCompanion(
-                      id: drift.Value(const Uuid().v4()),
-                      name: drift.Value(nameController.text),
-                      phone: drift.Value(
-                        phoneController.text.isEmpty
-                            ? null
-                            : phoneController.text,
-                      ),
-                      discountPercent: drift.Value(
-                        double.tryParse(discountController.text) ?? 0.0,
-                      ),
-                    ),
-                    syncRepo: syncRepo,
-                  );
-                } else {
-                  repo.updateCustomer(
-                    customer.copyWith(
-                      name: nameController.text,
-                      phone: drift.Value(
-                        phoneController.text.isEmpty
-                            ? null
-                            : phoneController.text,
-                      ),
-                      discountPercent:
+                // Capture context-dependent objects before the async gap.
+                final nav = Navigator.of(context);
+                final messenger = ScaffoldMessenger.of(context);
+                try {
+                  if (customer == null) {
+                    await repo.addCustomer(
+                      CustomersCompanion(
+                        id: drift.Value(const Uuid().v4()),
+                        name: drift.Value(nameController.text),
+                        phone: drift.Value(
+                          phoneController.text.isEmpty
+                              ? null
+                              : phoneController.text,
+                        ),
+                        discountPercent: drift.Value(
                           double.tryParse(discountController.text) ?? 0.0,
+                        ),
+                      ),
+                      syncRepo: syncRepo,
+                    );
+                  } else {
+                    await repo.updateCustomer(
+                      customer.copyWith(
+                        name: nameController.text,
+                        phone: drift.Value(
+                          phoneController.text.isEmpty
+                              ? null
+                              : phoneController.text,
+                        ),
+                        discountPercent:
+                            double.tryParse(discountController.text) ?? 0.0,
+                      ),
+                      syncRepo: syncRepo,
+                    );
+                  }
+                  nav.pop();
+                } catch (e) {
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Text('Error: $e'),
+                      backgroundColor: Colors.red,
                     ),
-                    syncRepo: syncRepo,
                   );
                 }
-                Navigator.pop(context);
               }
             },
             child: const Text('Save'),

@@ -32,13 +32,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   void initState() {
     super.initState();
     NotificationService.instance.requestPermissions();
-    _lowStockSubscription = ref.listenManual(
-      inventoryItemsStreamProvider,
-      (previous, next) async {
-        final items = next.valueOrNull ?? [];
-        await _handleLowStockNotifications(items);
-      },
-    );
+    _lowStockSubscription = ref.listenManual(inventoryItemsStreamProvider, (
+      previous,
+      next,
+    ) async {
+      final items = next.valueOrNull ?? [];
+      await _handleLowStockNotifications(items);
+    });
   }
 
   @override
@@ -47,15 +47,32 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     super.dispose();
   }
 
+  /// Returns a compact label showing the session time window, e.g.
+  /// "14:00 → Tue 14:00" for an overnight shift that spans two days.
+  String _sessionRangeLabel(DateTime start, DateTime end) {
+    final startStr = DateFormat('H:mm').format(start);
+    if (end.day != start.day) {
+      final endStr = DateFormat('EEE H:mm').format(end);
+      return '$startStr → $endStr';
+    }
+    return '$startStr → ${DateFormat('H:mm').format(end)}';
+  }
+
   Future<void> _pickDate(BuildContext context) async {
     final sessionManager = ref.read(sessionManagerProvider);
     final initialDate = _selectedDate ?? sessionManager.getCurrentSessionDate();
+
+    // Limit lastDate to the current session date so the user cannot accidentally
+    // navigate to a "future" session whose window hasn't started yet.
+    // (e.g. if today is 10 Mar before 2 PM the current session is still 9 Mar;
+    // picking 10 Mar would show an empty session that starts at 2 PM on 10 Mar.)
+    final lastDate = sessionManager.getCurrentSessionDate();
 
     final picked = await showDatePicker(
       context: context,
       initialDate: initialDate,
       firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
+      lastDate: lastDate,
       builder: (context, child) {
         final theme = Theme.of(context);
         final isDark = theme.brightness == Brightness.dark;
@@ -275,22 +292,40 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           ),
                         ],
                       ),
-                      child: Row(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          Icon(Icons.calendar_today, size: 16, color: coffee),
-                          const SizedBox(width: 8),
-                          Text(
-                            DateFormat('EEE, d MMM').format(currentDate),
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: coffeeDark,
-                            ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.calendar_today,
+                                size: 16,
+                                color: coffee,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                DateFormat('EEE, d MMM').format(currentDate),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: coffeeDark,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(
+                                Icons.arrow_drop_down,
+                                size: 18,
+                                color: coffeeDark,
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 4),
-                          Icon(
-                            Icons.arrow_drop_down,
-                            size: 18,
-                            color: coffeeDark,
+                          Text(
+                            _sessionRangeLabel(startOfDay, endOfDay),
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: coffeeDark.withOpacity(0.55),
+                            ),
                           ),
                         ],
                       ),
@@ -528,8 +563,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                   Expanded(
                                     child: badge(
                                       'Dine-in',
-                                      split.counts['Walk-in'] ?? 0,
-                                      split.totals['Walk-in'] ?? 0,
+                                      split.counts['Dine-in'] ?? 0,
+                                      split.totals['Dine-in'] ?? 0,
                                     ),
                                   ),
                                 ],
@@ -983,6 +1018,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       child: StreamBuilder<List<Order>>(
                         stream: sessionManager.watchOrdersForSession(
                           currentDate,
+                          locationId: currentLocationId,
                         ),
                         builder: (context, snapshot) {
                           if (!snapshot.hasData || snapshot.data!.isEmpty) {
@@ -1131,6 +1167,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                                       order.id,
                                                       syncRepo: syncRepo,
                                                       customerRepo: custRepo,
+                                                      onCancelled: () {
+                                                        setState(() {});
+                                                      },
                                                     );
                                                 // Bump so live stats re-query
                                                 ref

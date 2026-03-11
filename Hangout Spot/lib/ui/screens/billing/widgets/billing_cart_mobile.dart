@@ -16,6 +16,10 @@ class CartMobileBottomBar extends ConsumerWidget {
 
     return InkWell(
       onTap: () {
+        // Pre-capture theme values so the bottom sheet builder never
+        // references the outer context (which can be deactivated when
+        // CartMobileBottomBar is removed from the tree after clearCart).
+        final scaffoldBg = currentTheme.scaffoldBackgroundColor;
         showModalBottomSheet(
           context: context,
           isScrollControlled: true,
@@ -30,7 +34,7 @@ class CartMobileBottomBar extends ConsumerWidget {
                 maxChildSize: 0.95,
                 builder: (_, controller) => Container(
                   decoration: BoxDecoration(
-                    color: Theme.of(context).scaffoldBackgroundColor,
+                    color: scaffoldBg,
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(20),
                     ),
@@ -91,7 +95,13 @@ class _MobileCartModalState extends ConsumerState<MobileCartModal> {
     final cart = ref.watch(cartProvider);
     final notifier = ref.read(cartProvider.notifier);
 
-    return Column(
+    // Everything scrolls together via the DraggableScrollableSheet controller
+    // so the footer (with Print Bill / Hold buttons) is always reachable.
+    return ListView(
+      controller: widget.scrollController,
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.viewInsetsOf(context).bottom,
+      ),
       children: [
         // Header
         Container(
@@ -203,67 +213,63 @@ class _MobileCartModalState extends ConsumerState<MobileCartModal> {
           ),
         ),
 
-        // Cart Items
-        Expanded(
-          child: cart.items.isEmpty
-              ? Center(
-                  child: Text(
-                    'Cart empty',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: billingMutedText(context),
-                    ),
-                  ),
-                )
-              : Builder(
-                  builder: (context) {
-                    final screenWidth = MediaQuery.of(context).size.width;
-                    // Adaptive: 1 column on very small screens, 2 on normal
-                    final crossAxisCount = screenWidth < 360 ? 1 : 2;
-                    // Taller cards on small screens so names aren't clipped
-                    final childAspectRatio = screenWidth < 360
-                        ? 2.5
-                        : screenWidth < 420
-                        ? 1.6
-                        : 1.8;
-
-                    return GridView.builder(
-                      controller: widget.scrollController,
-                      padding: const EdgeInsets.all(12),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: crossAxisCount,
-                        crossAxisSpacing: 8,
-                        mainAxisSpacing: 8,
-                        childAspectRatio: childAspectRatio,
-                      ),
-                      itemCount: cart.items.length,
-                      itemBuilder: (context, index) {
-                        return CartItemTile(
-                          item: cart.items[index],
-                          notifier: notifier,
-                        );
-                      },
-                    );
-                  },
+        // Cart Items — rendered inline as a non-scrollable list
+        // (the outer ListView handles all scrolling)
+        if (cart.items.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 40),
+            child: Center(
+              child: Text(
+                'Cart empty',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: billingMutedText(context),
                 ),
-        ),
-
-        // Footer (compact, non-scrollable)
-        AnimatedPadding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.viewInsetsOf(context).bottom,
-          ),
-          duration: const Duration(milliseconds: 150),
-          curve: Curves.easeOut,
-          child: SafeArea(
-            bottom: true,
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: billingSurface(context, darkOpacity: 0.05),
-                boxShadow: billingShadow(context),
               ),
-              child: const CartFooter(),
             ),
+          )
+        else
+          Builder(
+            builder: (context) {
+              final screenWidth = MediaQuery.of(context).size.width;
+              final crossAxisCount = screenWidth < 360 ? 1 : 2;
+              final childAspectRatio = screenWidth < 360
+                  ? 2.5
+                  : screenWidth < 420
+                  ? 1.6
+                  : 1.8;
+
+              return GridView.builder(
+                // Disable GridView's own scrolling — the parent ListView scrolls
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(12),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: crossAxisCount,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                  childAspectRatio: childAspectRatio,
+                ),
+                itemCount: cart.items.length,
+                itemBuilder: (context, index) {
+                  return CartItemTile(
+                    item: cart.items[index],
+                    notifier: notifier,
+                  );
+                },
+              );
+            },
+          ),
+
+        // Footer — scrollable, always reachable
+        SafeArea(
+          bottom: true,
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: billingSurface(context, darkOpacity: 0.05),
+              boxShadow: billingShadow(context),
+            ),
+            child: const CartFooter(),
           ),
         ),
       ],

@@ -7,7 +7,6 @@ import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/data/providers/database_provider.dart';
 import 'package:hangout_spot/logic/billing/cart_provider.dart';
 import 'package:hangout_spot/logic/billing/session_provider.dart';
-import 'package:hangout_spot/logic/locations/location_provider.dart';
 import 'package:hangout_spot/data/repositories/order_repository.dart';
 import 'package:hangout_spot/services/printing_service.dart';
 import 'package:hangout_spot/services/share_service.dart';
@@ -21,8 +20,10 @@ import 'package:hangout_spot/data/repositories/sync_repository.dart';
 
 import 'package:hangout_spot/services/thermal_printing_service.dart';
 
-/// Prevents concurrent checkout / hold calls (double-tap or two-device race).
-final _checkoutInProgressProvider = StateProvider<bool>((ref) => false);
+/// Prevents concurrent checkout / hold calls (double-tap guard).
+/// Plain top-level bool so it never depends on a WidgetRef that might be
+/// disposed before the finally-block can reset it.
+bool _checkoutInProgress = false;
 
 Future<bool> _isBillWhatsAppEnabled() async {
   final prefs = await SharedPreferences.getInstance();
@@ -67,6 +68,11 @@ Future<void> printKot(BuildContext context, WidgetRef ref) async {
     return;
   }
 
+  // Capture context-dependent values BEFORE any async work
+  final messenger = ScaffoldMessenger.of(context);
+  final screenWidth = MediaQuery.of(context).size.width;
+  final navState = Navigator.of(context);
+
   try {
     final sessionManager = ref.read(sessionManagerProvider);
     final invoiceNumber = await sessionManager.peekNextInvoiceNumber();
@@ -89,7 +95,6 @@ Future<void> printKot(BuildContext context, WidgetRef ref) async {
     );
 
     // Look up category names so KOT prints clear item names
-    // Fetch ALL categories for robust lookup (avoids isIn query edge-cases)
     final db = ref.read(appDatabaseProvider);
     final allCategories = await db.select(db.categories).get();
     final catMap = {for (final c in allCategories) c.id: c.name};
@@ -125,48 +130,73 @@ Future<void> printKot(BuildContext context, WidgetRef ref) async {
 
     // Capture provider refs BEFORE popping (WidgetRef dies after pop)
     final thermalPrinter = ref.read(thermalPrintingServiceProvider);
-    final activeOutletFuture = ref.read(activeOutletProvider.future);
+    // Query active outlet directly — avoids StreamProvider hang
+    Location? activeOutlet;
+    try {
+      activeOutlet = await (db.select(
+        db.locations,
+      )..where((t) => t.isActive.equals(true))).getSingleOrNull();
+    } catch (e) {
+      logDebug('[KOT] Active outlet lookup failed (non-fatal): $e');
+    }
 
     // Close the Cart modal if on a mobile view BEFORE printing blocks
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("KOT sent to printer"),
-          duration: Duration(milliseconds: 1500),
-        ),
-      );
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Text("KOT sent to printer"),
+        duration: Duration(milliseconds: 1500),
+      ),
+    );
 
-      if (MediaQuery.of(context).size.width <= 900 &&
-          Navigator.canPop(context)) {
-        Navigator.pop(context);
+    if (screenWidth <= 900 && navState.canPop()) {
+      // Force modal close instantly using rootNavigator
+      Navigator.of(context, rootNavigator: true).pop();
+    }
+
+    // Show loading dialog immediately after closing cart
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator()),
+    );
+
+    // Run print operation asynchronously
+    Future<void> doPrint() async {
+      try {
+        await thermalPrinter.printKot(
+          order,
+          items,
+          storeName: activeOutlet?.name,
+          storeAddress: activeOutlet?.address,
+          itemCategories: itemCategoryMap,
+        );
+      } catch (e) {
+        logDebug("Thermal KOT print failed: $e");
+      } finally {
+        if (context.mounted) {
+          Navigator.of(context).pop(); // Dismiss loading dialog
+        }
       }
     }
 
-    // Try Thermal Print (uses captured refs)
-    try {
-      final activeOutlet = await activeOutletFuture;
-      await thermalPrinter.printKot(
-        order,
-        items,
-        storeName: activeOutlet?.name,
-        storeAddress: activeOutlet?.address,
-        itemCategories: itemCategoryMap,
-      );
-    } catch (e) {
-      logDebug("Thermal KOT print failed: $e");
-    }
+    // Start print operation
+    doPrint();
   } catch (e) {
-    if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Print failed: $e")));
-    }
+    logDebug("KOT print failed: $e");
+    try {
+      messenger.showSnackBar(SnackBar(content: Text("Print failed: $e")));
+    } catch (_) {}
   }
 }
 
 Future<void> holdOrder(BuildContext context, WidgetRef ref) async {
+  // Guard against double-tap / concurrent calls (same flag as checkout)
+  if (_checkoutInProgress) return;
+  _checkoutInProgress = true;
+
   final cart = ref.read(cartProvider);
   if (cart.items.isEmpty) {
+    _checkoutInProgress = false;
     if (context.mounted) {
       ScaffoldMessenger.of(
         context,
@@ -174,6 +204,11 @@ Future<void> holdOrder(BuildContext context, WidgetRef ref) async {
     }
     return;
   }
+
+  // Capture context-dependent values BEFORE any async work
+  final messenger = ScaffoldMessenger.of(context);
+  final screenWidth = MediaQuery.of(context).size.width;
+  final navState = Navigator.of(context);
 
   try {
     final sessionManager = ref.read(sessionManagerProvider);
@@ -187,38 +222,42 @@ Future<void> holdOrder(BuildContext context, WidgetRef ref) async {
           sessionManager: sessionManager,
         );
 
-    ref.read(cartProvider.notifier).clearCart();
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Order held!"),
-          duration: Duration(milliseconds: 1500),
-        ),
-      );
+    // Pop the modal BEFORE clearing the cart — same fix as checkout.
+    if (screenWidth <= 900 && navState.canPop()) {
+      navState.pop();
+    }
 
-      // Close the Cart modal if on a mobile view
-      if (MediaQuery.of(context).size.width <= 900 &&
-          Navigator.canPop(context)) {
-        Navigator.pop(context);
-      }
-    }
+    ref.read(cartProvider.notifier).clearCart();
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Text("Order held!"),
+        duration: Duration(milliseconds: 1500),
+      ),
+    );
   } catch (e) {
-    if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Error: $e")));
-    }
+    logDebug("Hold order error: $e");
+    try {
+      messenger.showSnackBar(SnackBar(content: Text("Error: $e")));
+    } catch (_) {}
+  } finally {
+    try {
+      _checkoutInProgress = false;
+    } catch (_) {}
   }
 }
 
 Future<void> checkout(BuildContext context, WidgetRef ref) async {
   // Guard against double-tap / concurrent calls
-  if (ref.read(_checkoutInProgressProvider)) return;
-  ref.read(_checkoutInProgressProvider.notifier).state = true;
+  if (_checkoutInProgress) {
+    logDebug('[BILL] Checkout blocked: already in progress');
+    return;
+  }
+  _checkoutInProgress = true;
+  logDebug('[BILL] Checkout started');
 
   final cart = ref.read(cartProvider);
   if (cart.items.isEmpty) {
-    ref.read(_checkoutInProgressProvider.notifier).state = false; // BUG-20
+    _checkoutInProgress = false; // BUG-20
     if (context.mounted) {
       ScaffoldMessenger.of(
         context,
@@ -232,7 +271,7 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
     final totalPaid = cart.paidCash + cart.paidUPI;
     // Allow small rounding difference (0.5)
     if ((totalPaid - cart.grandTotal).abs() > 0.5) {
-      ref.read(_checkoutInProgressProvider.notifier).state = false; // BUG-30
+      _checkoutInProgress = false; // BUG-30
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -247,6 +286,12 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
     }
   }
 
+  // Capture context-dependent values BEFORE any async work.
+  // After Navigator.pop the BuildContext is deactivated and lookups crash.
+  final messenger = ScaffoldMessenger.of(context);
+  final screenWidth = MediaQuery.of(context).size.width;
+  final navState = Navigator.of(context);
+
   try {
     // ── Capture ALL provider references BEFORE clearing cart / popping ──
     // After Navigator.pop the WidgetRef is disposed and ref.read() will throw.
@@ -259,20 +304,32 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
     final db = ref.read(appDatabaseProvider);
     final thermalPrinter = ref.read(thermalPrintingServiceProvider);
     final shareService = ref.read(shareServiceProvider);
-    // Pre-fetch active outlet (usually cached, very fast)
-    final activeOutletFuture = ref.read(activeOutletProvider.future);
+    // Query active outlet directly — avoids StreamProvider which can hang
+    // if locations table has corrupted DateTime data.
+    Location? activeOutlet;
+    try {
+      activeOutlet = await (db.select(
+        db.locations,
+      )..where((t) => t.isActive.equals(true))).getSingleOrNull();
+    } catch (e) {
+      logDebug('[BILL] Active outlet lookup failed (non-fatal): $e');
+    }
     // Capture sync notifier BEFORE pop (WidgetRef dies after Navigator.pop)
     final syncNotifier = ref.read(remoteSyncGenerationProvider.notifier);
     // Capture reward redemption info before cart is cleared
     final rewardPointsRedeemed = cart.rewardPointsRedeemed;
     final rewardNotifier = ref.read(rewardNotifierProvider.notifier);
-    // Pre-fetch reward balance if customer selected
+    // Pre-fetch reward balance if customer selected.
+    // Add timeout because the StreamProvider's .future can hang if the
+    // provider is invalidated mid-flight. Reward balance is only used for
+    // printing — the order save doesn't depend on it.
     Future<double?>? rewardBalanceFuture;
     if (customer != null) {
       rewardBalanceFuture = ref
           .read(customerRewardBalanceProvider(customer.id).future)
           .then<double?>((v) => v)
-          .catchError((_) => null as double?);
+          .catchError((_) => null as double?)
+          .timeout(const Duration(seconds: 3), onTimeout: () => null);
     }
 
     // Look up category names so bill prints clear item names
@@ -286,9 +343,8 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
       );
     }
 
-    // Resolve outlet and reward balance in parallel BEFORE the DB write
-    // so they're ready for printing immediately after.
-    final activeOutlet = await activeOutletFuture;
+    // Resolve reward balance BEFORE the DB write
+    // so it's ready for printing immediately after.
     final rewardBalance = await rewardBalanceFuture;
 
     // ── DB WRITE FIRST — cart is only cleared on success so items are never lost ──
@@ -344,22 +400,21 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
         )
         .toList();
 
-    // ── CLEAR CART AND CLOSE UI — DB write succeeded ──
-    ref.read(cartProvider.notifier).clearCart();
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Order completed!"),
-          duration: Duration(milliseconds: 1500),
-        ),
-      );
-
-      // Close the Cart modal if on a mobile view
-      if (MediaQuery.of(context).size.width <= 900 &&
-          Navigator.canPop(context)) {
-        Navigator.pop(context);
-      }
+    // ── CLOSE MODAL FIRST, THEN CLEAR CART ──
+    // Pop the modal BEFORE clearing the cart. clearCart() triggers a
+    // rebuild of _MobileLayout which removes CartMobileBottomBar from
+    // the tree, deactivating the context the modal may still reference.
+    if (screenWidth <= 900 && navState.canPop()) {
+      navState.pop();
     }
+
+    ref.read(cartProvider.notifier).clearCart();
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Text("Order completed!"),
+        duration: Duration(milliseconds: 1500),
+      ),
+    );
 
     // ── Everything below runs in background — uses captured refs only ──
 
@@ -397,11 +452,15 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
             .redeemReward(
               customerId: customerId,
               pointsToRedeem: rewardPointsRedeemed,
-              orderId: orderId, // BUG-29: link redemption to order for cancel refund
+              orderId:
+                  orderId, // BUG-29: link redemption to order for cancel refund
               description:
                   'Redeemed ${rewardPointsRedeemed.toInt()} points on order',
             )
-            .catchError((e) { logDebug("Reward redemption commit failed: $e"); return false; });
+            .catchError((e) {
+              logDebug("Reward redemption commit failed: $e");
+              return false;
+            });
       }
     }
 
@@ -423,13 +482,14 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
     // }
   } catch (e) {
     logDebug("Checkout error: $e");
-    if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Error: $e")));
-    }
+    try {
+      messenger.showSnackBar(SnackBar(content: Text("Error: $e")));
+    } catch (_) {}
   } finally {
-    ref.read(_checkoutInProgressProvider.notifier).state = false;
+    try {
+      _checkoutInProgress = false;
+    } catch (_) {}
+    logDebug('[BILL] Checkout completed');
   }
 }
 
@@ -566,6 +626,7 @@ Future<void> showRedemptionDialog(BuildContext context, WidgetRef ref) async {
 
   // Check if reward system is enabled
   final isEnabled = await ref.read(isRewardSystemEnabledProvider.future);
+  if (!context.mounted) return;
   if (!isEnabled) {
     await checkout(context, ref);
     return;
@@ -575,6 +636,7 @@ Future<void> showRedemptionDialog(BuildContext context, WidgetRef ref) async {
   final balance = await ref.read(
     customerRewardBalanceProvider(customer.id).future,
   );
+  if (!context.mounted) return;
 
   if (balance < MIN_REDEMPTION_POINTS) {
     await checkout(context, ref);
@@ -582,49 +644,49 @@ Future<void> showRedemptionDialog(BuildContext context, WidgetRef ref) async {
   }
 
   // Show redemption dialog
-  if (context.mounted) {
-    final settings = await ref.read(rewardSettingsProvider.future);
-    final redemptionRate =
-        double.tryParse(settings[REDEMPTION_RATE_KEY] ?? '1.0') ?? 1.0;
+  final settings = await ref.read(rewardSettingsProvider.future);
+  if (!context.mounted) return;
 
-    final maxRedemption = math
-        .min(balance * redemptionRate, cart.grandTotal)
-        .floor();
+  final redemptionRate =
+      double.tryParse(settings[REDEMPTION_RATE_KEY] ?? '1.0') ?? 1.0;
 
-    showDialog(
-      context: context,
-      builder: (ctx) => RedemptionDialog(
-        customerName: customer.name,
-        rewardBalance: balance.toInt(),
-        maxRedemption: maxRedemption,
-        currentTotal: cart.grandTotal,
-        onRedeem: (pointsToRedeem) async {
-          if (context.mounted) {
-            Navigator.pop(ctx);
+  final maxRedemption = math
+      .min(balance * redemptionRate, cart.grandTotal)
+      .floor();
 
-            // Apply redemption discount to cart (in-memory only).
-            // The DB transaction is committed atomically inside checkout()
-            // so points can never be lost if checkout doesn't complete.
-            final discountAmount = (pointsToRedeem * redemptionRate);
-            ref
-                .read(cartProvider.notifier)
-                .applyRewardDiscount(discountAmount, pointsToRedeem.toDouble());
-
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'Applied ₹${discountAmount.toStringAsFixed(2)} discount',
-                  ),
-                ),
-              );
-            }
-          }
-        },
-        onSkip: () {
+  showDialog(
+    context: context,
+    builder: (ctx) => RedemptionDialog(
+      customerName: customer.name,
+      rewardBalance: balance.toInt(),
+      maxRedemption: maxRedemption,
+      currentTotal: cart.grandTotal,
+      onRedeem: (pointsToRedeem) async {
+        if (context.mounted) {
           Navigator.pop(ctx);
-        },
-      ),
-    );
-  }
+
+          // Apply redemption discount to cart (in-memory only).
+          // The DB transaction is committed atomically inside checkout()
+          // so points can never be lost if checkout doesn't complete.
+          final discountAmount = (pointsToRedeem * redemptionRate);
+          ref
+              .read(cartProvider.notifier)
+              .applyRewardDiscount(discountAmount, pointsToRedeem.toDouble());
+
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Applied ₹${discountAmount.toStringAsFixed(2)} discount',
+                ),
+              ),
+            );
+          }
+        }
+      },
+      onSkip: () {
+        Navigator.pop(ctx);
+      },
+    ),
+  );
 }

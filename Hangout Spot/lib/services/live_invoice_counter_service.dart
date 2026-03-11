@@ -15,7 +15,12 @@ class LiveInvoiceCounterService {
   final FirebaseAuth _auth;
 
   LiveInvoiceCounterService({DatabaseReference? database, FirebaseAuth? auth})
-    : _database = database ?? FirebaseDatabase.instance.ref(),
+    : _database = database ??
+          FirebaseDatabase.instanceFor(
+            app: (auth ?? FirebaseAuth.instance).app,
+            databaseURL:
+                'https://hangout-spot-pos-default-rtdb.asia-southeast1.firebasedatabase.app',
+          ).ref(),
       _auth = auth ?? FirebaseAuth.instance;
 
   /// Get reference to user's invoice counter node
@@ -36,18 +41,23 @@ class LiveInvoiceCounterService {
     try {
       final sessionRef = counterRef.child('sessions').child(sessionId);
 
-      // Check if session already exists
-      final snapshot = await sessionRef.get();
-      if (snapshot.exists) {
+      // BUG-11 fix: use an atomic RTDB transaction so two devices that start
+      // simultaneously cannot both read "not exists" and both reset the counter
+      // to 0, losing invoices already generated in this session.
+      final result = await sessionRef
+          .child('currentNumber')
+          .runTransaction((currentValue) {
+            if (currentValue != null) return Transaction.abort(); // Already up
+            return Transaction.success(0);
+          });
+
+      if (!result.committed) {
         logDebug('✅ Counter already initialized for session: $sessionId');
         return;
       }
 
-      // Initialize new session
-      await sessionRef.set({
-        'startNumber':
-            ServerValue.timestamp, // Use timestamp as unique identifier
-        'currentNumber': 0,
+      // Write non-counter metadata only after winning the initialization race.
+      await sessionRef.update({
         'createdAt': ServerValue.timestamp,
         'lastUpdated': ServerValue.timestamp,
       });
@@ -87,7 +97,9 @@ class LiveInvoiceCounterService {
       final transactionResult = await sessionRef
           .child('currentNumber')
           .runTransaction((currentValue) {
-            final current = (currentValue as int?) ?? 0;
+            // BUG-10 fix: RTDB may return a double (e.g. 1.0) when the value was
+            // written by the server. Cast via num to avoid a TypeError crash.
+            final current = (currentValue as num?)?.toInt() ?? 0;
             return Transaction.success(current + 1);
           });
 
@@ -98,7 +110,7 @@ class LiveInvoiceCounterService {
         );
       }
 
-      final newNumber = transactionResult.snapshot.value as int;
+      final newNumber = (transactionResult.snapshot.value as num).toInt();
 
       // Update last used timestamp
       await sessionRef.child('lastUpdated').set(ServerValue.timestamp);
@@ -195,7 +207,7 @@ class LiveInvoiceCounterService {
       final transactionResult = await sessionRef
           .child('currentNumber')
           .runTransaction((currentValue) {
-            final current = (currentValue as int?) ?? 0;
+            final current = (currentValue as num?)?.toInt() ?? 0;
             return Transaction.success(current + count);
           });
 
@@ -206,7 +218,7 @@ class LiveInvoiceCounterService {
         );
       }
 
-      final endNumber = transactionResult.snapshot.value as int;
+      final endNumber = (transactionResult.snapshot.value as num).toInt();
       final startNumber = endNumber - count + 1;
 
       // Generate list of invoice numbers

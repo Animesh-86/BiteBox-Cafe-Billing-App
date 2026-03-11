@@ -201,7 +201,9 @@ class ThermalPrintingService {
 
       // Items - print with word-wrap (no mid-word breaks)
       for (var item in items) {
-        final itemTotal = (item.price * item.quantity) - item.discountAmount;
+        final itemTotal =
+            (item.price * item.quantity) -
+            (item.discountAmount * item.quantity);
 
         // Word-wrap item name at word boundaries (32 chars/line for normal font on 58mm)
         for (final line in _wordWrap(item.itemName, 32)) {
@@ -230,7 +232,7 @@ class ThermalPrintingService {
               ? (item.discountAmount / item.price * 100)
               : 0.0;
           bytes += generator.text(
-            '  Discount (${discountPercent.toStringAsFixed(0)}%): -Rs.${item.discountAmount.toStringAsFixed(0)}',
+            '  Discount (${discountPercent.toStringAsFixed(0)}%): -Rs.${(item.discountAmount * item.quantity).toStringAsFixed(0)}',
             styles: const PosStyles(align: PosAlign.left),
           );
         }

@@ -159,7 +159,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(openConnection());
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration {
@@ -262,9 +262,7 @@ class AppDatabase extends _$AppDatabase {
               'ALTER TABLE locations ADD COLUMN phone_number TEXT',
             );
           } catch (e) {
-            logDebug(
-              'Migration: phone_number column might already exist: $e',
-            );
+            logDebug('Migration: phone_number column might already exist: $e');
           }
           try {
             await m.database.customStatement(
@@ -275,7 +273,8 @@ class AppDatabase extends _$AppDatabase {
           }
           try {
             await m.database.customStatement(
-              "ALTER TABLE locations ADD COLUMN created_at INTEGER DEFAULT (strftime('%s', 'now'))",
+              // BUG-5 fix: store in microseconds to match Drift's DateTime encoding.
+              "ALTER TABLE locations ADD COLUMN created_at INTEGER DEFAULT (strftime('%s', 'now') * 1000000)",
             );
           } catch (e) {
             logDebug('Migration: created_at column might already exist: $e');
@@ -288,12 +287,88 @@ class AppDatabase extends _$AppDatabase {
             logDebug('Migration: address column might already exist: $e');
           }
         }
+        if (from < 11) {
+          // BUG-5 fix: upgrade any locations rows whose created_at was written
+          // as epoch seconds (migration v10 used strftime('%s','now') which
+          // returns seconds, but Drift encodes DateTime as microseconds).
+          // Values under 10_000_000_000 are definitely seconds — multiply by
+          // 1_000_000 to convert them to the microsecond representation Drift
+          // expects. Values already in microseconds remain unchanged.
+          try {
+            await m.database.customStatement(
+              'UPDATE locations '
+              'SET created_at = created_at * 1000000 '
+              "WHERE created_at IS NOT NULL AND created_at < 10000000000",
+            );
+            logDebug(
+              'Migration v11: converted locations.created_at to microseconds',
+            );
+          } catch (e) {
+            logDebug('Migration v11: created_at fix failed (non-fatal): $e');
+          }
+        }
+        if (from < 12) {
+          // FIX: Drift 2.x stores DateTime as Unix epoch *seconds*, NOT
+          // microseconds. Migrations v10/v11 incorrectly stored/multiplied
+          // locations.created_at into microseconds. Any value > 10 billion
+          // is not a valid seconds timestamp — divide by 1_000_000 to fix.
+          // Also fix any other tables that may have bad timestamps from
+          // cloud restores that wrote raw epoch integers.
+          const fixes = [
+            'UPDATE locations SET created_at = created_at / 1000000 '
+                "WHERE created_at IS NOT NULL AND created_at > 10000000000",
+            'UPDATE customers SET last_visit = last_visit / 1000000 '
+                "WHERE last_visit IS NOT NULL AND last_visit > 10000000000",
+            'UPDATE orders SET created_at = created_at / 1000000 '
+                "WHERE created_at IS NOT NULL AND created_at > 10000000000",
+            'UPDATE users SET created_at = created_at / 1000000 '
+                "WHERE created_at IS NOT NULL AND created_at > 10000000000",
+            'UPDATE reward_transactions SET created_at = created_at / 1000000 '
+                "WHERE created_at IS NOT NULL AND created_at > 10000000000",
+            'UPDATE settings SET updated_at = updated_at / 1000000 '
+                "WHERE updated_at IS NOT NULL AND updated_at > 10000000000",
+            'UPDATE sync_logs SET last_synced_at = last_synced_at / 1000000 '
+                "WHERE last_synced_at IS NOT NULL AND last_synced_at > 10000000000",
+          ];
+          for (final sql in fixes) {
+            try {
+              await m.database.customStatement(sql);
+            } catch (e) {
+              logDebug('Migration v12: fix failed (non-fatal): $e');
+            }
+          }
+          logDebug('Migration v12: normalised all DateTime columns to seconds');
+        }
       },
       beforeOpen: (details) async {
         // Disable foreign keys for this connection
         await customSelect('PRAGMA foreign_keys = OFF').get();
+
+        // Fix any DateTime columns with oversized values (microseconds instead
+        // of seconds). This runs every launch so hot-restart also benefits.
+        try {
+          for (final sql in const [
+            'UPDATE locations SET created_at = created_at / 1000000 '
+                "WHERE created_at IS NOT NULL AND created_at > 10000000000",
+            'UPDATE customers SET last_visit = last_visit / 1000000 '
+                "WHERE last_visit IS NOT NULL AND last_visit > 10000000000",
+            'UPDATE orders SET created_at = created_at / 1000000 '
+                "WHERE created_at IS NOT NULL AND created_at > 10000000000",
+          ]) {
+            await customStatement(sql);
+          }
+        } catch (e) {
+          logDebug('beforeOpen timestamp fix (non-fatal): $e');
+        }
+
         // Seed default outlet if none exist yet
-        final existing = await select(locations).get();
+        List<Location> existing;
+        try {
+          existing = await select(locations).get();
+        } catch (e) {
+          logDebug('beforeOpen: locations query failed, assuming empty: $e');
+          existing = [];
+        }
         if (existing.isEmpty) {
           await into(locations).insert(
             LocationsCompanion(

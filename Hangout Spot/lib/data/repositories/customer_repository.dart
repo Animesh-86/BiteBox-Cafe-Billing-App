@@ -103,7 +103,14 @@ class CustomerRepository {
     if (CustomerDefaults.seeded.any((c) => c.id == id)) {
       throw Exception('Default customers cannot be deleted');
     }
-    await (_db.delete(_db.customers)..where((t) => t.id.equals(id))).go();
+    // ISSUE-05 fix: delete orphaned reward transactions atomically with the
+    // customer row so no ghost balance streams persist after deletion.
+    await _db.transaction(() async {
+      await (_db.delete(_db.rewardTransactions)
+            ..where((t) => t.customerId.equals(id)))
+          .go();
+      await (_db.delete(_db.customers)..where((t) => t.id.equals(id))).go();
+    });
     syncRepo?.syncCustomersNow();
   }
 
@@ -195,4 +202,10 @@ class CustomerRepository {
 final customerRepositoryProvider = Provider<CustomerRepository>((ref) {
   final db = ref.watch(appDatabaseProvider);
   return CustomerRepository(db);
+});
+
+/// Live stream of a single customer by ID — updates whenever the row changes.
+final customerByIdStreamProvider =
+    StreamProvider.family<Customer?, String>((ref, id) {
+  return ref.watch(customerRepositoryProvider).watchCustomerById(id);
 });

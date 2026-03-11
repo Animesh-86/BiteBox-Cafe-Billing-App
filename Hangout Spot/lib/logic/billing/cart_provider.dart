@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
+import 'package:hangout_spot/utils/timestamp_utils.dart';
 import 'package:hangout_spot/logic/locations/location_provider.dart';
 
 // --- state ---
@@ -23,7 +24,7 @@ class CartItem {
     this.discountAmount = 0.0,
   });
 
-  double get total => (item.price * quantity) - discountAmount;
+  double get total => (item.price - discountAmount) * quantity;
 
   CartItem copyWith({int? quantity, String? note, double? discountAmount}) {
     return CartItem(
@@ -65,7 +66,8 @@ class CartState {
   final double manualDiscount;
   final double promoDiscount;
   final double rewardDiscount;
-  final double rewardPointsRedeemed; // points staged for redemption — written to DB only on checkout
+  final double
+  rewardPointsRedeemed; // points staged for redemption — written to DB only on checkout
   final bool canUndo;
   final bool canRedo;
 
@@ -94,7 +96,7 @@ class CartState {
   double get totalDiscount {
     double itemDiscounts = items.fold(
       0,
-      (sum, item) => sum + item.discountAmount,
+      (sum, item) => sum + item.discountAmount * item.quantity,
     );
     double afterItemDiscount = subtotal - itemDiscounts;
     double custDiscount = customer != null
@@ -173,7 +175,9 @@ class CartState {
               .toList() ??
           [],
       customer: json['customer'] != null
-          ? Customer.fromJson(json['customer'])
+          ? Customer.fromJson(
+              sanitiseDateFields(Map<String, dynamic>.from(json['customer'])),
+            )
           : null,
       paymentMode: json['paymentMode'] ?? 'Cash',
       paidCash: (json['paidCash'] ?? 0.0).toDouble(),
@@ -364,7 +368,13 @@ class CartNotifier extends StateNotifier<CartState> {
   }
 
   void setCustomer(Customer? customer) {
-    _applyState(state.copyWith(customer: customer));
+    _applyState(
+      state.copyWith(
+        customer: customer,
+        rewardDiscount: 0.0,
+        rewardPointsRedeemed: 0.0,
+      ),
+    );
   }
 
   void clearCustomerSelection() {
@@ -379,7 +389,8 @@ class CartNotifier extends StateNotifier<CartState> {
         paidUPI: state.paidUPI,
         manualDiscount: state.manualDiscount,
         promoDiscount: state.promoDiscount,
-        rewardDiscount: state.rewardDiscount,
+        rewardDiscount: 0.0,
+        rewardPointsRedeemed: 0.0,
         canUndo: state.canUndo,
         canRedo: state.canRedo,
       ),
@@ -422,7 +433,7 @@ class CartNotifier extends StateNotifier<CartState> {
   void setManualDiscount(double discount) {
     final itemDiscounts = state.items.fold(
       0.0,
-      (sum, item) => sum + item.discountAmount,
+      (sum, item) => sum + item.discountAmount * item.quantity,
     );
     final afterItemDiscount = state.subtotal - itemDiscounts;
     final custDiscount = state.customer != null
@@ -475,7 +486,7 @@ class CartNotifier extends StateNotifier<CartState> {
   void applyRewardDiscount(double discountAmount, double pointsRedeemed) {
     final itemDiscounts = state.items.fold(
       0.0,
-      (sum, item) => sum + item.discountAmount,
+      (sum, item) => sum + item.discountAmount * item.quantity,
     );
     final afterItemDiscount = state.subtotal - itemDiscounts;
     final custDiscount = state.customer != null
@@ -490,11 +501,13 @@ class CartNotifier extends StateNotifier<CartState> {
           state.manualDiscount,
     );
 
-    final nextReward = (state.rewardDiscount + discountAmount).clamp(
-      0.0,
-      maxReward,
+    final nextReward = discountAmount.clamp(0.0, maxReward);
+    _applyState(
+      state.copyWith(
+        rewardDiscount: nextReward,
+        rewardPointsRedeemed: pointsRedeemed,
+      ),
     );
-    _applyState(state.copyWith(rewardDiscount: nextReward, rewardPointsRedeemed: pointsRedeemed));
   }
 
   void cancelRewardDiscount() {

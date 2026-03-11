@@ -152,11 +152,25 @@ class OrderRepository {
     }
 
     // Get active outlet (required for order creation)
-    final activeOutlet = await (_db.select(
-      _db.locations,
-    )..where((t) => t.isActive.equals(true))).getSingleOrNull();
+    // Use raw SQL to avoid RangeError if created_at has corrupted timestamps.
+    String? activeOutletId;
+    try {
+      final activeOutlet = await (_db.select(
+        _db.locations,
+      )..where((t) => t.isActive.equals(true))).getSingleOrNull();
+      activeOutletId = activeOutlet?.id;
+    } catch (e) {
+      // Fallback: raw SQL fetching only the id column
+      logDebug('⚠️ Location query failed, using raw SQL fallback: $e');
+      final rows = await _db
+          .customSelect('SELECT id FROM locations WHERE is_active = 1 LIMIT 1')
+          .get();
+      if (rows.isNotEmpty) {
+        activeOutletId = rows.first.read<String>('id');
+      }
+    }
 
-    if (activeOutlet == null) {
+    if (activeOutletId == null) {
       throw Exception(
         'No active outlet found. Please activate an outlet in Settings before creating orders.',
       );
@@ -168,35 +182,72 @@ class OrderRepository {
     final catMap = {for (final c in allCategories) c.id: c.name};
 
     await _db.transaction(() async {
-      // If updating an existing Pending order, delete it first (simplest way to update items)
       if (cart.orderId != null) {
-        // Only delete items, as we will replace the order row
+        // Updating an existing pending order: delete its items, then update the
+        // order row in-place. Using update() instead of INSERT OR REPLACE avoids
+        // the SQLite behaviour where a UNIQUE-constraint conflict on invoiceNumber
+        // would silently delete a *different* completed order that already holds the
+        // same invoice number (BUG-data-integrity fix).
         await (_db.delete(
           _db.orderItems,
         )..where((t) => t.orderId.equals(cart.orderId!))).go();
-      }
 
-      await _db
-          .into(_db.orders)
-          .insert(
-            OrdersCompanion(
-              id: Value(orderId),
-              invoiceNumber: Value(invoiceNum!),
-              customerId: Value(platformCustomerId),
-              locationId: Value(activeOutlet.id), // Use active outlet
-              subtotal: Value(cart.subtotal),
-              discountAmount: Value(cart.totalDiscount),
-              taxAmount: Value(cart.taxAmount),
-              totalAmount: Value(cart.grandTotal),
-              paymentMode: Value(cart.paymentMode),
-              paidCash: Value(cart.paidCash),
-              paidUPI: Value(cart.paidUPI),
-              status: Value(status), // 'pending' or 'completed'
-              createdAt: Value(DateTime.now()),
-              isSynced: const Value(false), // Always start as unsynced
-            ),
-            mode: InsertMode.replace, // Replace if exists
+        await (_db.update(
+          _db.orders,
+        )..where((t) => t.id.equals(cart.orderId!))).write(
+          OrdersCompanion(
+            invoiceNumber: Value(invoiceNum!),
+            customerId: Value(platformCustomerId),
+            locationId: Value(activeOutletId),
+            subtotal: Value(cart.subtotal),
+            discountAmount: Value(cart.totalDiscount),
+            taxAmount: Value(cart.taxAmount),
+            totalAmount: Value(cart.grandTotal),
+            paymentMode: Value(cart.paymentMode),
+            paidCash: Value(cart.paidCash),
+            paidUPI: Value(cart.paidUPI),
+            status: Value(status),
+            isSynced: const Value(false),
+          ),
+        );
+      } else {
+        // New order: insertOrIgnore so a duplicate invoice number (possible in
+        // offline multi-device scenarios) never silently deletes an existing order.
+        await _db
+            .into(_db.orders)
+            .insert(
+              OrdersCompanion(
+                id: Value(orderId),
+                invoiceNumber: Value(invoiceNum!),
+                customerId: Value(platformCustomerId),
+                locationId: Value(activeOutletId),
+                subtotal: Value(cart.subtotal),
+                discountAmount: Value(cart.totalDiscount),
+                taxAmount: Value(cart.taxAmount),
+                totalAmount: Value(cart.grandTotal),
+                paymentMode: Value(cart.paymentMode),
+                paidCash: Value(cart.paidCash),
+                paidUPI: Value(cart.paidUPI),
+                status: Value(status),
+                createdAt: Value(DateTime.now()),
+                isSynced: const Value(false),
+              ),
+              mode: InsertMode.insertOrIgnore,
+            );
+
+        // BUG-1 fix: if the row was silently dropped (invoice collision),
+        // don't insert orphaned order items — throw so the caller sees the error.
+        final inserted = await (_db.select(
+          _db.orders,
+        )..where((t) => t.id.equals(orderId))).getSingleOrNull();
+        if (inserted == null) {
+          throw StateError(
+            'Invoice collision: order $orderId was not written '
+            '(invoiceNumber $invoiceNum already exists). '
+            'Retry to get a fresh invoice number.',
           );
+        }
+      }
 
       for (final ci in cart.items) {
         await _db
@@ -226,13 +277,13 @@ class OrderRepository {
       orderId,
       invoiceNum,
       cart,
-      activeOutlet.id,
+      activeOutletId,
       status,
     ).ignore();
 
     // Record to live analytics and kitchen display (only for completed orders)
     if (status == 'completed') {
-      await _decrementInventoryForCart(cart);
+      _decrementInventoryForCart(cart).ignore();
       _recordToLiveServices(orderId, invoiceNum).ignore();
     }
 
@@ -275,8 +326,20 @@ class OrderRepository {
     String orderId,
     String paymentMode, {
     SyncRepository? syncRepo,
+    SessionManager? sessionManager,
   }) async {
     int totalItems = 0;
+
+    // BUG-5 fix: if the order still carries a HOLD invoice number, assign a
+    // real sequential invoice before marking it completed.
+    final existingOrder = await (_db.select(
+      _db.orders,
+    )..where((t) => t.id.equals(orderId))).getSingleOrNull();
+    final String? newInvoiceNumber =
+        (existingOrder != null &&
+            existingOrder.invoiceNumber.startsWith('HOLD-'))
+        ? await _getNextCompletedInvoice(sessionManager)
+        : null;
 
     await _db.transaction(() async {
       final order = await (_db.select(
@@ -292,13 +355,22 @@ class OrderRepository {
 
       totalItems = items.fold<int>(0, (sum, item) => sum + item.quantity);
 
-      await (_db.update(_db.orders)..where((t) => t.id.equals(orderId))).write(
-        OrdersCompanion(
-          status: const Value('completed'),
-          paymentMode: Value(paymentMode),
-          isSynced: const Value(false), // Mark unsynced to push payment update
-        ),
-      );
+      final companion = newInvoiceNumber != null
+          ? OrdersCompanion(
+              invoiceNumber: Value(newInvoiceNumber),
+              status: const Value('completed'),
+              paymentMode: Value(paymentMode),
+              isSynced: const Value(false),
+            )
+          : OrdersCompanion(
+              status: const Value('completed'),
+              paymentMode: Value(paymentMode),
+              isSynced: const Value(false),
+            );
+
+      await (_db.update(
+        _db.orders,
+      )..where((t) => t.id.equals(orderId))).write(companion);
       // recordSale is called AFTER the transaction with the updated order
       // to ensure it uses the correct paymentMode. (BUG-10)
     });
@@ -323,14 +395,18 @@ class OrderRepository {
   /// Returns the next invoice number for a completed order.
   /// Prefers the RTDB atomic counter (collision-free on multi-device) and
   /// falls back to the local SQLite-based sequential count when offline.
-  Future<String> _getNextCompletedInvoice(SessionManager? sessionManager) async {
+  Future<String> _getNextCompletedInvoice(
+    SessionManager? sessionManager,
+  ) async {
     if (_liveInvoiceCounter != null && sessionManager != null) {
       try {
         final sessionId = sessionManager.getCurrentSessionId();
-        return await _liveInvoiceCounter.getNextInvoiceNumber(
-          sessionId: sessionId,
-          prefix: '#',
-        );
+        // BUG-FIX: Firebase RTDB runTransaction can hang forever when the
+        // connection is forcefully killed. Add a timeout so we fall back to
+        // the local SQLite counter instead of freezing the entire checkout.
+        return await _liveInvoiceCounter
+            .getNextInvoiceNumber(sessionId: sessionId, prefix: '#')
+            .timeout(const Duration(seconds: 5));
       } catch (e) {
         logDebug('⚠️ RTDB invoice counter failed, falling back to local: $e');
       }
@@ -357,8 +433,7 @@ class OrderRepository {
     // beverages — avoids 6 Firestore reads on every non-beverage order.
     final hasBeverages = cart.items.any(
       (ci) =>
-          ci.quantity > 0 &&
-          allowedNames.contains(ci.item.name.toLowerCase()),
+          ci.quantity > 0 && allowedNames.contains(ci.item.name.toLowerCase()),
     );
     if (!hasBeverages) return;
     await repo.ensureDefaultBeverageInventory();
@@ -514,6 +589,7 @@ class OrderRepository {
     String orderId, {
     SyncRepository? syncRepo,
     CustomerRepository? customerRepo,
+    void Function()? onCancelled,
   }) async {
     // We need the order details before we cancel it to properly revert its impacts
     final order = await (_db.select(
@@ -532,6 +608,10 @@ class OrderRepository {
         ),
       );
     });
+    // Notify UI/dashboard immediately
+    if (onCancelled != null) {
+      onCancelled();
+    }
 
     // Attempt immediate push of cancellation outside of database transaction
     // to prevent Firebase Realtime Database thread locks from hanging SQLite.
@@ -556,19 +636,14 @@ class OrderRepository {
         // Delete the 'earn' reward transaction for this order so the
         // customer's earned balance is reverted.
         await (_db.delete(_db.rewardTransactions)
-              ..where(
-                (t) =>
-                    t.orderId.equals(orderId) & t.type.equals('earn'),
-              ))
+              ..where((t) => t.orderId.equals(orderId) & t.type.equals('earn')))
             .go();
 
         // Delete the 'redeem' reward transaction for this order so any
         // points the customer redeemed at checkout are refunded. (BUG-29)
-        await (_db.delete(_db.rewardTransactions)
-              ..where(
-                (t) =>
-                    t.orderId.equals(orderId) & t.type.equals('redeem'),
-              ))
+        await (_db.delete(_db.rewardTransactions)..where(
+              (t) => t.orderId.equals(orderId) & t.type.equals('redeem'),
+            ))
             .go();
 
         // Restock inventory for any beverage items on the order. (BUG-11)
@@ -634,8 +709,10 @@ class OrderRepository {
   }) async {
     if (customerId == null ||
         customerId.isEmpty ||
-        customerId == CustomerDefaults.walkInId) {
-      return; // No reward for anonymous orders
+        customerId == CustomerDefaults.walkInId ||
+        customerId == CustomerDefaults.zomatoId ||
+        customerId == CustomerDefaults.swiggyId) {
+      return; // No reward for platform/anonymous customers
     }
 
     // Check if reward system is enabled by querying settings

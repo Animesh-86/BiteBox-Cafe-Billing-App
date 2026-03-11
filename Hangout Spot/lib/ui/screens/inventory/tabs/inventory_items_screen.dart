@@ -960,15 +960,63 @@ class _DailyTrackerRowState extends ConsumerState<_DailyTrackerRow> {
   void _updateValue() {
     final text = _valueController.text.trim();
     final repo = ref.read(inventoryRepositoryProvider);
+    final prevVal = widget.currentDaily?.items[widget.item.id];
+    final prevQty = double.tryParse(prevVal ?? '') ?? 0.0;
+    final newQty = double.tryParse(text) ?? prevQty;
 
-    // Use field-level update so concurrent edits from different devices
-    // don't overwrite each other's fields (only the specific item field is
-    // touched, not the entire items map).
+    // Update the current item value
     repo.updateDailyItemField(
       date: widget.selectedDate,
       itemId: widget.item.id,
       value: text.isEmpty ? null : text,
     );
+
+    // If this is a bottle or cold drink and stock increased, decrement relevant tracker
+    final itemName = widget.item.name.toLowerCase();
+    final itemCategory = widget.item.category.toLowerCase();
+    final daily = widget.currentDaily;
+    if (daily != null && newQty > prevQty) {
+      // Bottle logic
+      if (itemName.contains('bottle') || itemCategory.contains('bottle')) {
+        final orderedBottleEntry = daily.items.entries.firstWhere(
+          (e) =>
+              e.value.toLowerCase().contains('ordered bottle') ||
+              e.key.toLowerCase().contains('ordered bottle'),
+          orElse: () => MapEntry('', ''),
+        );
+        if (orderedBottleEntry.key.isNotEmpty) {
+          final orderedVal =
+              double.tryParse(daily.items[orderedBottleEntry.key] ?? '') ?? 0.0;
+          final newOrderedVal = orderedVal - 1;
+          repo.updateDailyItemField(
+            date: widget.selectedDate,
+            itemId: orderedBottleEntry.key,
+            value: newOrderedVal.toString(),
+          );
+        }
+      }
+      // Cold drink logic
+      if (itemName.contains('cold drink') ||
+          itemCategory.contains('cold drink')) {
+        final orderedColdDrinkEntry = daily.items.entries.firstWhere(
+          (e) =>
+              e.value.toLowerCase().contains('ordered cold drink') ||
+              e.key.toLowerCase().contains('ordered cold drink'),
+          orElse: () => MapEntry('', ''),
+        );
+        if (orderedColdDrinkEntry.key.isNotEmpty) {
+          final orderedVal =
+              double.tryParse(daily.items[orderedColdDrinkEntry.key] ?? '') ??
+              0.0;
+          final newOrderedVal = orderedVal - 1;
+          repo.updateDailyItemField(
+            date: widget.selectedDate,
+            itemId: orderedColdDrinkEntry.key,
+            value: newOrderedVal.toString(),
+          );
+        }
+      }
+    }
   }
 
   @override

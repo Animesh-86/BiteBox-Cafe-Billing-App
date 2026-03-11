@@ -5,6 +5,7 @@ import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/data/local/db/menu_seeder.dart';
 import 'package:hangout_spot/data/constants/customer_defaults.dart';
 import 'package:drift/drift.dart';
+import 'package:hangout_spot/utils/timestamp_utils.dart';
 import '../providers/database_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -125,18 +126,18 @@ class SyncRepository {
           final localMap = Map<String, dynamic>.from(c.toJson());
           final cloudEntry = mergedMap[c.id];
           if (cloudEntry != null) {
-            final cloudVisits =
-                (cloudEntry['totalVisits'] as num? ?? 0).toInt();
-            final cloudSpent =
-                (cloudEntry['totalSpent'] as num? ?? 0.0).toDouble();
+            final cloudVisits = (cloudEntry['totalVisits'] as num? ?? 0)
+                .toInt();
+            final cloudSpent = (cloudEntry['totalSpent'] as num? ?? 0.0)
+                .toDouble();
             localMap['totalVisits'] =
                 (localMap['totalVisits'] as int? ?? 0) > cloudVisits
-                    ? localMap['totalVisits']
-                    : cloudVisits;
+                ? localMap['totalVisits']
+                : cloudVisits;
             localMap['totalSpent'] =
                 (localMap['totalSpent'] as double? ?? 0.0) > cloudSpent
-                    ? localMap['totalSpent']
-                    : cloudSpent;
+                ? localMap['totalSpent']
+                : cloudSpent;
           }
           mergedMap[c.id] = localMap;
         }
@@ -155,8 +156,35 @@ class SyncRepository {
       addToBatch('config', 'locations', locations);
       addToBatch('config', 'settings', settings);
 
-      // Loyalty
-      addToBatch('loyalty', 'reward_transactions', rewardTransactions);
+      // Loyalty — merge-by-ID so Device A's backup never erases Device B's
+      // reward transactions that haven't been pulled locally yet. (ISSUE-07 fix)
+      try {
+        final cloudTxDoc = await baseRef
+            .collection('loyalty')
+            .doc('reward_transactions')
+            .get();
+        final cloudTxList = cloudTxDoc.exists
+            ? List<Map<String, dynamic>>.from(cloudTxDoc.data()!['list'] ?? [])
+            : <Map<String, dynamic>>[];
+
+        final mergedTx = <String, Map<String, dynamic>>{};
+        for (final t in cloudTxList) {
+          final id = t['id'] as String?;
+          if (id != null) mergedTx[id] = t;
+        }
+        // Local transactions overwrite cloud on ID collision (local is authoritative).
+        for (final t in rewardTransactions) {
+          mergedTx[t.id] = t.toJson();
+        }
+
+        batch.set(baseRef.collection('loyalty').doc('reward_transactions'), {
+          'list': mergedTx.values.toList(),
+          'lastUpdated': FieldValue.serverTimestamp(),
+        });
+      } catch (e) {
+        logDebug('⚠️ Reward TX merge failed, falling back to overwrite: $e');
+        addToBatch('loyalty', 'reward_transactions', rewardTransactions);
+      }
 
       await batch.commit();
 
@@ -196,16 +224,16 @@ class SyncRepository {
           // For aggregate counters, keep the higher value so a device with
           // stale local data cannot overwrite fresher data from another device.
           final cloudVisits = (cloudEntry['totalVisits'] as num? ?? 0).toInt();
-          final cloudSpent =
-              (cloudEntry['totalSpent'] as num? ?? 0.0).toDouble();
+          final cloudSpent = (cloudEntry['totalSpent'] as num? ?? 0.0)
+              .toDouble();
           localMap['totalVisits'] =
               (localMap['totalVisits'] as int? ?? 0) > cloudVisits
-                  ? localMap['totalVisits']
-                  : cloudVisits;
+              ? localMap['totalVisits']
+              : cloudVisits;
           localMap['totalSpent'] =
               (localMap['totalSpent'] as double? ?? 0.0) > cloudSpent
-                  ? localMap['totalSpent']
-                  : cloudSpent;
+              ? localMap['totalSpent']
+              : cloudSpent;
         }
         mergedMap[c.id] = localMap;
       }
@@ -370,7 +398,7 @@ class SyncRepository {
         final result = <T>[];
         for (final e in list) {
           try {
-            result.add(fromJson(e));
+            result.add(fromJson(sanitiseDateFields(e)));
           } catch (err) {
             skipped++;
             logDebug('⚠️ Skipping malformed $label record: $err');
@@ -480,11 +508,14 @@ class SyncRepository {
       await MenuSeeder.deduplicateAll(_db);
 
       // Re-seed default customers (Walk-in, Zomato, Swiggy) in case cloud
-      // data didn't include them
+      // data didn't include them.
+      // ISSUE-08 fix: use insertOrIgnore so cloud-restored stats for the
+      // default customers (e.g. Zomato total revenue) are NOT overwritten with
+      // zeros — only insert if the row is genuinely absent.
       for (final seed in CustomerDefaults.seeded) {
         await _db
             .into(_db.customers)
-            .insertOnConflictUpdate(
+            .insert(
               CustomersCompanion(
                 id: Value(seed.id),
                 name: Value(seed.name),
@@ -494,6 +525,7 @@ class SyncRepository {
                 totalSpent: const Value(0.0),
                 lastVisit: const Value(null),
               ),
+              mode: InsertMode.insertOrIgnore,
             );
       }
 
