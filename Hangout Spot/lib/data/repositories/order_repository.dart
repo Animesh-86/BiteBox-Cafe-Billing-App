@@ -421,35 +421,37 @@ class OrderRepository {
   Future<void> _decrementInventoryForCart(CartState cart) async {
     final repo = _inventoryRepo;
     if (repo == null) return;
-    const allowedNames = {
-      'coca cola',
-      'sprite',
-      'fanta',
-      'thumbs up',
-      'water bottle (small)',
-      'water bottle (large)',
-    };
-    // BUG-12: Only initialise beverage inventory when the cart actually has
-    // beverages — avoids 6 Firestore reads on every non-beverage order.
-    final hasBeverages = cart.items.any(
-      (ci) =>
-          ci.quantity > 0 && allowedNames.contains(ci.item.name.toLowerCase()),
-    );
-    if (!hasBeverages) return;
-    await repo.ensureDefaultBeverageInventory();
+    
     for (final ci in cart.items) {
       if (ci.quantity <= 0) continue;
-      final nameKey = ci.item.name.toLowerCase();
-      if (!allowedNames.contains(nameKey)) continue;
+      
       try {
-        // BUG-13: Firestore stores names in Title-Case ("Coca Cola").
-        // Pass title-cased name so findItemByName exact-match succeeds
-        // regardless of how the cafe owner named the item in the menu.
-        await repo.adjustStockByName(
-          name: _titleCase(ci.item.name),
-          delta: -ci.quantity.toDouble(),
-          reason: 'order_sale',
-        );
+        final originalName = ci.item.name;
+        
+        // Strategy 1: Attempt exact name match
+        final exactItem = await repo.findItemByName(originalName);
+        if (exactItem != null) {
+          await repo.adjustStockTransaction(
+            itemId: exactItem.id,
+            delta: -ci.quantity.toDouble(),
+            reason: 'order_sale',
+          );
+          continue;
+        }
+
+        // Strategy 2: Attempt title-case fallback
+        final tcName = _titleCase(originalName);
+        if (tcName != originalName) {
+          final tcItem = await repo.findItemByName(tcName);
+          if (tcItem != null) {
+            await repo.adjustStockTransaction(
+              itemId: tcItem.id,
+              delta: -ci.quantity.toDouble(),
+              reason: 'order_sale',
+            );
+            continue;
+          }
+        }
       } catch (e) {
         logDebug('⚠️ Inventory adjust skipped for ${ci.item.name}: $e');
       }

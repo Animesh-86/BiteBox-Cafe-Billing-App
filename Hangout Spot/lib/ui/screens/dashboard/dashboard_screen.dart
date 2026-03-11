@@ -106,9 +106,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final todayKey = _dateKey(DateTime.now());
 
     for (final item in items) {
-      if (item.currentQty >= item.minQty) continue;
-
       final key = 'dash_low_${item.id}_$todayKey';
+
+      if (item.currentQty > item.minQty) {
+        // Stock is healthy; reset the notified flag so if it falls low again today, we alert again.
+        if (prefs.containsKey(key)) {
+          await prefs.remove(key);
+        }
+        continue;
+      }
+
       if (prefs.getBool(key) == true) continue;
 
       await NotificationService.instance.showNow(
@@ -393,7 +400,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     inventoryAsync.when(
                       data: (items) {
                         final lowStock = items
-                            .where((i) => i.currentQty < i.minQty)
+                            .where((i) => i.currentQty <= i.minQty)
                             .toList();
                         if (lowStock.isEmpty) {
                           return const SizedBox.shrink();
