@@ -31,14 +31,7 @@ class BillingItemsGrid extends ConsumerWidget {
             stockByName[inv.name.toLowerCase()] = inv.currentQty;
           }
         });
-        const trackedNames = {
-          'coca cola',
-          'sprite',
-          'fanta',
-          'thumbs up',
-          'water bottle (small)',
-          'water bottle (large)',
-        };
+        // Removed hardcoded trackedNames; any item in inventory is now tracked.
 
         var filtered = (selectedCat == null || selectedCat == 'all')
             ? availableItems
@@ -142,7 +135,7 @@ class BillingItemsGrid extends ConsumerWidget {
                         itemBuilder: (context, index) {
                           final item = filtered[index];
                           final nameKey = item.name.toLowerCase();
-                          final isTracked = trackedNames.contains(nameKey);
+                          final isTracked = stockByName.containsKey(nameKey);
                           final isOutOfStock =
                               isTracked && (stockByName[nameKey] ?? 0) <= 0;
 
