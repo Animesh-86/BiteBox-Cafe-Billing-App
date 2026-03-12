@@ -461,7 +461,9 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
                   Text(
                     '${data.cancelledOrdersCount} voided transactions',
                     style: TextStyle(
-                      color: AnalyticsTheme.primaryText(context).withOpacity(0.7),
+                      color: AnalyticsTheme.primaryText(
+                        context,
+                      ).withOpacity(0.7),
                       fontSize: 13,
                     ),
                   ),
@@ -482,7 +484,7 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
               ),
               const SizedBox(height: 2),
               Text(
-                'lost revenue',
+                'cancelled value',
                 style: TextStyle(
                   color: AnalyticsTheme.primaryText(context).withOpacity(0.5),
                   fontSize: 11,
@@ -515,7 +517,11 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: AnalyticsTheme.iconContainer(context),
-                child: Icon(icon, color: AnalyticsTheme.primaryGold(context), size: 20),
+                child: Icon(
+                  icon,
+                  color: AnalyticsTheme.primaryGold(context),
+                  size: 20,
+                ),
               ),
               const Spacer(),
               Container(
@@ -741,7 +747,9 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
         );
       },
       loading: () => Center(
-        child: CircularProgressIndicator(color: AnalyticsTheme.primaryGold(context)),
+        child: CircularProgressIndicator(
+          color: AnalyticsTheme.primaryGold(context),
+        ),
       ),
       error: (err, _) => Text(
         'Channel analytics error: $err',
@@ -860,7 +868,10 @@ class _OverviewScreenState extends ConsumerState<OverviewScreen> {
           const SizedBox(height: 8),
           Text(
             subtitle,
-            style: TextStyle(fontSize: 14, color: AnalyticsTheme.secondaryText(context)),
+            style: TextStyle(
+              fontSize: 14,
+              color: AnalyticsTheme.secondaryText(context),
+            ),
             textAlign: TextAlign.center,
           ),
         ],
