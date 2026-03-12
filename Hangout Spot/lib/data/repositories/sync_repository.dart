@@ -474,8 +474,18 @@ class SyncRepository {
         );
       });
 
-      // Insert orders in chunks of 200 to avoid overwhelming SQLite
+      // Sort orders so that 'completed' and newer orders are inserted last,
+      // ensuring they win any UNIQUE invoiceNumber constraint collisions (BUG-SYNC).
       final parsedOrders = _safeParse(orders, Order.fromJson, 'order');
+      parsedOrders.sort((a, b) {
+        // First priority: status ('completed' wins over 'cancelled'/'pending')
+        if (a.status == 'completed' && b.status != 'completed') return 1; // a comes after b
+        if (b.status == 'completed' && a.status != 'completed') return -1; // a comes before b
+        // Second priority: newer wins (newer timestamp should be inserted last)
+        return a.createdAt.compareTo(b.createdAt);
+      });
+
+      // Insert orders in chunks of 200 to avoid overwhelming SQLite
       for (var i = 0; i < parsedOrders.length; i += 200) {
         final chunk = parsedOrders.skip(i).take(200).toList();
         await _db.batch((batch) {

@@ -97,8 +97,40 @@ class RealTimeOrderService {
       )..where((t) => t.id.equals(cloudOrder.id))).getSingleOrNull();
 
       if (localOrder == null) {
-        // New Order - Insert
-        logDebug('🆕 New Order received: ${cloudOrder.invoiceNumber}');
+        // It's a "New" Order ID, but we must check for invoiceNumber collision
+        final conflictingOrder = await (_db.select(
+          _db.orders,
+        )..where((t) => t.invoiceNumber.equals(cloudOrder.invoiceNumber)))
+            .getSingleOrNull();
+
+        if (conflictingOrder != null) {
+          // Collision! Resolve based on status
+          if (cloudOrder.status == 'completed' &&
+              conflictingOrder.status != 'completed') {
+            logDebug(
+              '⚔️ Collision resolved: Cloud COMPLETED wins. Replacing local ${conflictingOrder.status}.',
+            );
+          } else if (conflictingOrder.status == 'completed' &&
+              cloudOrder.status != 'completed') {
+            logDebug(
+              '⚔️ Collision resolved: Local COMPLETED protects against Cloud ${cloudOrder.status}.',
+            );
+            return false;
+          } else {
+            // Both same status. Newer wins.
+            if (cloudOrder.createdAt.isAfter(conflictingOrder.createdAt)) {
+              logDebug('⚔️ Collision resolved: Cloud is newer.');
+            } else {
+              logDebug('⚔️ Collision resolved: Local is newer.');
+              return false;
+            }
+          }
+        } else {
+          logDebug('🆕 New Order received: ${cloudOrder.invoiceNumber}');
+        }
+
+        // Insert Order - Drift's insertOrReplace will automatically delete any row
+        // that violates the UNIQUE constraint on invoiceNumber.
         await _db
             .into(_db.orders)
             .insert(cloudOrder, mode: InsertMode.insertOrReplace);
@@ -109,14 +141,13 @@ class RealTimeOrderService {
       } else {
         // Existing Order - Use timestamp to resolve conflicts
 
-        // BUG-1 fix: guard locally-cancelled orders. A cashier's explicit
-        // cancellation must never be silently reverted by a stale cloud snapshot
-        // that arrived after the local change. Only the cloud's own 'cancelled'
-        // status can override a local cancellation.
+        // BUG-1 fix adapted: guard locally-cancelled orders against STALE PENDING updates.
+        // However, if the cloud says it is COMPLETED (e.g., the chef finished it),
+        // we MUST respect the Cloud's completed state to resolve discrepancies.
         if (localOrder.status == 'cancelled' &&
-            cloudOrder.status != 'cancelled') {
+            cloudOrder.status == 'pending') {
           logDebug(
-            '⏭️ Skipping update – protecting local cancellation: '
+            '⏭️ Skipping update – protecting local cancellation from stale pending: '
             '${cloudOrder.invoiceNumber}',
           );
           return false;

@@ -213,7 +213,19 @@ Future<void> holdOrder(BuildContext context, WidgetRef ref) async {
   try {
     final sessionManager = ref.read(sessionManagerProvider);
 
-    // DB write FIRST — cart is only cleared on success so items are never lost
+    // ── INSTANT UI DISMISSAL ──
+    if (screenWidth <= 900 && navState.canPop()) {
+      navState.pop();
+    }
+    ref.read(cartProvider.notifier).clearCart();
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Text("Holding order..."),
+        duration: Duration(milliseconds: 1000),
+      ),
+    );
+
+    // ── BACKGROUND SAVE ──
     await ref
         .read(orderRepositoryProvider)
         .createOrderFromCart(
@@ -222,12 +234,6 @@ Future<void> holdOrder(BuildContext context, WidgetRef ref) async {
           sessionManager: sessionManager,
         );
 
-    // Pop the modal BEFORE clearing the cart — same fix as checkout.
-    if (screenWidth <= 900 && navState.canPop()) {
-      navState.pop();
-    }
-
-    ref.read(cartProvider.notifier).clearCart();
     messenger.showSnackBar(
       const SnackBar(
         content: Text("Order held!"),
@@ -236,8 +242,18 @@ Future<void> holdOrder(BuildContext context, WidgetRef ref) async {
     );
   } catch (e) {
     logDebug("Hold order error: $e");
+    // Restore cart if background hold fails
     try {
-      messenger.showSnackBar(SnackBar(content: Text("Error: $e")));
+      ref.read(cartProvider.notifier).restoreCart(cart);
+      logDebug("Cart restored after failed hold.");
+    } catch (_) {}
+
+    try {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text("Failed to hold — Cart restored. Error: $e"),
+        ),
+      );
     } catch (_) {}
   } finally {
     try {
@@ -304,25 +320,12 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
     final db = ref.read(appDatabaseProvider);
     final thermalPrinter = ref.read(thermalPrintingServiceProvider);
     final shareService = ref.read(shareServiceProvider);
-    // Query active outlet directly — avoids StreamProvider which can hang
-    // if locations table has corrupted DateTime data.
-    Location? activeOutlet;
-    try {
-      activeOutlet = await (db.select(
-        db.locations,
-      )..where((t) => t.isActive.equals(true))).getSingleOrNull();
-    } catch (e) {
-      logDebug('[BILL] Active outlet lookup failed (non-fatal): $e');
-    }
     // Capture sync notifier BEFORE pop (WidgetRef dies after Navigator.pop)
     final syncNotifier = ref.read(remoteSyncGenerationProvider.notifier);
     // Capture reward redemption info before cart is cleared
     final rewardPointsRedeemed = cart.rewardPointsRedeemed;
     final rewardNotifier = ref.read(rewardNotifierProvider.notifier);
     // Pre-fetch reward balance if customer selected.
-    // Add timeout because the StreamProvider's .future can hang if the
-    // provider is invalidated mid-flight. Reward balance is only used for
-    // printing — the order save doesn't depend on it.
     Future<double?>? rewardBalanceFuture;
     if (customer != null) {
       rewardBalanceFuture = ref
@@ -332,23 +335,39 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
           .timeout(const Duration(seconds: 3), onTimeout: () => null);
     }
 
-    // Look up category names so bill prints clear item names
-    // Fetch ALL categories for robust lookup (avoids isIn query edge-cases)
-    final allCategories = await db.select(db.categories).get();
-    final catMap = {for (final c in allCategories) c.id: c.name};
-    logDebug('[BILL] Found ${allCategories.length} categories');
-    for (final ci in cart.items) {
-      logDebug(
-        '[BILL] Item "${ci.item.name}" catId=${ci.item.categoryId} catName="${catMap[ci.item.categoryId] ?? '(none)'}"',
-      );
+    // ── INSTANT UI DISMISSAL ──
+    // Pop the modal BEFORE clearing the cart and BEFORE awaiting anything.
+    if (screenWidth <= 900 && navState.canPop()) {
+      navState.pop();
+    }
+    ref.read(cartProvider.notifier).clearCart();
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Text("Processing order..."),
+        duration: Duration(milliseconds: 1000),
+      ),
+    );
+
+    // ── EVERYTHING BELOW RUNS IN BACKGROUND ──
+    
+    // Query active outlet directly — avoids StreamProvider which can hang
+    Location? activeOutlet;
+    try {
+      activeOutlet = await (db.select(
+        db.locations,
+      )..where((t) => t.isActive.equals(true))).getSingleOrNull();
+    } catch (e) {
+      logDebug('[BILL] Active outlet lookup failed (non-fatal): $e');
     }
 
-    // Resolve reward balance BEFORE the DB write
-    // so it's ready for printing immediately after.
-    final rewardBalance = await rewardBalanceFuture;
+    // Look up category names so bill prints clear item names
+    final allCategories = await db.select(db.categories).get();
+    final catMap = {for (final c in allCategories) c.id: c.name};
 
-    // ── DB WRITE FIRST — cart is only cleared on success so items are never lost ──
-    // (BUG-21 fix: match the same safe ordering as holdOrder)
+    // Resolve reward balance BEFORE the DB write
+    final rewardBalance = rewardBalanceFuture != null ? await rewardBalanceFuture : null;
+
+    // ── DB WRITE ──
     final orderId = await orderRepo.createOrderFromCart(
       cart,
       status: 'completed',
@@ -361,7 +380,6 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
     } catch (_) {}
 
     // Build Order from in-memory cart data + fast PK lookup for invoice number
-    // (a single indexed SELECT by primary key is ~1ms — negligible)
     final dbOrder = await (db.select(
       db.orders,
     )..where((t) => t.id.equals(orderId))).getSingleOrNull();
@@ -400,15 +418,6 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
         )
         .toList();
 
-    // ── CLOSE MODAL FIRST, THEN CLEAR CART ──
-    // Pop the modal BEFORE clearing the cart. clearCart() triggers a
-    // rebuild of _MobileLayout which removes CartMobileBottomBar from
-    // the tree, deactivating the context the modal may still reference.
-    if (screenWidth <= 900 && navState.canPop()) {
-      navState.pop();
-    }
-
-    ref.read(cartProvider.notifier).clearCart();
     messenger.showSnackBar(
       const SnackBar(
         content: Text("Order completed!"),
@@ -482,8 +491,20 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
     // }
   } catch (e) {
     logDebug("Checkout error: $e");
+    
+    // RESTORE CART IF FALLBACK FAILS
     try {
-      messenger.showSnackBar(SnackBar(content: Text("Error: $e")));
+      ref.read(cartProvider.notifier).restoreCart(cart);
+      logDebug("Cart restored after failed checkout.");
+    } catch (_) {}
+
+    try {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text("Checkout failed — Cart restored. Error: $e"),
+          duration: const Duration(seconds: 3),
+        ),
+      );
     } catch (_) {}
   } finally {
     try {

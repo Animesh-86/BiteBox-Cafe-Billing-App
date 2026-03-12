@@ -898,6 +898,94 @@ class OrderRepository {
       return 0;
     }
   }
+
+  /// Force entirely re-sync all orders created today to the cloud.
+  /// This ensures any discrepancies (e.g. from tests vs real orders)
+  /// are aggressively pushed so other devices can resolve collisions perfectly.
+  Future<int> forceSyncTodayOrders() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        logDebug('⚠️ Not logged in, skipping force sync');
+        return 0;
+      }
+
+      final now = DateTime.now();
+      final startOfDay = DateTime(now.year, now.month, now.day);
+      
+      final todayOrders = await (_db.select(_db.orders)
+            ..where((tbl) => tbl.createdAt.isBiggerOrEqualValue(startOfDay)))
+          .get();
+
+      if (todayOrders.isEmpty) return 0;
+
+      logDebug('🔥 Force-syncing ${todayOrders.length} orders from today...');
+      int successCount = 0;
+
+      for (var order in todayOrders) {
+        try {
+          final items = await (_db.select(_db.orderItems)
+                ..where((t) => t.orderId.equals(order.id)))
+              .get();
+          
+          final itemsData = items
+              .map(
+                (oi) => {
+                  'id': oi.id,
+                  'itemId': oi.itemId,
+                  'itemName': oi.itemName,
+                  'price': oi.price,
+                  'quantity': oi.quantity,
+                  'note': oi.note,
+                  'discountAmount': oi.discountAmount,
+                },
+              )
+              .toList();
+
+          final orderData = {
+            'id': order.id,
+            'invoiceNumber': order.invoiceNumber,
+            'customerId': order.customerId,
+            'locationId': order.locationId,
+            'subtotal': order.subtotal,
+            'discountAmount': order.discountAmount,
+            'taxAmount': order.taxAmount,
+            'totalAmount': order.totalAmount,
+            'paymentMode': order.paymentMode,
+            'paidCash': order.paidCash,
+            'paidUPI': order.paidUPI,
+            'status': order.status,
+            'createdAt': order.createdAt.toIso8601String(),
+            'isSynced': true,
+            'lastModified': FieldValue.serverTimestamp(),
+            'items': itemsData, // Include items in the order data
+          };
+
+          // Push to Firestore
+          await FirebaseFirestore.instance
+              .collection('cafes')
+              .doc(user.uid)
+              .collection('orders')
+              .doc(order.id)
+              .set(orderData, SetOptions(merge: true));
+
+          // Ensure it's marked as synced locally
+          await (_db.update(_db.orders)..where((t) => t.id.equals(order.id)))
+              .write(const OrdersCompanion(isSynced: Value(true)));
+
+          successCount++;
+        } catch (e) {
+          logDebug('⚠️ Failed to force-sync order ${order.invoiceNumber}: $e');
+        }
+      }
+
+      logDebug('✅ Successfully force-synced $successCount/${todayOrders.length} orders');
+      return successCount;
+    } catch (e) {
+      logDebug('❌ Error in forceSyncTodayOrders: $e');
+      return 0;
+    }
+  }
 }
 
 final orderRepositoryProvider = Provider<OrderRepository>((ref) {

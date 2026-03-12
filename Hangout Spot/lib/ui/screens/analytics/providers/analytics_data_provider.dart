@@ -6,6 +6,8 @@ import 'package:hangout_spot/data/providers/realtime_services_provider.dart';
 import 'package:hangout_spot/data/local/db/app_database.dart';
 import 'package:hangout_spot/logic/billing/session_provider.dart';
 
+import 'package:hangout_spot/data/constants/customer_defaults.dart';
+
 // Live customer count provider for current session
 final liveCustomerCountProvider = StreamProvider<int>((ref) {
   final db = ref.watch(appDatabaseProvider);
@@ -19,11 +21,18 @@ final liveCustomerCountProvider = StreamProvider<int>((ref) {
     ..where((tbl) => tbl.createdAt.isSmallerThanValue(endOfDay))
     ..where((tbl) => tbl.status.equals('completed'));
 
-  // BUG-6 fix: count distinct customer IDs so one customer making 3 orders
-  // is counted once, not three times.
-  return query.watch().map(
-    (orders) => orders.map((o) => o.customerId ?? '').toSet().length,
-  );
+  return query.watch().map((orders) {
+    int walkInCount = 0;
+    final namedCustomerIds = <String>{};
+    for (final o in orders) {
+      if (o.customerId == null || o.customerId == CustomerDefaults.walkInId) {
+        walkInCount++; // Each walk-in order counts as a new unique customer
+      } else {
+        namedCustomerIds.add(o.customerId!); // Named customers counted once per day
+      }
+    }
+    return walkInCount + namedCustomerIds.length;
+  });
 });
 
 // Data Models

@@ -97,6 +97,26 @@ final liveHourlyRevenueProvider = StreamProvider<Map<int, double>>((ref) {
   return service.watchTodayHourlyRevenue();
 });
 
+/// Stream provider for Platform Split ('Orders by channel')
+final livePlatformSplitProvider = StreamProvider<PlatformSplit>((ref) async* {
+  final sessionManager = ref.watch(sessionManagerProvider);
+  final analytics = ref.watch(analyticsRepositoryProvider);
+  final locationId = ref.watch(currentLocationIdProvider).valueOrNull;
+
+  ref.watch(remoteSyncGenerationProvider);
+
+  final sessionDate = sessionManager.getCurrentSessionDate();
+  final range = sessionManager.getSessionRange(sessionDate);
+  final start = range['start']!;
+  final end = range['end']!;
+
+  yield await analytics.getPlatformSplit(
+    start,
+    end,
+    locationId: locationId,
+  );
+});
+
 /// Stream provider for payment breakdown
 final livePaymentBreakdownProvider = StreamProvider<Map<String, double>>((ref) {
   final service = ref.watch(liveAnalyticsServiceProvider);

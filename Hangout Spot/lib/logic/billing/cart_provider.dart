@@ -456,6 +456,10 @@ class CartNotifier extends StateNotifier<CartState> {
     _applyState(CartState());
   }
 
+  void restoreCart(CartState savedCart) {
+    _applyState(savedCart);
+  }
+
   void loadOrder(
     Order order,
     List<({OrderItem orderItem, Item realItem})> details,

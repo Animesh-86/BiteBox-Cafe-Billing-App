@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hangout_spot/data/repositories/sync_repository.dart';
@@ -12,6 +12,7 @@ import 'package:hangout_spot/services/realtime_order_service.dart';
 import 'package:hangout_spot/services/auto_sync_service.dart';
 import 'package:hangout_spot/data/providers/realtime_services_provider.dart';
 import 'package:hangout_spot/logic/billing/cart_provider.dart';
+import 'package:hangout_spot/data/repositories/order_repository.dart';
 import '../utils/password_reauth.dart';
 import '../widgets/settings_shared.dart';
 
@@ -55,10 +56,12 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> {
   Future<void> _sync() async {
     setState(() => _isSyncing = true);
     try {
+      // Force sync all today's orders first to fix any multi-device cloud inconsistencies.
+      await ref.read(orderRepositoryProvider).forceSyncTodayOrders();
       await ref.read(syncRepositoryProvider).backupData();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Sync completed successfully")),
+          const SnackBar(content: Text("Sync & Full Backup completed successfully")),
         );
       }
     } catch (e) {

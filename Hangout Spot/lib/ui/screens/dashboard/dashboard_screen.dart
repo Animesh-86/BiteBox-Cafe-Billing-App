@@ -483,104 +483,32 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       error: (_, __) => const SizedBox.shrink(),
                     ),
                     const SizedBox(height: 8),
-                    FutureBuilder<PlatformSplit>(
-                      future: analytics.getPlatformSplit(
-                        startOfDay,
-                        endOfDay,
-                        locationId: currentLocationId,
-                      ),
-                      builder: (context, snapshot) {
-                        if (!snapshot.hasData) return const SizedBox.shrink();
-                        final split = snapshot.data!;
-                        Widget badge(String label, int count, double total) {
-                          return Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 6,
+                    (_selectedDate == null)
+                        ? Consumer(
+                            builder: (context, ref, child) {
+                              final splitAsync = ref.watch(
+                                livePlatformSplitProvider,
+                              );
+                              return splitAsync.when(
+                                data: (split) =>
+                                    _buildPlatformSplit(split, theme),
+                                loading: () => const SizedBox.shrink(),
+                                error: (_, __) => const SizedBox.shrink(),
+                              );
+                            },
+                          )
+                        : FutureBuilder<PlatformSplit>(
+                            future: analytics.getPlatformSplit(
+                              startOfDay,
+                              endOfDay,
+                              locationId: currentLocationId,
                             ),
-                            decoration: BoxDecoration(
-                              color: cream,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: coffee.withOpacity(0.2),
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  label,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    color: coffeeDark,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '$count orders · ₹${total.toStringAsFixed(0)}',
-                                  style: TextStyle(
-                                    color: coffeeDark.withOpacity(0.75),
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }
-
-                        return Container(
-                          width: double.infinity,
-                          margin: const EdgeInsets.only(top: 4),
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: coffee.withOpacity(0.08),
-                            borderRadius: BorderRadius.circular(12),
+                            builder: (context, snapshot) {
+                              if (!snapshot.hasData)
+                                return const SizedBox.shrink();
+                              return _buildPlatformSplit(snapshot.data!, theme);
+                            },
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Orders by channel',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  color: coffeeDark,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                    child: badge(
-                                      'Zomato',
-                                      split.counts['Zomato'] ?? 0,
-                                      split.totals['Zomato'] ?? 0,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: badge(
-                                      'Swiggy',
-                                      split.counts['Swiggy'] ?? 0,
-                                      split.totals['Swiggy'] ?? 0,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: badge(
-                                      'Dine-in',
-                                      split.counts['Dine-in'] ?? 0,
-                                      split.totals['Dine-in'] ?? 0,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
                   ],
                 ),
               ),
@@ -1301,6 +1229,99 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     } else {
       return "${difference.inDays}d ago";
     }
+  }
+
+  Widget _buildPlatformSplit(PlatformSplit split, ThemeData theme) {
+    Widget badge(String label, int count, double total) {
+      final isDark = theme.brightness == Brightness.dark;
+      final cream = isDark ? const Color(0xFF2C2420) : const Color(0xFFFDFBF7);
+      final coffee = isDark ? const Color(0xFFD3A889) : const Color(0xFF8B5E3C);
+      final coffeeDark = isDark
+          ? const Color(0xFFE5CCB9)
+          : const Color(0xFF4A3424);
+
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: cream,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: coffee.withOpacity(0.2)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(fontWeight: FontWeight.w700, color: coffeeDark),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '$count orders · ₹${total.toStringAsFixed(0)}',
+              style: TextStyle(
+                color: coffeeDark.withOpacity(0.75),
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final isDark = theme.brightness == Brightness.dark;
+    final coffee = isDark ? const Color(0xFFD3A889) : const Color(0xFF8B5E3C);
+    final coffeeDark = isDark
+        ? const Color(0xFFE5CCB9)
+        : const Color(0xFF4A3424);
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: coffee.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Orders by channel',
+            style: TextStyle(fontWeight: FontWeight.w700, color: coffeeDark),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: badge(
+                  'Zomato',
+                  split.counts['Zomato'] ?? 0,
+                  split.totals['Zomato'] ?? 0,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: badge(
+                  'Swiggy',
+                  split.counts['Swiggy'] ?? 0,
+                  split.totals['Swiggy'] ?? 0,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: badge(
+                  'Dine-in',
+                  (split.counts['Dine-in'] ?? 0) +
+                      (split.counts['Walk-in'] ?? 0),
+                  (split.totals['Dine-in'] ?? 0) +
+                      (split.totals['Walk-in'] ?? 0),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }
 
