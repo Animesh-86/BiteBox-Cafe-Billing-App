@@ -207,12 +207,15 @@ class OrderRepository {
             paidCash: Value(cart.paidCash),
             paidUPI: Value(cart.paidUPI),
             status: Value(status),
+            lastModified: Value(DateTime.now()),
             isSynced: const Value(false),
           ),
         );
       } else {
-        // New order: insertOrIgnore so a duplicate invoice number (possible in
-        // offline multi-device scenarios) never silently deletes an existing order.
+        // New order: resolve any invoice collision atomically inside the
+        // transaction so no race condition can slip between the check and insert.
+        invoiceNum = await _resolveInvoiceCollision(invoiceNum!);
+
         await _db
             .into(_db.orders)
             .insert(
@@ -230,20 +233,22 @@ class OrderRepository {
                 paidUPI: Value(cart.paidUPI),
                 status: Value(status),
                 createdAt: Value(DateTime.now()),
+                lastModified: Value(DateTime.now()),
+                syncVersion: const Value(1),
                 isSynced: const Value(false),
               ),
               mode: InsertMode.insertOrIgnore,
             );
 
-        // BUG-1 fix: if the row was silently dropped (invoice collision),
-        // don't insert orphaned order items — throw so the caller sees the error.
+        // Verify the row was actually written. If not, even the in-transaction
+        // collision resolution couldn't help (extreme race) — surface the error.
         final inserted = await (_db.select(
           _db.orders,
         )..where((t) => t.id.equals(orderId))).getSingleOrNull();
         if (inserted == null) {
           throw StateError(
             'Invoice collision: order $orderId was not written '
-            '(invoiceNumber $invoiceNum already exists). '
+            '(invoiceNumber $invoiceNum still conflicts). '
             'Retry to get a fresh invoice number.',
           );
         }
@@ -275,7 +280,7 @@ class OrderRepository {
     // Fire and forget Firestore sync in the background so UI doesn't lag
     _tryImmediatePush(
       orderId,
-      invoiceNum,
+      invoiceNum!,
       cart,
       activeOutletId,
       status,
@@ -284,7 +289,7 @@ class OrderRepository {
     // Record to live analytics and kitchen display (only for completed orders)
     if (status == 'completed') {
       _decrementInventoryForCart(cart).ignore();
-      _recordToLiveServices(orderId, invoiceNum).ignore();
+      _recordToLiveServices(orderId, invoiceNum!).ignore();
     }
 
     // NOTE: Orders are pushed individually via _tryImmediatePush.
@@ -360,11 +365,13 @@ class OrderRepository {
               invoiceNumber: Value(newInvoiceNumber),
               status: const Value('completed'),
               paymentMode: Value(paymentMode),
+              lastModified: Value(DateTime.now()),
               isSynced: const Value(false),
             )
           : OrdersCompanion(
               status: const Value('completed'),
               paymentMode: Value(paymentMode),
+              lastModified: Value(DateTime.now()),
               isSynced: const Value(false),
             );
 
@@ -395,39 +402,86 @@ class OrderRepository {
   /// Returns the next invoice number for a completed order.
   /// Prefers the RTDB atomic counter (collision-free on multi-device) and
   /// falls back to the local SQLite-based sequential count when offline.
+  /// After getting a candidate, validates it against the local DB and resolves
+  /// any cross-session collision (e.g. yesterday's #1001 vs today's #1001).
   Future<String> _getNextCompletedInvoice(
     SessionManager? sessionManager,
   ) async {
+    String? candidate;
+
     if (_liveInvoiceCounter != null && sessionManager != null) {
       try {
         final sessionId = sessionManager.getCurrentSessionId();
         // BUG-FIX: Firebase RTDB runTransaction can hang forever when the
         // connection is forcefully killed. Add a timeout so we fall back to
         // the local SQLite counter instead of freezing the entire checkout.
-        return await _liveInvoiceCounter
+        candidate = await _liveInvoiceCounter!
             .getNextInvoiceNumber(sessionId: sessionId, prefix: '#')
             .timeout(const Duration(seconds: 5));
       } catch (e) {
         logDebug('⚠️ RTDB invoice counter failed, falling back to local: $e');
       }
     }
-    if (sessionManager != null) {
-      return await sessionManager.getNextInvoiceNumber();
+
+    if (candidate == null && sessionManager != null) {
+      candidate = await sessionManager.getNextInvoiceNumber();
     }
-    // Last-resort fallback: non-sequential but unique.
-    return "INV-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}-${const Uuid().v4().substring(0, 4)}";
+
+    if (candidate == null) {
+      // Last-resort fallback: non-sequential but unique.
+      return "INV-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}-${const Uuid().v4().substring(0, 4)}";
+    }
+
+    // Guard against cross-session collisions: the RTDB counter resets each
+    // new session (day) to start from #0001/#1001, but the local DB retains
+    // all historical orders. Resolve by finding the true max and going above it.
+    return await _resolveInvoiceCollision(candidate);
   }
 
+  /// Checks if [candidate] already exists for TODAY's session in the local DB.
+  /// Cross-day same invoice numbers are allowed (e.g. #1001 on Monday and
+  /// #1001 on Tuesday). Only same-day duplicates are resolved by bumping.
+  Future<String> _resolveInvoiceCollision(String candidate) async {
+    final today = DateTime.now();
+    final startOfDay = DateTime(today.year, today.month, today.day);
+
+    final existing = await (_db.select(_db.orders)
+          ..where((t) => t.invoiceNumber.equals(candidate))
+          ..where((t) => t.createdAt.isBiggerOrEqualValue(startOfDay)))
+        .getSingleOrNull();
+
+    if (existing == null) return candidate; // No same-day collision
+
+    // Same-day collision (RTDB failed and offline fallback double-counted).
+    // Find the max invoice number for today and go one above it.
+    final todayOrders = await (_db.select(_db.orders)
+          ..where((t) => t.createdAt.isBiggerOrEqualValue(startOfDay)))
+        .get();
+    int maxNum = 1000;
+    for (final o in todayOrders) {
+      final inv = o.invoiceNumber;
+      if (inv.startsWith('#')) {
+        final n = int.tryParse(inv.substring(1));
+        if (n != null && n > maxNum) maxNum = n;
+      }
+    }
+
+    final resolved = '#${maxNum + 1}';
+    logDebug(
+      '⚠️ Same-day invoice collision on $candidate — resolved to $resolved',
+    );
+    return resolved;
+  }
   Future<void> _decrementInventoryForCart(CartState cart) async {
     final repo = _inventoryRepo;
     if (repo == null) return;
-    
+
     for (final ci in cart.items) {
       if (ci.quantity <= 0) continue;
-      
+
       try {
         final originalName = ci.item.name;
-        
+
         // Strategy 1: Attempt exact name match
         final exactItem = await repo.findItemByName(originalName);
         if (exactItem != null) {
@@ -500,6 +554,7 @@ class OrderRepository {
           'createdAt': DateTime.now().toIso8601String(),
           'isSynced': true,
           'lastModified': FieldValue.serverTimestamp(),
+          'syncVersion': 1,
           'items': itemsData, // Include items in the order data
         };
 
@@ -511,9 +566,15 @@ class OrderRepository {
             .doc(orderId)
             .set(orderData, SetOptions(merge: true));
 
-        // Mark as synced locally
-        await (_db.update(_db.orders)..where((t) => t.id.equals(orderId)))
-            .write(const OrdersCompanion(isSynced: Value(true)));
+        // Mark as synced locally and persist lastModified
+        await (_db.update(
+          _db.orders,
+        )..where((t) => t.id.equals(orderId))).write(
+          OrdersCompanion(
+            isSynced: const Value(true),
+            lastModified: Value(DateTime.now()),
+          ),
+        );
 
         logDebug('✅ Order pushed to Firestore: $invoiceNum');
       }
@@ -566,6 +627,7 @@ class OrderRepository {
         'createdAt': order.createdAt.toIso8601String(),
         'isSynced': true,
         'lastModified': FieldValue.serverTimestamp(),
+        'syncVersion': order.syncVersion,
         'items': itemsData,
       };
 
@@ -577,7 +639,10 @@ class OrderRepository {
           .set(orderData, SetOptions(merge: true));
 
       await (_db.update(_db.orders)..where((t) => t.id.equals(orderId))).write(
-        const OrdersCompanion(isSynced: Value(true)),
+        OrdersCompanion(
+          isSynced: const Value(true),
+          lastModified: Value(DateTime.now()),
+        ),
       );
 
       logDebug('✅ Order update pushed: ${order.invoiceNumber}');
@@ -602,9 +667,10 @@ class OrderRepository {
 
     await _db.transaction(() async {
       await (_db.update(_db.orders)..where((t) => t.id.equals(orderId))).write(
-        const OrdersCompanion(
-          status: Value('cancelled'),
-          isSynced: Value(
+        OrdersCompanion(
+          status: const Value('cancelled'),
+          lastModified: Value(DateTime.now()),
+          isSynced: const Value(
             false,
           ), // Mark unsynced so it pushes to cloud on next sync
         ),
@@ -866,6 +932,7 @@ class OrderRepository {
             'createdAt': order.createdAt.toIso8601String(),
             'isSynced': true,
             'lastModified': FieldValue.serverTimestamp(),
+            'syncVersion': order.syncVersion,
             'items': itemsData,
           };
 
@@ -878,8 +945,14 @@ class OrderRepository {
               .set(orderData, SetOptions(merge: true));
 
           // Mark as synced in local DB
-          await (_db.update(_db.orders)..where((t) => t.id.equals(order.id)))
-              .write(const OrdersCompanion(isSynced: Value(true)));
+          await (_db.update(
+            _db.orders,
+          )..where((t) => t.id.equals(order.id))).write(
+            OrdersCompanion(
+              isSynced: const Value(true),
+              lastModified: Value(DateTime.now()),
+            ),
+          );
 
           successCount++;
           logDebug('✅ Synced order: ${order.invoiceNumber}');
@@ -912,10 +985,10 @@ class OrderRepository {
 
       final now = DateTime.now();
       final startOfDay = DateTime(now.year, now.month, now.day);
-      
-      final todayOrders = await (_db.select(_db.orders)
-            ..where((tbl) => tbl.createdAt.isBiggerOrEqualValue(startOfDay)))
-          .get();
+
+      final todayOrders = await (_db.select(
+        _db.orders,
+      )..where((tbl) => tbl.createdAt.isBiggerOrEqualValue(startOfDay))).get();
 
       if (todayOrders.isEmpty) return 0;
 
@@ -924,10 +997,10 @@ class OrderRepository {
 
       for (var order in todayOrders) {
         try {
-          final items = await (_db.select(_db.orderItems)
-                ..where((t) => t.orderId.equals(order.id)))
-              .get();
-          
+          final items = await (_db.select(
+            _db.orderItems,
+          )..where((t) => t.orderId.equals(order.id))).get();
+
           final itemsData = items
               .map(
                 (oi) => {
@@ -958,6 +1031,7 @@ class OrderRepository {
             'createdAt': order.createdAt.toIso8601String(),
             'isSynced': true,
             'lastModified': FieldValue.serverTimestamp(),
+            'syncVersion': order.syncVersion,
             'items': itemsData, // Include items in the order data
           };
 
@@ -970,8 +1044,14 @@ class OrderRepository {
               .set(orderData, SetOptions(merge: true));
 
           // Ensure it's marked as synced locally
-          await (_db.update(_db.orders)..where((t) => t.id.equals(order.id)))
-              .write(const OrdersCompanion(isSynced: Value(true)));
+          await (_db.update(
+            _db.orders,
+          )..where((t) => t.id.equals(order.id))).write(
+            OrdersCompanion(
+              isSynced: const Value(true),
+              lastModified: Value(DateTime.now()),
+            ),
+          );
 
           successCount++;
         } catch (e) {
@@ -979,7 +1059,9 @@ class OrderRepository {
         }
       }
 
-      logDebug('✅ Successfully force-synced $successCount/${todayOrders.length} orders');
+      logDebug(
+        '✅ Successfully force-synced $successCount/${todayOrders.length} orders',
+      );
       return successCount;
     } catch (e) {
       logDebug('❌ Error in forceSyncTodayOrders: $e');

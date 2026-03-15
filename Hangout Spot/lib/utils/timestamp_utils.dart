@@ -5,7 +5,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 /// When Firestore data is passed to Drift's `fromJson`, these fields must be
 /// ISO 8601 strings. Cloud data may contain Firestore [Timestamp] objects or
 /// raw epoch integers instead — this helper normalises them.
-const _dateTimeKeys = {'createdAt', 'lastVisit', 'lastSyncedAt', 'updatedAt'};
+const _dateTimeKeys = {
+  'createdAt',
+  'lastVisit',
+  'lastSyncedAt',
+  'updatedAt',
+  'lastModified',
+};
 
 /// Normalises a map coming from Firestore so that any DateTime-typed field
 /// is an ISO 8601 string, which is what Drift's default [ValueSerializer]

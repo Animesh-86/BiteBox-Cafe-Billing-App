@@ -51,7 +51,28 @@ class RealTimeOrderService {
           for (var change in snapshot.docChanges) {
             if (change.type == DocumentChangeType.added ||
                 change.type == DocumentChangeType.modified) {
-              final changed = await _processSingleOrder(change.doc.data()!);
+              final data = change.doc.data();
+              if (data == null) continue;
+
+              // Skip echo-back: if the doc has isSynced=true and matches a
+              // local order that is already synced with same status, this is
+              // likely our own push echoing back from Firestore.
+              final docId = data['id'] as String?;
+              if (docId != null) {
+                final local = await (_db.select(
+                  _db.orders,
+                )..where((t) => t.id.equals(docId))).getSingleOrNull();
+                if (local != null &&
+                    local.isSynced &&
+                    local.status == (data['status'] as String?) &&
+                    local.paymentMode == (data['paymentMode'] as String?) &&
+                    local.invoiceNumber == (data['invoiceNumber'] as String?)) {
+                  // This is our own write echoing back — skip
+                  continue;
+                }
+              }
+
+              final changed = await _processSingleOrder(data);
               if (changed) anyChanges = true;
             }
           }
@@ -89,22 +110,26 @@ class RealTimeOrderService {
   // Returns true if local DB was modified.
   Future<bool> _syncSingleOrder(Map<String, dynamic> orderMap) async {
     try {
-      final cloudOrder = Order.fromJson(sanitiseDateFields(orderMap));
+      final sanitised = sanitiseDateFields(orderMap);
+      final cloudOrder = Order.fromJson(sanitised);
+      final cloudSyncVersion = (orderMap['syncVersion'] as num?)?.toInt() ?? 1;
 
-      // Check if order exists locally
+      // Check if order exists locally by ID
       final localOrder = await (_db.select(
         _db.orders,
       )..where((t) => t.id.equals(cloudOrder.id))).getSingleOrNull();
 
       if (localOrder == null) {
-        // It's a "New" Order ID, but we must check for invoiceNumber collision
-        final conflictingOrder = await (_db.select(
-          _db.orders,
-        )..where((t) => t.invoiceNumber.equals(cloudOrder.invoiceNumber)))
-            .getSingleOrNull();
+        // ── NEW ORDER (not seen locally before) ──
+        // Check for invoiceNumber collision with a different order ID
+        final conflictingOrder =
+            await (_db.select(_db.orders)..where(
+                  (t) => t.invoiceNumber.equals(cloudOrder.invoiceNumber),
+                ))
+                .getSingleOrNull();
 
         if (conflictingOrder != null) {
-          // Collision! Resolve based on status
+          // Invoice collision with different order ID — resolve by status priority
           if (cloudOrder.status == 'completed' &&
               conflictingOrder.status != 'completed') {
             logDebug(
@@ -117,7 +142,7 @@ class RealTimeOrderService {
             );
             return false;
           } else {
-            // Both same status. Newer wins.
+            // Both same status — newer wins
             if (cloudOrder.createdAt.isAfter(conflictingOrder.createdAt)) {
               logDebug('⚔️ Collision resolved: Cloud is newer.');
             } else {
@@ -129,8 +154,7 @@ class RealTimeOrderService {
           logDebug('🆕 New Order received: ${cloudOrder.invoiceNumber}');
         }
 
-        // Insert Order - Drift's insertOrReplace will automatically delete any row
-        // that violates the UNIQUE constraint on invoiceNumber.
+        // Insert the cloud order
         await _db
             .into(_db.orders)
             .insert(cloudOrder, mode: InsertMode.insertOrReplace);
@@ -139,11 +163,9 @@ class RealTimeOrderService {
         await _restoreOrderItems(cloudOrder.id, orderMap);
         return true;
       } else {
-        // Existing Order - Use timestamp to resolve conflicts
+        // ── EXISTING ORDER (update) ──
 
-        // BUG-1 fix adapted: guard locally-cancelled orders against STALE PENDING updates.
-        // However, if the cloud says it is COMPLETED (e.g., the chef finished it),
-        // we MUST respect the Cloud's completed state to resolve discrepancies.
+        // Guard: locally-cancelled orders are protected from stale pending updates
         if (localOrder.status == 'cancelled' &&
             cloudOrder.status == 'pending') {
           logDebug(
@@ -153,66 +175,69 @@ class RealTimeOrderService {
           return false;
         }
 
-        final cloudModified = orderMap['lastModified'];
-        // BUG-1 fix: local orders don't have a persisted lastModified field,
-        // so fall back to createdAt as an approximation. This is still
-        // imperfect but the cancellation guard above covers the highest-risk
-        // case. A proper fix requires adding a lastModified column to orders.
-        final localModified = localOrder.createdAt;
-
-        bool shouldUpdate = false;
-
-        // If cloud has timestamp, compare with local
-        if (cloudModified != null) {
-          DateTime cloudTime;
-          if (cloudModified is Timestamp) {
-            cloudTime = cloudModified.toDate();
-          } else if (cloudModified is String) {
-            cloudTime = DateTime.parse(cloudModified);
-          } else {
-            // No valid timestamp, fall back to status comparison
-            shouldUpdate =
-                localOrder.status != cloudOrder.status ||
-                localOrder.paymentMode != cloudOrder.paymentMode;
-            if (shouldUpdate) {
-              logDebug(
-                '🔄 Updating Order (no timestamp): ${cloudOrder.invoiceNumber}',
-              );
-              await _db.update(_db.orders).replace(cloudOrder);
-            }
-            return shouldUpdate;
-          }
-
-          // Cloud is newer, update local
-          if (cloudTime.isAfter(localModified)) {
+        // If the local order was modified locally and not yet synced, protect it
+        // unless the cloud version has a higher syncVersion or is strictly newer.
+        if (!localOrder.isSynced) {
+          // Local has unsynced changes — only accept cloud if it has higher version
+          if (cloudSyncVersion <= localOrder.syncVersion) {
             logDebug(
-              '🔄 Updating Order (cloud newer): ${cloudOrder.invoiceNumber}',
-            );
-            await _db.update(_db.orders).replace(cloudOrder);
-            // Update orderItems as well
-            await _restoreOrderItems(cloudOrder.id, orderMap);
-            return true;
-          } else {
-            logDebug(
-              '⏭️ Skipping update (local newer): ${cloudOrder.invoiceNumber}',
+              '⏭️ Skipping update – local has unsynced changes (v${localOrder.syncVersion} >= cloud v$cloudSyncVersion): '
+              '${cloudOrder.invoiceNumber}',
             );
             return false;
           }
-        } else {
-          // No timestamp, fall back to field comparison
-          shouldUpdate =
-              localOrder.status != cloudOrder.status ||
-              localOrder.paymentMode != cloudOrder.paymentMode;
-          if (shouldUpdate) {
-            logDebug(
-              '🔄 Updating Order (field changed): ${cloudOrder.invoiceNumber}',
-            );
-            await _db.update(_db.orders).replace(cloudOrder);
-            // Update orderItems as well
-            await _restoreOrderItems(cloudOrder.id, orderMap);
-          }
-          return shouldUpdate;
         }
+
+        // Compare using lastModified (proper field, no longer falling back to createdAt)
+        final cloudModified = orderMap['lastModified'];
+        final localModified = localOrder.lastModified ?? localOrder.createdAt;
+
+        bool shouldUpdate = false;
+
+        if (cloudModified != null) {
+          DateTime? cloudTime;
+          if (cloudModified is Timestamp) {
+            cloudTime = cloudModified.toDate();
+          } else if (cloudModified is String) {
+            cloudTime = DateTime.tryParse(cloudModified);
+          }
+
+          if (cloudTime != null) {
+            if (cloudTime.isAfter(localModified)) {
+              shouldUpdate = true;
+              logDebug(
+                '🔄 Updating Order (cloud newer): ${cloudOrder.invoiceNumber}',
+              );
+            } else {
+              logDebug(
+                '⏭️ Skipping update (local newer): ${cloudOrder.invoiceNumber}',
+              );
+              return false;
+            }
+          } else {
+            // Invalid timestamp — fall back to field comparison
+            shouldUpdate =
+                localOrder.status != cloudOrder.status ||
+                localOrder.paymentMode != cloudOrder.paymentMode;
+          }
+        } else {
+          // No timestamp — fall back to syncVersion and field comparison
+          if (cloudSyncVersion > localOrder.syncVersion) {
+            shouldUpdate = true;
+          } else {
+            shouldUpdate =
+                localOrder.status != cloudOrder.status ||
+                localOrder.paymentMode != cloudOrder.paymentMode;
+          }
+        }
+
+        if (shouldUpdate) {
+          logDebug('🔄 Updating Order: ${cloudOrder.invoiceNumber}');
+          await _db.update(_db.orders).replace(cloudOrder);
+          await _restoreOrderItems(cloudOrder.id, orderMap);
+          return true;
+        }
+        return false;
       }
     } catch (e) {
       logDebug('❌ Error syncing order: $e');
@@ -244,11 +269,14 @@ class RealTimeOrderService {
         // Insert items from cloud
         for (final itemData in itemsData) {
           final itemMap = itemData as Map<String, dynamic>;
+          // Preserve the original item ID from cloud to prevent duplicates.
+          // Only generate a new UUID if the cloud data doesn't include an ID.
+          final itemId = (itemMap['id'] as String?) ?? const Uuid().v4();
           await _db
               .into(_db.orderItems)
               .insert(
                 OrderItemsCompanion(
-                  id: Value(const Uuid().v4()),
+                  id: Value(itemId),
                   orderId: Value(orderId),
                   itemId: Value(itemMap['itemId'] as String),
                   itemName: Value(itemMap['itemName'] as String),
@@ -259,6 +287,7 @@ class RealTimeOrderService {
                     (itemMap['discountAmount'] as num?)?.toDouble() ?? 0.0,
                   ),
                 ),
+                mode: InsertMode.insertOrReplace,
               );
         }
       });

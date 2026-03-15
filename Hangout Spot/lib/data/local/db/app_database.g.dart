@@ -2242,7 +2242,6 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
-    defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'),
   );
   static const VerificationMeta _customerIdMeta = const VerificationMeta(
     'customerId',
@@ -2369,6 +2368,29 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
     requiredDuringInsert: false,
     defaultValue: currentDateAndTime,
   );
+  static const VerificationMeta _lastModifiedMeta = const VerificationMeta(
+    'lastModified',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastModified = GeneratedColumn<DateTime>(
+    'last_modified',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _syncVersionMeta = const VerificationMeta(
+    'syncVersion',
+  );
+  @override
+  late final GeneratedColumn<int> syncVersion = GeneratedColumn<int>(
+    'sync_version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
   static const VerificationMeta _isSyncedMeta = const VerificationMeta(
     'isSynced',
   );
@@ -2399,6 +2421,8 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
     paymentMode,
     status,
     createdAt,
+    lastModified,
+    syncVersion,
     isSynced,
   ];
   @override
@@ -2510,6 +2534,24 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
         createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
       );
     }
+    if (data.containsKey('last_modified')) {
+      context.handle(
+        _lastModifiedMeta,
+        lastModified.isAcceptableOrUnknown(
+          data['last_modified']!,
+          _lastModifiedMeta,
+        ),
+      );
+    }
+    if (data.containsKey('sync_version')) {
+      context.handle(
+        _syncVersionMeta,
+        syncVersion.isAcceptableOrUnknown(
+          data['sync_version']!,
+          _syncVersionMeta,
+        ),
+      );
+    }
     if (data.containsKey('is_synced')) {
       context.handle(
         _isSyncedMeta,
@@ -2577,6 +2619,14 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
       )!,
+      lastModified: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_modified'],
+      ),
+      syncVersion: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sync_version'],
+      )!,
       isSynced: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_synced'],
@@ -2604,6 +2654,8 @@ class Order extends DataClass implements Insertable<Order> {
   final String paymentMode;
   final String status;
   final DateTime createdAt;
+  final DateTime? lastModified;
+  final int syncVersion;
   final bool isSynced;
   const Order({
     required this.id,
@@ -2619,6 +2671,8 @@ class Order extends DataClass implements Insertable<Order> {
     required this.paymentMode,
     required this.status,
     required this.createdAt,
+    this.lastModified,
+    required this.syncVersion,
     required this.isSynced,
   });
   @override
@@ -2641,6 +2695,10 @@ class Order extends DataClass implements Insertable<Order> {
     map['payment_mode'] = Variable<String>(paymentMode);
     map['status'] = Variable<String>(status);
     map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || lastModified != null) {
+      map['last_modified'] = Variable<DateTime>(lastModified);
+    }
+    map['sync_version'] = Variable<int>(syncVersion);
     map['is_synced'] = Variable<bool>(isSynced);
     return map;
   }
@@ -2664,6 +2722,10 @@ class Order extends DataClass implements Insertable<Order> {
       paymentMode: Value(paymentMode),
       status: Value(status),
       createdAt: Value(createdAt),
+      lastModified: lastModified == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastModified),
+      syncVersion: Value(syncVersion),
       isSynced: Value(isSynced),
     );
   }
@@ -2687,6 +2749,8 @@ class Order extends DataClass implements Insertable<Order> {
       paymentMode: serializer.fromJson<String>(json['paymentMode']),
       status: serializer.fromJson<String>(json['status']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      lastModified: serializer.fromJson<DateTime?>(json['lastModified']),
+      syncVersion: serializer.fromJson<int>(json['syncVersion']),
       isSynced: serializer.fromJson<bool>(json['isSynced']),
     );
   }
@@ -2707,6 +2771,8 @@ class Order extends DataClass implements Insertable<Order> {
       'paymentMode': serializer.toJson<String>(paymentMode),
       'status': serializer.toJson<String>(status),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'lastModified': serializer.toJson<DateTime?>(lastModified),
+      'syncVersion': serializer.toJson<int>(syncVersion),
       'isSynced': serializer.toJson<bool>(isSynced),
     };
   }
@@ -2725,6 +2791,8 @@ class Order extends DataClass implements Insertable<Order> {
     String? paymentMode,
     String? status,
     DateTime? createdAt,
+    Value<DateTime?> lastModified = const Value.absent(),
+    int? syncVersion,
     bool? isSynced,
   }) => Order(
     id: id ?? this.id,
@@ -2740,6 +2808,8 @@ class Order extends DataClass implements Insertable<Order> {
     paymentMode: paymentMode ?? this.paymentMode,
     status: status ?? this.status,
     createdAt: createdAt ?? this.createdAt,
+    lastModified: lastModified.present ? lastModified.value : this.lastModified,
+    syncVersion: syncVersion ?? this.syncVersion,
     isSynced: isSynced ?? this.isSynced,
   );
   Order copyWithCompanion(OrdersCompanion data) {
@@ -2769,6 +2839,12 @@ class Order extends DataClass implements Insertable<Order> {
           : this.paymentMode,
       status: data.status.present ? data.status.value : this.status,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      lastModified: data.lastModified.present
+          ? data.lastModified.value
+          : this.lastModified,
+      syncVersion: data.syncVersion.present
+          ? data.syncVersion.value
+          : this.syncVersion,
       isSynced: data.isSynced.present ? data.isSynced.value : this.isSynced,
     );
   }
@@ -2789,6 +2865,8 @@ class Order extends DataClass implements Insertable<Order> {
           ..write('paymentMode: $paymentMode, ')
           ..write('status: $status, ')
           ..write('createdAt: $createdAt, ')
+          ..write('lastModified: $lastModified, ')
+          ..write('syncVersion: $syncVersion, ')
           ..write('isSynced: $isSynced')
           ..write(')'))
         .toString();
@@ -2809,6 +2887,8 @@ class Order extends DataClass implements Insertable<Order> {
     paymentMode,
     status,
     createdAt,
+    lastModified,
+    syncVersion,
     isSynced,
   );
   @override
@@ -2828,6 +2908,8 @@ class Order extends DataClass implements Insertable<Order> {
           other.paymentMode == this.paymentMode &&
           other.status == this.status &&
           other.createdAt == this.createdAt &&
+          other.lastModified == this.lastModified &&
+          other.syncVersion == this.syncVersion &&
           other.isSynced == this.isSynced);
 }
 
@@ -2845,6 +2927,8 @@ class OrdersCompanion extends UpdateCompanion<Order> {
   final Value<String> paymentMode;
   final Value<String> status;
   final Value<DateTime> createdAt;
+  final Value<DateTime?> lastModified;
+  final Value<int> syncVersion;
   final Value<bool> isSynced;
   final Value<int> rowid;
   const OrdersCompanion({
@@ -2861,6 +2945,8 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     this.paymentMode = const Value.absent(),
     this.status = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.lastModified = const Value.absent(),
+    this.syncVersion = const Value.absent(),
     this.isSynced = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -2878,6 +2964,8 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     required String paymentMode,
     this.status = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.lastModified = const Value.absent(),
+    this.syncVersion = const Value.absent(),
     this.isSynced = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -2899,6 +2987,8 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     Expression<String>? paymentMode,
     Expression<String>? status,
     Expression<DateTime>? createdAt,
+    Expression<DateTime>? lastModified,
+    Expression<int>? syncVersion,
     Expression<bool>? isSynced,
     Expression<int>? rowid,
   }) {
@@ -2916,6 +3006,8 @@ class OrdersCompanion extends UpdateCompanion<Order> {
       if (paymentMode != null) 'payment_mode': paymentMode,
       if (status != null) 'status': status,
       if (createdAt != null) 'created_at': createdAt,
+      if (lastModified != null) 'last_modified': lastModified,
+      if (syncVersion != null) 'sync_version': syncVersion,
       if (isSynced != null) 'is_synced': isSynced,
       if (rowid != null) 'rowid': rowid,
     });
@@ -2935,6 +3027,8 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     Value<String>? paymentMode,
     Value<String>? status,
     Value<DateTime>? createdAt,
+    Value<DateTime?>? lastModified,
+    Value<int>? syncVersion,
     Value<bool>? isSynced,
     Value<int>? rowid,
   }) {
@@ -2952,6 +3046,8 @@ class OrdersCompanion extends UpdateCompanion<Order> {
       paymentMode: paymentMode ?? this.paymentMode,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
+      lastModified: lastModified ?? this.lastModified,
+      syncVersion: syncVersion ?? this.syncVersion,
       isSynced: isSynced ?? this.isSynced,
       rowid: rowid ?? this.rowid,
     );
@@ -2999,6 +3095,12 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (lastModified.present) {
+      map['last_modified'] = Variable<DateTime>(lastModified.value);
+    }
+    if (syncVersion.present) {
+      map['sync_version'] = Variable<int>(syncVersion.value);
+    }
     if (isSynced.present) {
       map['is_synced'] = Variable<bool>(isSynced.value);
     }
@@ -3024,6 +3126,8 @@ class OrdersCompanion extends UpdateCompanion<Order> {
           ..write('paymentMode: $paymentMode, ')
           ..write('status: $status, ')
           ..write('createdAt: $createdAt, ')
+          ..write('lastModified: $lastModified, ')
+          ..write('syncVersion: $syncVersion, ')
           ..write('isSynced: $isSynced, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -6237,6 +6341,8 @@ typedef $$OrdersTableCreateCompanionBuilder =
       required String paymentMode,
       Value<String> status,
       Value<DateTime> createdAt,
+      Value<DateTime?> lastModified,
+      Value<int> syncVersion,
       Value<bool> isSynced,
       Value<int> rowid,
     });
@@ -6255,6 +6361,8 @@ typedef $$OrdersTableUpdateCompanionBuilder =
       Value<String> paymentMode,
       Value<String> status,
       Value<DateTime> createdAt,
+      Value<DateTime?> lastModified,
+      Value<int> syncVersion,
       Value<bool> isSynced,
       Value<int> rowid,
     });
@@ -6353,6 +6461,16 @@ class $$OrdersTableFilterComposer
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastModified => $composableBuilder(
+    column: $table.lastModified,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get syncVersion => $composableBuilder(
+    column: $table.syncVersion,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6461,6 +6579,16 @@ class $$OrdersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get lastModified => $composableBuilder(
+    column: $table.lastModified,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get syncVersion => $composableBuilder(
+    column: $table.syncVersion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isSynced => $composableBuilder(
     column: $table.isSynced,
     builder: (column) => ColumnOrderings(column),
@@ -6526,6 +6654,16 @@ class $$OrdersTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get lastModified => $composableBuilder(
+    column: $table.lastModified,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get syncVersion => $composableBuilder(
+    column: $table.syncVersion,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<bool> get isSynced =>
       $composableBuilder(column: $table.isSynced, builder: (column) => column);
@@ -6597,6 +6735,8 @@ class $$OrdersTableTableManager
                 Value<String> paymentMode = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime?> lastModified = const Value.absent(),
+                Value<int> syncVersion = const Value.absent(),
                 Value<bool> isSynced = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => OrdersCompanion(
@@ -6613,6 +6753,8 @@ class $$OrdersTableTableManager
                 paymentMode: paymentMode,
                 status: status,
                 createdAt: createdAt,
+                lastModified: lastModified,
+                syncVersion: syncVersion,
                 isSynced: isSynced,
                 rowid: rowid,
               ),
@@ -6631,6 +6773,8 @@ class $$OrdersTableTableManager
                 required String paymentMode,
                 Value<String> status = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime?> lastModified = const Value.absent(),
+                Value<int> syncVersion = const Value.absent(),
                 Value<bool> isSynced = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => OrdersCompanion.insert(
@@ -6647,6 +6791,8 @@ class $$OrdersTableTableManager
                 paymentMode: paymentMode,
                 status: status,
                 createdAt: createdAt,
+                lastModified: lastModified,
+                syncVersion: syncVersion,
                 isSynced: isSynced,
                 rowid: rowid,
               ),

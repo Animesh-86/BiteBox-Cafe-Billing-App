@@ -147,20 +147,6 @@ class ThermalPrintingService {
           bold: true,
         ),
       );
-      if (storeAddress != null) {
-        // Strip any Phone: lines from address
-        final cleanAddress = storeAddress
-            .split('\n')
-            .where((line) => !line.trim().toLowerCase().startsWith('phone:'))
-            .join('\n')
-            .trim();
-        if (cleanAddress.isNotEmpty) {
-          bytes += generator.text(
-            cleanAddress,
-            styles: const PosStyles(align: PosAlign.center),
-          );
-        }
-      }
       bytes += generator.feed(1);
 
       // Bill Details

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -27,6 +28,10 @@ class DashboardScreen extends ConsumerStatefulWidget {
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   DateTime? _selectedDate; // Null means 'current session date'
   ProviderSubscription<AsyncValue<List<InventoryItem>>>? _lowStockSubscription;
+  final PageController _carouselController = PageController();
+  Timer? _carouselTimer;
+  int _currentCarouselPage = 0;
+  int _carouselPageCount = 0;
 
   @override
   void initState() {
@@ -44,6 +49,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   void dispose() {
     _lowStockSubscription?.close();
+    _carouselTimer?.cancel();
+    _carouselController.dispose();
     super.dispose();
   }
 
@@ -402,81 +409,29 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         final lowStock = items
                             .where((i) => i.currentQty <= i.minQty)
                             .toList();
-                        if (lowStock.isEmpty) {
-                          return const SizedBox.shrink();
-                        }
 
-                        final preview = lowStock
-                            .take(3)
-                            .map(
-                              (i) =>
-                                  '${i.name} (${_formatQty(i.currentQty)}/${_formatQty(i.minQty)} ${i.unit})',
-                            )
-                            .join(' • ');
-                        final remaining = lowStock.length - 3;
-                        final subtitle = remaining > 0
-                            ? '$preview • +$remaining more'
-                            : preview;
+                        return Consumer(
+                          builder: (context, ref, child) {
+                            final analyticsData = ref.watch(
+                              analyticsDataProvider((
+                                startDate: startOfDay,
+                                endDate: endOfDay,
+                                filterName: 'Today',
+                              )),
+                            );
 
-                        return Container(
-                          width: double.infinity,
-                          margin: const EdgeInsets.only(top: 8),
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: caramel.withOpacity(0.18),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: caramel.withOpacity(0.35),
-                            ),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: caramel.withOpacity(0.3),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Icon(
-                                  Icons.warning_rounded,
-                                  color: coffeeDark,
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Low stock alert',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        color: coffeeDark,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      '${lowStock.length} item(s) below minimum',
-                                      style: TextStyle(
-                                        color: coffeeDark.withOpacity(0.85),
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      subtitle,
-                                      style: TextStyle(
-                                        color: coffeeDark.withOpacity(0.75),
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
+                            final peakForecast = analyticsData.whenOrNull(
+                              data: (data) => data.todayPeakForecast,
+                            );
+
+                            return _buildInfoCarousel(
+                              lowStockItems: lowStock,
+                              peakForecast: peakForecast,
+                              caramel: caramel,
+                              coffee: coffee,
+                              coffeeDark: coffeeDark,
+                            );
+                          },
                         );
                       },
                       loading: () => const SizedBox.shrink(),
@@ -510,113 +465,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             },
                           ),
                   ],
-                ),
-              ),
-              // Peak Hour Forecast Banner
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
-                child: Consumer(
-                  builder: (context, ref, child) {
-                    final analyticsData = ref.watch(
-                      analyticsDataProvider((
-                        startDate: startOfDay,
-                        endDate: endOfDay,
-                        filterName: 'Today',
-                      )),
-                    );
-
-                    return analyticsData.when(
-                      data: (data) {
-                        if (data.todayPeakForecast != null) {
-                          final forecast = data.todayPeakForecast!;
-                          return Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(16),
-                            margin: const EdgeInsets.only(bottom: 16),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  caramel.withOpacity(0.25),
-                                  coffee.withOpacity(0.15),
-                                ],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: caramel.withOpacity(0.3),
-                                width: 1.5,
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: caramel.withOpacity(0.3),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Icon(
-                                    Icons.schedule_rounded,
-                                    color: coffeeDark,
-                                    size: 24,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Expected Peak Today',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: coffeeDark.withOpacity(0.7),
-                                          letterSpacing: 0.5,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        forecast.formattedTime,
-                                        style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          color: coffeeDark,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: coffee.withOpacity(0.15),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    forecast.dayName,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: coffeeDark,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }
-                        return const SizedBox.shrink();
-                      },
-                      loading: () => const SizedBox.shrink(),
-                      error: (_, __) => const SizedBox.shrink(),
-                    );
-                  },
                 ),
               ),
               Padding(
@@ -1229,6 +1077,253 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     } else {
       return "${difference.inDays}d ago";
     }
+  }
+
+  void _startCarouselTimer() {
+    _carouselTimer?.cancel();
+    if (_carouselPageCount <= 1) return;
+    _carouselTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!mounted || _carouselPageCount <= 1) return;
+      final next = (_currentCarouselPage + 1) % _carouselPageCount;
+      _carouselController.animateToPage(
+        next,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    });
+  }
+
+  Widget _buildInfoCarousel({
+    required List<InventoryItem> lowStockItems,
+    required TodayPeakForecast? peakForecast,
+    required Color caramel,
+    required Color coffee,
+    required Color coffeeDark,
+  }) {
+    final cards = <Widget>[];
+
+    // Card 1: Low Stock Alert
+    if (lowStockItems.isNotEmpty) {
+      final preview = lowStockItems
+          .take(3)
+          .map(
+            (i) =>
+                '${i.name} (${_formatQty(i.currentQty)}/${_formatQty(i.minQty)} ${i.unit})',
+          )
+          .join(' \u2022 ');
+      final remaining = lowStockItems.length - 3;
+      final subtitle =
+          remaining > 0 ? '$preview \u2022 +$remaining more' : preview;
+
+      cards.add(
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: caramel.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(Icons.warning_rounded, color: coffeeDark, size: 20),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Low stock alert',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: coffeeDark,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${lowStockItems.length} item(s) below minimum',
+                    style: TextStyle(
+                      color: coffeeDark.withOpacity(0.85),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: coffeeDark.withOpacity(0.75),
+                      fontSize: 12,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Card 2: Peak Forecast
+    if (peakForecast != null) {
+      cards.add(
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: caramel.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                Icons.schedule_rounded,
+                color: coffeeDark,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Expected Peak Today',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: coffeeDark.withOpacity(0.7),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    peakForecast.formattedTime,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: coffeeDark,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 6,
+              ),
+              decoration: BoxDecoration(
+                color: coffee.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                peakForecast.dayName,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: coffeeDark,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (cards.isEmpty) return const SizedBox.shrink();
+
+    // Update page count and restart timer if needed
+    if (_carouselPageCount != cards.length) {
+      _carouselPageCount = cards.length;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _startCarouselTimer();
+      });
+    }
+
+    // Single card — show statically, no dots
+    if (cards.length == 1) {
+      return Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(top: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              caramel.withOpacity(0.22),
+              coffee.withOpacity(0.12),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: caramel.withOpacity(0.3)),
+        ),
+        child: cards.first,
+      );
+    }
+
+    // Multiple cards — carousel with dots
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 8),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            caramel.withOpacity(0.22),
+            coffee.withOpacity(0.12),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: caramel.withOpacity(0.3)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            height: 80,
+            child: PageView.builder(
+              controller: _carouselController,
+              itemCount: cards.length,
+              onPageChanged: (index) {
+                setState(() => _currentCarouselPage = index);
+                _startCarouselTimer(); // Reset timer on manual swipe
+              },
+              itemBuilder: (context, index) {
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                  child: cards[index],
+                );
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8, top: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(cards.length, (index) {
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  width: _currentCarouselPage == index ? 16 : 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: _currentCarouselPage == index
+                        ? coffeeDark
+                        : coffeeDark.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                );
+              }),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildPlatformSplit(PlatformSplit split, ThemeData theme) {

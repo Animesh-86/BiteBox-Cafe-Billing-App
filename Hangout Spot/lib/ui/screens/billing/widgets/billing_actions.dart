@@ -91,6 +91,8 @@ Future<void> printKot(BuildContext context, WidgetRef ref) async {
       paymentMode: cart.paymentMode,
       status: 'pending',
       createdAt: DateTime.now(),
+      lastModified: DateTime.now(),
+      syncVersion: 1,
       isSynced: false,
     );
 
@@ -250,9 +252,7 @@ Future<void> holdOrder(BuildContext context, WidgetRef ref) async {
 
     try {
       messenger.showSnackBar(
-        SnackBar(
-          content: Text("Failed to hold — Cart restored. Error: $e"),
-        ),
+        SnackBar(content: Text("Failed to hold — Cart restored. Error: $e")),
       );
     } catch (_) {}
   } finally {
@@ -349,7 +349,7 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
     );
 
     // ── EVERYTHING BELOW RUNS IN BACKGROUND ──
-    
+
     // Query active outlet directly — avoids StreamProvider which can hang
     Location? activeOutlet;
     try {
@@ -365,7 +365,9 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
     final catMap = {for (final c in allCategories) c.id: c.name};
 
     // Resolve reward balance BEFORE the DB write
-    final rewardBalance = rewardBalanceFuture != null ? await rewardBalanceFuture : null;
+    final rewardBalance = rewardBalanceFuture != null
+        ? await rewardBalanceFuture
+        : null;
 
     // ── DB WRITE ──
     final orderId = await orderRepo.createOrderFromCart(
@@ -397,6 +399,8 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
       paidUPI: cart.paidUPI,
       status: 'completed',
       createdAt: dbOrder?.createdAt ?? DateTime.now(),
+      lastModified: DateTime.now(),
+      syncVersion: dbOrder?.syncVersion ?? 1,
       isSynced: false,
     );
 
@@ -491,7 +495,7 @@ Future<void> checkout(BuildContext context, WidgetRef ref) async {
     // }
   } catch (e) {
     logDebug("Checkout error: $e");
-    
+
     // RESTORE CART IF FALLBACK FAILS
     try {
       ref.read(cartProvider.notifier).restoreCart(cart);

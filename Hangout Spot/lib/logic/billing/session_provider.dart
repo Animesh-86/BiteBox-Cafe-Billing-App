@@ -90,6 +90,9 @@ class SessionManager {
 
   /// Get next invoice number for current session.
   /// Optimized for speed: purely local, no network calls.
+  /// Resets to #1001 each new session (day) — same numbers across different
+  /// days are intentional and safe since the UNIQUE constraint on invoiceNumber
+  /// was removed in schema v14.
   Future<String> getNextInvoiceNumber() async {
     final sessionDate = getCurrentSessionDate();
     final sessionStart = DateTime(
@@ -110,13 +113,12 @@ class SessionManager {
     return '#$nextNumber';
   }
 
-  /// Peek at the next invoice number for current session without incrementing it
+  /// Peek at the next invoice number for current session without incrementing it.
   /// Used for UI display purposes to prevent burning sequence numbers on rebuilds.
   /// Always uses local SQLite count — the Firestore path for counters is RTDB
-  /// (not Firestore), so we skip the cloud check entirely.  (BUG-15)
+  /// (not Firestore), so we skip the cloud check entirely.
   Future<String> peekNextInvoiceNumber() async {
     final sessionDate = getCurrentSessionDate();
-
     final sessionStart = DateTime(
       sessionDate.year,
       sessionDate.month,

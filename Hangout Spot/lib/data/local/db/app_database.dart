@@ -76,7 +76,7 @@ class Locations extends Table {
 
 class Orders extends Table {
   TextColumn get id => text()();
-  TextColumn get invoiceNumber => text().unique()();
+  TextColumn get invoiceNumber => text()();
   TextColumn get customerId =>
       text().nullable()(); // No FK constraint for nullable field
   TextColumn get locationId => text().nullable()();
@@ -91,6 +91,8 @@ class Orders extends Table {
     const Constant('completed'),
   )(); // completed, cancelled, pending
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get lastModified => dateTime().nullable()();
+  IntColumn get syncVersion => integer().withDefault(const Constant(1))();
   BoolColumn get isSynced => boolean().withDefault(const Constant(false))();
 
   @override
@@ -159,7 +161,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(openConnection());
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 15;
 
   @override
   MigrationStrategy get migration {
@@ -339,10 +341,227 @@ class AppDatabase extends _$AppDatabase {
           }
           logDebug('Migration v12: normalised all DateTime columns to seconds');
         }
+        if (from < 13) {
+          // Add lastModified and syncVersion columns to orders table for
+          // proper conflict resolution and duplicate prevention.
+          try {
+            await m.database.customStatement(
+              'ALTER TABLE orders ADD COLUMN last_modified INTEGER',
+            );
+          } catch (e) {
+            logDebug('Migration: last_modified column might already exist: $e');
+          }
+          try {
+            await m.database.customStatement(
+              'ALTER TABLE orders ADD COLUMN sync_version INTEGER DEFAULT 1',
+            );
+          } catch (e) {
+            logDebug('Migration: sync_version column might already exist: $e');
+          }
+          // Backfill lastModified from createdAt for existing orders
+          try {
+            await m.database.customStatement(
+              'UPDATE orders SET last_modified = created_at WHERE last_modified IS NULL',
+            );
+          } catch (e) {
+            logDebug(
+              'Migration v13: backfill last_modified failed (non-fatal): $e',
+            );
+          }
+          logDebug(
+            'Migration v13: added lastModified and syncVersion to orders',
+          );
+        }
+        if (from < 14) {
+          // Drop the UNIQUE constraint on invoiceNumber. SQLite cannot drop
+          // constraints directly — table must be recreated using the standard
+          // rename-create-copy-drop pattern.
+          // Invoice numbers intentionally reset to #1001 each new session/day;
+          // same number across different days is valid by design.
+          try {
+            await m.database.customStatement('ALTER TABLE orders RENAME TO orders_old');
+            await m.database.customStatement('''
+              CREATE TABLE orders (
+                id TEXT NOT NULL,
+                invoice_number TEXT NOT NULL,
+                customer_id TEXT,
+                location_id TEXT,
+                subtotal REAL NOT NULL,
+                discount_amount REAL NOT NULL DEFAULT 0.0,
+                tax_amount REAL NOT NULL DEFAULT 0.0,
+                total_amount REAL NOT NULL,
+                paid_cash REAL NOT NULL DEFAULT 0.0,
+                paid_u_p_i REAL NOT NULL DEFAULT 0.0,
+                payment_mode TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'completed',
+                created_at INTEGER NOT NULL DEFAULT 0,
+                last_modified INTEGER,
+                sync_version INTEGER NOT NULL DEFAULT 1,
+                is_synced INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (id)
+              )
+            ''');
+            await m.database.customStatement('''
+              INSERT INTO orders (id, invoice_number, customer_id, location_id,
+                subtotal, discount_amount, tax_amount, total_amount, paid_cash,
+                paid_u_p_i, payment_mode, status, created_at, last_modified,
+                sync_version, is_synced)
+              SELECT id, invoice_number, customer_id, location_id,
+                subtotal, discount_amount, tax_amount, total_amount, paid_cash,
+                paid_u_p_i, payment_mode, status, created_at, last_modified,
+                sync_version, is_synced
+              FROM orders_old
+            ''');
+            await m.database.customStatement('DROP TABLE orders_old');
+            logDebug('Migration v14: removed UNIQUE constraint from invoiceNumber');
+          } catch (e) {
+            logDebug('Migration v14 failed (non-fatal, table may already be correct): $e');
+          }
+        }
+        if (from < 15) {
+          // Recovery migration for devices that ran the broken v14 which used
+          // "paid_upi" instead of "paid_u_p_i". Those devices have:
+          //   - orders       : empty table with wrong column name
+          //   - orders_old   : all data with correct column name (left behind)
+          // Recover by dropping the broken table, recreating correctly, copying.
+          try {
+            final hasOldTable = (await m.database.customSelect(
+              "SELECT name FROM sqlite_master WHERE type='table' AND name='orders_old'",
+            ).get()).isNotEmpty;
+
+            if (hasOldTable) {
+              // Broken v14 ran — drop the empty broken table
+              await m.database.customStatement('DROP TABLE IF EXISTS orders');
+              await m.database.customStatement('''
+                CREATE TABLE orders (
+                  id TEXT NOT NULL,
+                  invoice_number TEXT NOT NULL,
+                  customer_id TEXT,
+                  location_id TEXT,
+                  subtotal REAL NOT NULL,
+                  discount_amount REAL NOT NULL DEFAULT 0.0,
+                  tax_amount REAL NOT NULL DEFAULT 0.0,
+                  total_amount REAL NOT NULL,
+                  paid_cash REAL NOT NULL DEFAULT 0.0,
+                  paid_u_p_i REAL NOT NULL DEFAULT 0.0,
+                  payment_mode TEXT NOT NULL,
+                  status TEXT NOT NULL DEFAULT 'completed',
+                  created_at INTEGER NOT NULL DEFAULT 0,
+                  last_modified INTEGER,
+                  sync_version INTEGER NOT NULL DEFAULT 1,
+                  is_synced INTEGER NOT NULL DEFAULT 0,
+                  PRIMARY KEY (id)
+                )
+              ''');
+              await m.database.customStatement('''
+                INSERT INTO orders (id, invoice_number, customer_id, location_id,
+                  subtotal, discount_amount, tax_amount, total_amount, paid_cash,
+                  paid_u_p_i, payment_mode, status, created_at, last_modified,
+                  sync_version, is_synced)
+                SELECT id, invoice_number, customer_id, location_id,
+                  subtotal, discount_amount, tax_amount, total_amount, paid_cash,
+                  paid_u_p_i, payment_mode, status, created_at, last_modified,
+                  sync_version, is_synced
+                FROM orders_old
+              ''');
+              await m.database.customStatement('DROP TABLE orders_old');
+              logDebug('Migration v15: recovered orders data from orders_old');
+            } else {
+              logDebug('Migration v15: orders_old not found, no recovery needed');
+            }
+          } catch (e) {
+            logDebug('Migration v15 recovery failed: $e');
+          }
+        }
       },
       beforeOpen: (details) async {
         // Disable foreign keys for this connection
         await customSelect('PRAGMA foreign_keys = OFF').get();
+
+        // ── Schema repair: ensure orders.paid_u_p_i column exists ───────────
+        // Runs every launch as a safety net in case migrations left the table
+        // in a broken state (e.g., broken v14 created column as "paid_upi").
+        try {
+          final cols =
+              (await customSelect('PRAGMA table_info(orders)').get())
+                  .map((r) => r.data['name'] as String)
+                  .toSet();
+
+          if (!cols.contains('paid_u_p_i')) {
+            logDebug(
+              'beforeOpen: orders.paid_u_p_i missing – starting repair',
+            );
+
+            const createOrdersSql = '''
+              CREATE TABLE orders (
+                id TEXT NOT NULL,
+                invoice_number TEXT NOT NULL,
+                customer_id TEXT,
+                location_id TEXT,
+                subtotal REAL NOT NULL,
+                discount_amount REAL NOT NULL DEFAULT 0.0,
+                tax_amount REAL NOT NULL DEFAULT 0.0,
+                total_amount REAL NOT NULL,
+                paid_cash REAL NOT NULL DEFAULT 0.0,
+                paid_u_p_i REAL NOT NULL DEFAULT 0.0,
+                payment_mode TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'completed',
+                created_at INTEGER NOT NULL DEFAULT 0,
+                last_modified INTEGER,
+                sync_version INTEGER NOT NULL DEFAULT 1,
+                is_synced INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (id)
+              )
+            ''';
+
+            const destCols =
+                'id, invoice_number, customer_id, location_id, '
+                'subtotal, discount_amount, tax_amount, total_amount, '
+                'paid_cash, paid_u_p_i, payment_mode, status, created_at, '
+                'last_modified, sync_version, is_synced';
+
+            final hasOrdersOld = (await customSelect(
+              "SELECT name FROM sqlite_master "
+              "WHERE type='table' AND name='orders_old'",
+            ).get()).isNotEmpty;
+
+            if (hasOrdersOld) {
+              // orders_old (from a failed v14) has data with the correct
+              // paid_u_p_i column — recreate orders and copy from backup.
+              await customStatement('DROP TABLE IF EXISTS orders');
+              await customStatement(createOrdersSql);
+              await customStatement(
+                'INSERT INTO orders ($destCols) '
+                'SELECT $destCols FROM orders_old',
+              );
+              await customStatement('DROP TABLE orders_old');
+              logDebug('beforeOpen: repaired orders table from orders_old');
+            } else if (cols.contains('paid_upi')) {
+              // orders has the wrong column name "paid_upi" with live data —
+              // rename it, recreate with the correct name, copy with alias.
+              await customStatement(
+                'ALTER TABLE orders RENAME TO orders_old',
+              );
+              await customStatement(createOrdersSql);
+              const srcCols =
+                  'id, invoice_number, customer_id, location_id, '
+                  'subtotal, discount_amount, tax_amount, total_amount, '
+                  'paid_cash, paid_upi, payment_mode, status, created_at, '
+                  'last_modified, sync_version, is_synced';
+              await customStatement(
+                'INSERT INTO orders ($destCols) '
+                'SELECT $srcCols FROM orders_old',
+              );
+              await customStatement('DROP TABLE orders_old');
+              logDebug(
+                'beforeOpen: repaired orders – renamed paid_upi → paid_u_p_i',
+              );
+            }
+          }
+        } catch (e) {
+          logDebug('beforeOpen: orders column repair (non-fatal): $e');
+        }
+        // ────────────────────────────────────────────────────────────────────
 
         // Fix any DateTime columns with oversized values (microseconds instead
         // of seconds). This runs every launch so hot-restart also benefits.
