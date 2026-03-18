@@ -60,9 +60,8 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
       setState(() => _devices = devices);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Error scanning: $e")));
+        final friendlyError = ErrorHandler.handlePrintingError(e);
+        ErrorUI.showSnackBar(context, friendlyError);
       }
     } finally {
       setState(() => _scanning = false);
@@ -184,19 +183,15 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
               const SizedBox(height: 16),
               ElevatedButton.icon(
                 onPressed: () async {
-                  // Test Print
-                  // final service = ref.read(thermalPrintingServiceProvider);
-                  // For a real test we need an Order object, but we can just print simple text here
                   try {
-                    // Simple test
                     _bluetooth.printCustom("TEST PRINT SUCCESS", 1, 1);
                     _bluetooth.printNewLine();
                     _bluetooth.printNewLine();
                   } catch (e) {
-                    if (mounted)
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("Print error: $e")),
-                      );
+                    if (mounted) {
+                      final friendlyError = ErrorHandler.handlePrintingError(e);
+                      ErrorUI.showSnackBar(context, friendlyError);
+                    }
                   }
                 },
                 icon: const Icon(Icons.print),
@@ -242,10 +237,10 @@ class _PrinterSettingsScreenState extends ConsumerState<PrinterSettingsScreen> {
                       );
                   } catch (e) {
                     setState(() => _connected = false);
-                    if (mounted)
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("Connection failed: $e")),
-                      );
+                    if (mounted) {
+                      final friendlyError = ErrorHandler.handlePrintingError(e);
+                      ErrorUI.showSnackBar(context, friendlyError);
+                    }
                   }
                 },
                 child: const Text("Connect"),
